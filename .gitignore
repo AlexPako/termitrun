@@ -1,0 +1,10 @@
+# прогресс и замечания игрока — личные, в репозиторий не идут
+progress.json
+progress.*.json
+feedback.jsonl
+# песочницы заданий, кэш звука, служебное
+.sandbox/
+.cache/
+__pycache__/
+*.pyc
+.DS_Store

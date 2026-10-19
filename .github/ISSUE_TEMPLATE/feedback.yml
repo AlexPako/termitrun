@@ -1,0 +1,45 @@
+name: Замечание из игры
+description: Баг, идея, пожелание или что-то непонятно — всё пригодится
+title: "[из игры] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что играешь и пишешь! Подойдёт всё: ошибка, идея, пожелание,
+        место, где было непонятно. Заполни, что можешь, — пустые поля не страшны.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Что это
+      options:
+        - "🐞 Баг — что-то сломалось или работает не так"
+        - "💡 Идея — как сделать игру лучше"
+        - "❓ Непонятно — запутался, не понял задание или подсказку"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: Что случилось или что предлагаешь
+      description: Своими словами. Если что-то делал — какие команды набирал.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Что ожидал увидеть
+      description: Для бага — как должно было быть. Для идеи можно пропустить.
+  - type: input
+    id: task
+    attributes:
+      label: Задание
+      description: Номер задания (в квадратных скобках в ./termit list), если знаешь
+  - type: input
+    id: version
+    attributes:
+      label: Версия игры
+  - type: input
+    id: macos
+    attributes:
+      label: Версия macOS
+      description: Меню  → Об этом Mac

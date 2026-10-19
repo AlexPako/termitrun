@@ -1,0 +1,1475 @@
+"""Трек «Инструменты»: справка, less, nano, vim."""
+import hashlib
+import json
+import os
+import re
+import shutil
+import tarfile
+from pathlib import Path
+from typing import List
+
+from termit_app import brewstub, implants, sandbox, textnorm
+from termit_app.tasks import kit
+from termit_app.tasks.base import AnswerTask, Task, Variant, Verdict, sources, variant_index
+
+# Слово для поиска: в less поиск чувствителен к регистру, и ПЕРВОЕ совпадение в man
+# должно попадать на строку нужного флага (проверяет tests/test_tools_unit.ManPoolTest).
+MAN_POOL = [
+    ("ls", "сортирует файлы по размеру", "-S", "by size"),
+    ("sort", "сортирует в обратном порядке", "-r", "reverse"),
+    ("wc", "считает байты", "-c", "number of bytes"),
+    ("grep", "ищет без учёта больших и маленьких букв", "-i", "case"),
+    ("du", "показывает размеры в «человеческих» единицах (K, M, G)", "-h", "Human"),
+    ("head", "задаёт, сколько строк показать", "-n", "Print count"),
+]
+
+# Вариант B — другой пул, то же правило первого совпадения. У ls вместо -a взят -A: строка
+# -a в man слово в слово повторяет начало строки -A, а -A стоит выше — до -a поиск не дойдёт.
+MAN_POOL_B = [
+    ("cp", "не перезаписывает уже существующий файл", "-n", "Do not overwrite"),
+    ("mkdir", "создаёт и все недостающие промежуточные папки", "-p", "intermediate"),
+    ("rm", "спрашивает подтверждение перед удалением каждого файла", "-i", "before attempting"),
+    ("ls", "показывает скрытые файлы, но без строк . и ..", "-A", "except for"),
+]
+
+# Длинная форма флага — как она стоит в man macOS на той же строке (tests/test_tools_unit
+# сверяет с настоящей справкой). Кто дочитал до неё, сдаёт верный ответ (Н приёмки-1).
+MAN_LONG = {("sort", "-r"): "--reverse", ("grep", "-i"): "--ignore-case",
+            ("grep", "-v"): "--invert-match", ("uniq", "-c"): "--count"}
+
+# Вариант C — обратный вопрос: (команда, флаг, начала принимаемых слов, слово-ответ эталона,
+# слово-обманка). Обманка — из соседнего флага, куда легко промахнуться поиском: /-v в man grep
+# сначала находит --version, /-n в man sort — --general-numeric-sort.
+MAN_POOL_C = [
+    ("ls", "-r", ("revers",), "reverse", "recursive"),
+    ("grep", "-v", ("invert", "invers"), "invert", "version"),
+    ("wc", "-l", ("line",), "lines", "longest"),
+    ("sort", "-n", ("numer", "arithmetic"), "numeric", "general"),
+    ("uniq", "-c", ("count",), "count", "repeated"),
+    ("head", "-c", ("byte",), "bytes", "lines"),
+]
+
+
+class ManFlag(AnswerTask):
+    id = "man_flag"
+    track = "tools"
+    title = "Спроси у справки"
+    case_sensitive = True
+    scroll = ("man КОМАНДА — полная справка. Внутри: пробел — страница вниз, b — вверх, "
+              "/слово и Enter — искать, n — следующее совпадение, q — выйти.\n"
+              "Поиск различает большие и маленькие буквы. У системных команд macOS нет --help — "
+              "только man.")
+    variants = (
+        Variant("Каким флагом {cmd} {what}? Не гадай — найди в справке. "
+                "Ответ: ans ФЛАГ",
+                wrong=("print -r -- {decoy}",),
+                alternatives=("man {cmd} | grep -B1 '{word}' — строка со словом и та, что над "
+                              "ней (-B1 — одна строка до совпадения), без листания",)),
+        Variant("Какой флаг у {cmd} отвечает за то, что команда {what}? "
+                "Найди в справке и сдай: ans ФЛАГ",
+                wrong=("print -r -- {decoy}",),
+                alternatives=("man {cmd} | grep -B1 '{word}' — найти строку, не открывая "
+                              "листалку; -B1 добавит строку над совпадением",)),
+        Variant("У {cmd} есть флаг {flag}. Что он делает? Найди его описание в справке и сдай "
+                "одно слово оттуда — по-английски, как в man, то, что называет само действие "
+                "(у du -h это human): ans СЛОВО",
+                hints=("Справка — man {cmd}. Внутри ищи сам флаг: /{flag} и Enter.",
+                       "Поиск ловит и куски длинных слов: жми n, пока строка не начнётся "
+                       "с {flag}. Большая и маленькая буква — разные флаги.",
+                       "man {cmd} → /{flag} → n до строки «{flag} …» → ключевое слово "
+                       "описания, например ans {answer}"),
+                solution="man {cmd}, затем /{flag}, n до строки флага, q",
+                solution_script="print -r -- {answer}",
+                wrong=("print -r -- {decoy}",),
+                alternatives=("man {cmd} | grep -A2 -- '^ *{flag}' — описание флага без "
+                              "листания: -A2 добавит две строки после совпадения",)),
+    )
+    par = 45
+    hints = ("Справка по команде — man {cmd}. Внутри ищи слово через /.",
+             "man {cmd}, потом /{word} и Enter; n — следующее совпадение.",
+             "Ответ — буква с минусом в начале строки с «{word}» (или строкой выше). "
+             "Сдай: ans -БУКВА")
+    solution = "man {cmd}, затем /{word}, n, q"
+    solution_script = "print -r -- {answer}"
+    explain = "man — главный справочник на Mac. Ищи через / — и не листай минутами."
+    spell = "man команда — справка; внутри /слово — поиск, n — дальше, q — выход"
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 2:
+            cmd, flag, accept, answer, decoy = rng.choice(MAN_POOL_C)
+            return {"cmd": cmd, "flag": flag, "accept": list(accept), "answer": answer,
+                    "decoy": decoy}
+        cmd, what, answer, word = rng.choice(MAN_POOL_B if variant == 1 else MAN_POOL)
+        return {"cmd": cmd, "what": what, "answer": answer, "word": word,
+                "decoy": answer.swapcase()}
+
+    def matches(self, given, ctx):
+        if ctx.state.get("_variant") == 2:      # ключевое слово описания, без регистра
+            words = re.findall(r"[a-zа-яё]+", textnorm.norm(given).casefold())
+            return any(w.startswith(a) for w in words for a in ctx.state["accept"])
+        flag = ctx.state["answer"]
+        forms = {flag, MAN_LONG.get((ctx.state.get("cmd"), flag), flag)}
+        # «-r», «r», «--reverse» и строка из man целиком «-r, --reverse»
+        got = [x if x.startswith("-") else "-" + x
+               for x in re.split(r"[\s,]+", textnorm.clean(given)) if x]
+        return 0 < len(got) <= 2 and all(x in forms for x in got)
+
+    def wrong_message(self, given, ctx):
+        if ctx.state.get("_variant") != 2:
+            word = textnorm.clean(given)
+            if re.fullmatch(r"[A-Za-z]{2,}", word):
+                return ("Нужен сам флаг: минус и буква из начала строки справки, например "
+                        "-x. Слово из описания — это не флаг.")
+            return super().wrong_message(given, ctx)
+        if re.search(r"[а-яё]", given.casefold()):
+            return "Сдай слово из справки — по-английски, как написано в man."
+        return (f"Это слово не говорит, что делает {ctx.state['flag']}. Найди строку, которая "
+                f"начинается с {ctx.state['flag']}: какое слово в ней называет само действие?")
+
+
+class FlagUse(AnswerTask):
+    """FB3 (6): флаг не на карточке — найди его в справке и примени. Флаг со значением,
+    длинная форма, «--» — конец флагов."""
+    id = "flag_use"
+    track = "tools"
+    title = "Найди флаг и примени"
+    scroll = ("Флаг не помнишь — найди сам: man КОМАНДА, /слово и Enter, q — выйти. Не "
+              "системные программы покажут флаги и по --help: jq --help; примеры даст tldr (он позже).\n"
+              "Значение флага идёт следом: head -n 3 — три строки (n — number, число). Длинные "
+              "флаги — словами: grep --ignore-case = grep -i.\n"
+              "-- — конец флагов: в rm -- -old.txt имя с минусом — файл, а не флаг.")
+    variants = (
+        Variant("Сколько строк со словом ERROR в server.log? grep умеет сам считать совпавшие "
+                "строки — найди этот флаг в man grep и примени. Ответ: ans ЧИСЛО",
+                wrong=("grep ERROR server.log",),
+                alternatives=("grep ERROR server.log — и сосчитать строки глазами: дольше и "
+                              "легко сбиться",)),
+        Variant("Пароль — первые {n} символов файла code.txt. head умеет брать не строки, а "
+                "символы (байты): найди флаг в man head и сдай пароль: ans ПАРОЛЬ",
+                hints=("Нужен флаг head про байты: man head, внутри /bytes.",
+                       "Флаг со значением: число символов идёт следом за флагом.",
+                       "head -c {n} code.txt — и ans ПАРОЛЬ"),
+                solution="head -c {n} code.txt",
+                solution_script="head -c {n} code.txt",
+                wrong=("head -n {n} code.txt",),
+                alternatives=("ans $(head -c {n} code.txt) — подставить сразу",)),
+        Variant("ls показывает папку queue по алфавиту. Какое имя окажется первым, если ls "
+                "перевернёт порядок? Флаг «наоборот» найди в man ls. Ответ: ans ИМЯ",
+                hints=("В man ls ищи слово reverse: /reverse и Enter.",
+                       "Флаг переворачивает любой порядок ls — и по алфавиту тоже.",
+                       "ls -r queue — первое имя сверху, его и сдай"),
+                solution="ls -r queue",
+                solution_script="ls -r queue | head -1",
+                wrong=("ls queue | head -1",),
+                alternatives=("ls queue — и взять последнее имя снизу",)),
+    )
+    # флаги, которые игрок находит в справке сам: «сначала учим» их с карточек не ждёт
+    man_flags = ("-c", "-r")
+    par = 45
+    hints = ("Флаг для подсчёта — в справке: man grep, внутри /count.",
+             "Нашёл строку «-c …» — это он. Выйди из man (q) и примени флаг к файлу.",
+             "grep -c ERROR server.log — и ans ЧИСЛО")
+    solution = "grep -c ERROR server.log"
+    explain = ("Флага нет на карточке — не беда: man КОМАНДА и /слово выудят его за "
+               "полминуты. Бывает, флаг ждёт значение — head -c 5 — его пишут следом.")
+    spell = "man команда, /слово — найти флаг; флаг со значением: head -c 5"
+    trap_messages = {"all": "Это все строки файла, а нужны только строки с ERROR.",
+                     "first": "Это первое имя по алфавиту. Нужно первое, когда ls перевернёт "
+                              "порядок."}
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 1:
+            n = rng.randint(5, 8)
+            code = "".join(rng.choice("abcdefghjkmnpqrstuvwxyz23456789") for _ in range(12))
+            kit.write(box / "code.txt", code + "\n")
+            return {"n": n, "answer": code[:n], "traps": [], "sources": sources(box, "code.txt")}
+        if variant == 2:
+            names = sorted(f"{w}.txt" for w in rng.sample(kit.LATIN, 5))
+            for name in names:
+                kit.write(box / "queue" / name, "в очереди\n")
+            return {"answer": names[-1], "traps": [["first", names[0]]]}
+        kinds = ["INFO", "INFO", "WARN", "ERROR"]
+        levels = [rng.choice(kinds) for _ in range(rng.randint(9, 14))]
+        if "ERROR" not in levels:
+            levels[rng.randrange(len(levels))] = "ERROR"
+        rows = [f"12:{i:02d} {lv} job {kit.latin(rng)}" for i, lv in enumerate(levels)]
+        kit.write(box / "server.log", "\n".join(rows) + "\n")
+        return {"answer": str(levels.count("ERROR")), "traps": [["all", len(rows)]],
+                "sources": sources(box, "server.log")}
+
+    def answer_kind(self, state):
+        return "number" if state.get("_variant", 0) == 0 else "text"
+
+    def matches(self, given, ctx):
+        if ctx.state.get("_variant") == 1:          # пароль — с учётом регистра, ровно
+            return textnorm.clean(given) == ctx.state["answer"]
+        return super().matches(given, ctx)
+
+
+class LessSearch(AnswerTask):
+    id = "less_search"
+    track = "tools"
+    title = "Иголка в логе"
+    scroll = ("less ФАЙЛ — листать большой файл. Пробел — страница вниз, /слово — поиск, "
+              "n — следующее, G — в конец, g — в начало, q — выход.\n"
+              "Опытные часто обходятся без листания: grep СЛОВО файл — только строки со словом; "
+              "tail -1 файл — последняя строка.")
+    variants = (
+        Variant("В логе server.log больше {n} строк. В строке с CRITICAL в конце стоит "
+                "число — какое? И какое слово стоит после «Signature:» в самой последней строке? "
+                "Ответ: ans ЧИСЛО СЛОВО",
+                wrong=("grep CRITICAL server.log | cut -c1-5; tail -1 server.log | cut -d' ' -f2",),
+                alternatives=("grep CRITICAL server.log и tail -1 server.log — без листания",)),
+        Variant("В логе server.log больше {n} строк, каждая начинается с пятизначного номера. "
+                "Найди ПЕРВУЮ строку с WARN и сдай её номер: ans НОМЕР",
+                hints=("Лог огромный — открывай в less, руками его не пролистать.",
+                       "В less: /WARN и Enter прыгнет к первому совпадению. n — уже второе, "
+                       "оно не нужно.",
+                       "less server.log → /WARN → первые 5 цифр строки → q → ans НОМЕР"),
+                solution="less server.log → /WARN → номер строки → q",
+                solution_script="grep -m1 WARN server.log | cut -c1-5",
+                wrong=("grep WARN server.log | sed -n 2p | cut -c1-5",),
+                alternatives=("grep -m1 WARN server.log — -m1 остановит grep на первой "
+                              "находке",)),
+        Variant("В логе server.log больше {n} строк, и где-то в нём сервис перезапускался — "
+                "строка с RESTART. Какое событие записано сразу после неё? Сдай его без "
+                "номера строки: ans СОБЫТИЕ",
+                hints=("Открой лог в less и найди перезапуск поиском.",
+                       "/RESTART и Enter — курсор на нужной строке; ответ — строка под ней.",
+                       "less server.log → /RESTART → строка ниже, без номера → q → ans СОБЫТИЕ"),
+                solution="less server.log → /RESTART → строка ниже → q",
+                solution_script="grep -A1 RESTART server.log | tail -1 | cut -d' ' -f2-",
+                wrong=("grep -B1 RESTART server.log | head -1 | cut -d' ' -f2-",),
+                alternatives=("grep -A1 RESTART server.log — строка и одна после неё: -A1 — одна "
+                              "строка после совпадения",)),
+    )
+    par = 50
+    hints = ("Открой лог в less: cat вывалит на экран простыню, которой не видно конца.",
+             "В less: /CRITICAL и Enter — найти; G — прыгнуть в самый конец.",
+             "less server.log → /CRITICAL → запомни число → G → слово в последней строке → q")
+    solution = "less server.log → /CRITICAL → G → q"
+    solution_script = ("grep CRITICAL server.log | grep -oE '[0-9]+$'; "
+                       "tail -1 server.log | cut -d' ' -f2")
+    explain = "less не тащит файл целиком и умеет искать — им и читают логи на миллион строк."
+    spell = "less файл — листать; /слово — поиск, n — дальше, G — конец, q — выход"
+
+    EVENTS = ["INFO backup done", "INFO user login", "INFO cache cleared", "INFO cron ok",
+              "WARN slow query", "INFO sync done", "INFO health ok"]
+    # после перезапуска — события, которых в остальном логе нет: не угадать по частоте
+    AFTER_RESTART = ["INFO config reloaded", "WARN cache cold", "INFO journal replayed",
+                     "INFO workers up", "WARN queue backlog"]
+
+    def setup_variant(self, box, rng, variant):
+        n = rng.randint(3000, 6000)
+        if variant == 0:
+            num, seal = rng.randint(100, 9999), kit.latin(rng)
+            pos = rng.randint(n // 4, n - 10)
+            lines = [f"{i:05d} CRITICAL disk failure, code {num}" if i == pos
+                     else f"{i:05d} {rng.choice(self.EVENTS)}" for i in range(n)]
+            lines.append(f"Signature: {seal}")
+            kit.write(box / "server.log", "\n".join(lines) + "\n")
+            return {"n": n, "answer": f"{num} {seal}", "sources": sources(box, "server.log")}
+        quiet = [e for e in self.EVENTS if not e.startswith("WARN")]
+        if variant == 1:
+            # до первого WARN — только INFO, дальше WARN встречаются как обычно
+            first = rng.randint(n // 5, n // 2)
+            events = [rng.choice(quiet) if i < first else
+                      "WARN disk almost full" if i == first else rng.choice(self.EVENTS)
+                      for i in range(n)]
+            if not any(e.startswith("WARN") for e in events[first + 1:]):
+                events[-5] = "WARN slow query"
+            lines = [f"{i:05d} {e}" for i, e in enumerate(events)]
+            kit.write(box / "server.log", "\n".join(lines) + "\n")
+            second = next(i for i in range(first + 1, n) if events[i].startswith("WARN"))
+            return {"n": n, "answer": f"{first:05d}", "traps": [["second", f"{second:05d}"]],
+                    "sources": sources(box, "server.log")}
+        pos = rng.randint(n // 4, n - 10)
+        after = rng.choice(self.AFTER_RESTART)
+        events = [rng.choice(self.EVENTS) for _ in range(n)]
+        events[pos] = "CRIT service RESTART"
+        events[pos + 1] = after
+        lines = [f"{i:05d} {e}" for i, e in enumerate(events)]
+        kit.write(box / "server.log", "\n".join(lines) + "\n")
+        prev = events[pos - 1]
+        return {"n": n, "answer": after,
+                "traps": [["before", prev], ["before", prev.split(" ", 1)[1]],
+                          ["restart", "CRIT service RESTART"], ["restart", "service RESTART"]],
+                "sources": sources(box, "server.log")}
+
+    trap_messages = {
+        "second": "Это не первая строка с WARN: n уводит к следующей. После /WARN и Enter less "
+                  "стоит на первой.",
+        "before": "Это строка над RESTART, а нужна та, что под ней.",
+        "restart": "Это сама строка перезапуска, а нужна следующая — под ней.",
+    }
+
+    def answer_kind(self, state):
+        return "number" if state.get("_variant") == 1 else "text"
+
+    def matches(self, given, ctx):
+        if ctx.state.get("_variant") == 1:      # номер: «00731» и «731» — одно число
+            return textnorm.same_number(given, ctx.state["answer"])
+        if ctx.state.get("_variant") == 2:      # событие: уровень (INFO/WARN) можно опустить
+            ans = ctx.state["answer"]
+            return any(textnorm.same_words(given, a) for a in (ans, ans.split(" ", 1)[1]))
+        # число и слово: порядок и запятая между ними не важны («6568, lighthouse»)
+        return textnorm.same_parts(given, str(ctx.state["answer"]).split())
+
+
+class NanoConfig(Task):
+    id = "nano_config"
+    track = "tools"
+    title = "Конфиг в nano"
+    scroll = ("nano ФАЙЛ — простой редактор (на Mac это pico). Внизу подсказки, ^ — это Ctrl. "
+              "Ctrl+W — поиск, Ctrl+K — вырезать строку, Ctrl+O и Enter — сохранить, Ctrl+X — выйти.\n"
+              "Ctrl+W и сразу Enter — искать то же слово дальше. Ctrl+X по несохранённому файлу "
+              "спросит, сохранить ли: Y — да.")
+    variants = (
+        Variant("В конфиге app.conf замени port 5432 на 6432 (строка «port = 5432») и удали "
+                "строку с debug. "
+                "backup_port не трогай. Редактор — nano.",
+                wrong=("sed -i '' -e 's/5432/6432/' -e '/^debug = /d' app.conf",),
+                alternatives=("nano app.conf, Ctrl+W port и Enter — прыжок прямо к нужной "
+                              "строке, без листания",)),
+        Variant("В db.ini поменяй пользователя: user = test должно стать user = admin. И допиши "
+                "в самый конец файла новую строку timeout = 30. Остальное не трогай. "
+                "Редактор — nano.",
+                hints=("Открой файл: nano db.ini",
+                       "Ctrl+W user — найти строку, исправь test на admin; потом стрелкой вниз "
+                       "до самого конца файла и напечатай новую строку.",
+                       "nano db.ini → в строке user исправить test на admin → в конце файла "
+                       "дописать timeout = 30 → Ctrl+O, Enter → Ctrl+X"),
+                solution="nano db.ini → в строке user исправить test на admin → в конце "
+                         "дописать timeout = 30 → Ctrl+O, Enter → Ctrl+X",
+                solution_script=("sed -i '' 's/^user = test$/user = admin/' db.ini && "
+                                 "echo 'timeout = 30' >> db.ini"),
+                wrong=("sed -i '' 's/test/admin/' db.ini && echo 'timeout = 30' >> db.ini",
+                       "sed -i '' 's/^user = test$/user = admin/' db.ini"),
+                alternatives=("echo 'timeout = 30' >> db.ini — >> дописывает строку в конец "
+                              "файла без редактора",)),
+        Variant("В web.conf закомментируй строку ssl = off — поставь в её начало решётку, чтобы "
+                "вышло «# ssl = off». И замени workers = {workers} на workers = {new_workers}. "
+                "ssl_cert и max_workers не трогай. Редактор — nano.",
+                hints=("Открой файл: nano web.conf",
+                       "Решётка ставится в самое начало строки: встань на ssl = off, Ctrl+A — в "
+                       "начало строки, набери # и пробел. workers ищи через Ctrl+W.",
+                       "nano web.conf → в начало строки ssl = off дописать # и пробел → в "
+                       "строке workers число {new_workers} → Ctrl+O, Enter → Ctrl+X"),
+                solution="nano web.conf → закомментировать ssl = off → в строке workers "
+                         "поставить {new_workers} → Ctrl+O, Enter → Ctrl+X",
+                solution_script=("sed -i '' -e 's/^ssl = off$/# ssl = off/' "
+                                 "-e 's/^workers = {workers}$/workers = {new_workers}/' web.conf"),
+                wrong=("sed -i '' -e 's/^ssl = off$/# ssl = off/' "
+                       "-e 's/workers = [0-9]*/workers = {new_workers}/' web.conf",
+                       "sed -i '' -e 's/^ssl/# ssl/' "
+                       "-e 's/^workers = {workers}$/workers = {new_workers}/' web.conf"),
+                alternatives=("nano web.conf, Ctrl+W ssl и Enter — прыжок прямо к строке, "
+                              "которую надо закомментировать",)),
+    )
+    par = 60
+    hints = ("Открой файл: nano app.conf",
+             "Ctrl+W port — найти строку (попал на backup_port — Ctrl+W и Enter ищут дальше); "
+             "исправь число; на строке debug нажми Ctrl+K.",
+             "Ctrl+O, Enter — сохранить; Ctrl+X — выйти. Проверить: cat app.conf")
+    solution = "nano app.conf → исправить port → Ctrl+K на строке debug → Ctrl+O, Enter → Ctrl+X"
+    solution_script = "sed -i '' -e 's/^port = 5432$/port = 6432/' -e '/^debug = /d' app.conf"
+    explain = "Так конфиги на серверах и правят: открыл, нашёл, поправил, сохранил."
+    spell = "nano файл — редактор: Ctrl+W поиск, Ctrl+K вырезать строку, Ctrl+O сохранить, Ctrl+X выход"
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 1:
+            keys = [("host", "127.0.0.1"), ("port", "5432"), ("name", "test_db"),
+                    ("user", "test"), ("password", f"{kit.latin(rng)}{rng.randint(10, 99)}"),
+                    ("pool", str(rng.randint(2, 20)))]
+            rng.shuffle(keys)
+            body = "".join(f"{k} = {v}\n" for k, v in keys)
+            f = kit.write(box / "db.ini", "[database]\n" + body)
+            want = ("[database]\n" + body.replace("user = test\n", "user = admin\n") +
+                    "timeout = 30\n")
+            return {"file": "db.ini", "want": want, "orig": kit.sha(f)}
+        if variant == 2:
+            workers = rng.randint(2, 8)
+            new = workers + rng.randint(1, 8)
+            keys = [("server_name", f"{kit.latin(rng)}.local"), ("listen", "8443"),
+                    ("ssl", "off"), ("ssl_cert", "/etc/ssl/site.pem"),
+                    ("workers", str(workers)), ("max_workers", str(rng.randint(20, 64))),
+                    ("log_level", "info")]
+            rng.shuffle(keys)
+            lines = [f"{k} = {v}\n" for k, v in keys]
+            f = kit.write(box / "web.conf", "".join(lines))
+            fix = {"ssl = off\n": "# ssl = off\n",
+                   f"workers = {workers}\n": f"workers = {new}\n"}
+            want = "".join(fix.get(l, l) for l in lines)
+            return {"file": "web.conf", "workers": workers, "new_workers": new,
+                    "want": want, "orig": kit.sha(f)}
+        keys = [("name", f"app-{kit.latin(rng)}"), ("host", "127.0.0.1"), ("port", "5432"),
+                ("backup_port", "5432"), ("debug", "true"), ("workers", str(rng.randint(2, 16))),
+                ("log_dir", "/var/log/app"), ("timeout", str(rng.randint(10, 90)))]
+        rng.shuffle(keys)
+        f = kit.write(box / "app.conf", "".join(f"{k} = {v}\n" for k, v in keys))
+        want = "".join(f"{k} = {'6432' if k == 'port' else v}\n" for k, v in keys if k != "debug")
+        return {"file": "app.conf", "want": want, "orig": kit.sha(f)}
+
+    def check(self, ctx):
+        return check_edit(ctx.box / ctx.state.get("file", "app.conf"), ctx.state)
+
+
+def check_edit(f, state) -> Verdict:
+    """Правка файла в редакторе: точное совпадение; при ошибке — разница «ждали/получилось»."""
+    if not f.is_file():
+        return Verdict(False, f"Файл {f.name} пропал — набери reset.")
+    got = f.read_text("utf-8", errors="replace")
+    if got.rstrip("\n") == state["want"].rstrip("\n"):
+        return Verdict(True)
+    if kit.sha(f) == state["orig"]:
+        return Verdict(False)
+    return Verdict(False, "Файл ты поменял, но пока не так:\n" + kit.diff_text(got, state["want"]) +
+                   "\n   Запутался — reset вернёт файл как был.")
+
+
+COMMIT_SH = """#!/bin/sh
+# Открывает сообщение в vim — так же делает git commit.
+cd "$(dirname "$0")" || exit 1
+cat > message.txt <<'EOT'
+__BODY__
+EOT
+__NOEOL__before=$(md5 -q message.txt)
+if [ -n "$TERMIT_VIM_EX" ]; then
+  vim -Es -u NONE __VIMARGS__ -c "$TERMIT_VIM_EX" -c wq message.txt   # для эталонных тестов
+else
+  vim __VIMARGS__ message.txt
+fi
+after=$(md5 -q message.txt)
+grep -v '^#' message.txt | sed '/^[[:space:]]*$/d' > result.txt
+echo "$before $after" > .msg_hash
+echo "vim закрыт."
+"""
+
+VIM_SCROLL = ("vim — редактор, в который тебя закидывают другие программы и серверы. Он стартует в "
+              "режиме команд: "
+              "буквы — это приказы, а не текст. i — начать печатать, Esc — закончить, "
+              ":wq и Enter — сохранить и выйти, :q! и Enter — выйти без сохранения.\n"
+              "Команды vim набирай в английской раскладке: в русской :wq превратится в :цй.")
+
+
+NO_EOL = 'printf \'%s\' "$(cat message.txt)" > message.txt   # без финального перевода строки\n'
+
+
+def _commit_sh(box, body: str, no_eol: bool = False, vim_args: str = ""):
+    """vim_args — стартовые -c для vim (и в эталонной ветке тоже: TERMIT_VIM_EX идёт после
+    них, как клавиши игрока после старта)."""
+    text = (COMMIT_SH.replace("__BODY__", body).replace("__NOEOL__", NO_EOL if no_eol else "")
+            .replace("__VIMARGS__", vim_args))
+    p = kit.write(box / "commit.sh", text)
+    os.chmod(p, 0o755)
+
+
+class VimTrap(Task):
+    id = "vim_trap"
+    track = "tools"
+    title = "Капкан Vim: сохранить и выйти"
+    autorun = "./commit.sh"
+    scroll = VIM_SCROLL
+    variants = (
+        Variant("Как только нажмёшь Enter, откроется vim — так же его сами открывают и другие "
+                "программы, когда ждут от тебя текст. "
+                "Впиши на первой строке «Подписано: {name}» и выйди С сохранением. "
+                "Не вышло — запусти ./commit.sh снова.",
+                wrong=("TERMIT_VIM_EX='q!' ./commit.sh",),
+                alternatives=("ZZ — то же, что :wq, без двоеточия",)),
+        Variant("Нажми Enter — откроется vim, а в сообщении вместо текста заглушка TODO. "
+                "Замени строку TODO одной строкой своего текста — любой, хоть одним словом — "
+                "и выйди с сохранением. В vim: S (Shift+s) — стереть строку под курсором и сразу "
+                "печатать. Не вышло — запусти ./commit.sh снова.",
+                hints=("Ты в vim, курсор уже на строке TODO. Её нужно стереть и напечатать своё.",
+                       "Не вышло с S — то же делает cc. Или по-простому: A (Shift+a) — печатать "
+                       "в конце строки, потом Backspace четыре раза.",
+                       "./commit.sh → S → свой текст → Esc → :wq → Enter"),
+                solution="S → свой текст → Esc → :wq",
+                solution_script="TERMIT_VIM_EX='1s/^TODO$/Поправил вход/' ./commit.sh",
+                wrong=("TERMIT_VIM_EX='q!' ./commit.sh",
+                       "TERMIT_VIM_EX='1s/^/Готово /' ./commit.sh"),
+                alternatives=("cc — то же, что S: стереть строку и печатать заново",)),
+        Variant("Нажми Enter — откроется vim с готовым сообщением. Допиши в самый конец, "
+                "последней строкой, «Проверил: {name}» и выйди с сохранением. В vim: G — на "
+                "последнюю строку, o — новая строка под ней и сразу печать. "
+                "Не вышло — запусти ./commit.sh снова.",
+                hints=("Ты в vim. Чтобы писать в конце, сначала прыгни на последнюю строку.",
+                       "Без G и o тоже можно: стрелками вниз до последней строки, A — печатать "
+                       "в её конце, Enter — новая строка.",
+                       "./commit.sh → G → o → Проверил: {name} → Esc → :wq → Enter"),
+                solution="G → o → Проверил: {name} → Esc → :wq",
+                solution_script="TERMIT_VIM_EX='normal GoПроверил: {name}' ./commit.sh",
+                wrong=("TERMIT_VIM_EX='q!' ./commit.sh",
+                       "TERMIT_VIM_EX='normal ggOПроверил: {name}' ./commit.sh"),
+                alternatives=(":$ и Enter — тоже прыжок на последнюю строку",)),
+    )
+    par = 60
+    hints = ("Ты в vim. Сначала i — тогда буквы станут текстом.",
+             "Напечатай строку, потом Esc, переключи раскладку на английскую и набери :wq",
+             "./commit.sh → i → Подписано: {name} → Esc → :wq → Enter")
+    solution = "i → Подписано: {name} → Esc → :wq"
+    solution_script = "TERMIT_VIM_EX='1s/^$/Подписано: {name}/' ./commit.sh"
+    explain = "i — вставка, Esc — назад в команды, :wq — записать и выйти. Хватит, чтобы не застрять."
+    spell = "vim: i — печатать, Esc — стоп, :wq — сохранить и выйти"
+
+    SAVE = "\n# Строки с # будут отброшены. Esc, потом :wq и Enter — сохранить и выйти."
+
+    def setup_variant(self, box, rng, variant):
+        name = kit.latin(rng).capitalize()
+        if variant == 1:
+            _commit_sh(box, "TODO\n# Замени строку TODO одной строкой своего текста."
+                            "\n# S (Shift+s) — стереть строку под курсором и сразу печатать." +
+                       self.SAVE)
+            return {"name": name}
+        if variant == 2:
+            body = [f"Обновил {kit.latin(rng)}", f"Поправил {kit.word(rng)}"]
+            line = f"Проверил: {name}"
+            _commit_sh(box, "\n".join(body) + f"\n# Допиши последней строкой: {line}"
+                       "\n# G — на последнюю строку, o — новая строка под ней и сразу печать." +
+                       self.SAVE)
+            return {"name": name, "body": body, "line": line}
+        _commit_sh(box, "\n# Впиши на первой строке: Подписано: " + name +
+                   "\n# i — печатать, Esc — закончить, :wq и Enter — сохранить и выйти."
+                   "\n# Строки с # будут отброшены.")
+        return {"name": name}
+
+    def check(self, ctx):
+        r = ctx.box / "result.txt"
+        if not r.exists():
+            return Verdict(False)
+        lines = [l.strip() for l in r.read_text("utf-8", errors="replace").splitlines() if l.strip()]
+        v = ctx.state.get("_variant", 0)
+        if v == 1:
+            if len(lines) == 1 and "TODO" not in lines[0]:
+                return Verdict(True)
+            return Verdict(False, "Нужна одна строка твоего текста, и TODO в ней остаться не "
+                                  "должно. Запусти ./commit.sh ещё раз.")
+        if v == 2:
+            if lines == ctx.state["body"] + [ctx.state["line"]]:
+                return Verdict(True)
+            return Verdict(False, "Строка не та, не в конце или не сохранилась. Запусти "
+                                  "./commit.sh ещё раз.")
+        if lines == [f"Подписано: {ctx.state['name']}"]:
+            return Verdict(True)
+        return Verdict(False, "Строка не та или не сохранилась. Запусти ./commit.sh ещё раз.")
+
+
+class VimEscape(Task):
+    id = "vim_escape"
+    track = "tools"
+    title = "Капкан Vim: выйти без сохранения"
+    autorun = "./commit.sh"
+    scroll = VIM_SCROLL
+    variants = (
+        Variant("Нажми Enter — откроется vim с сообщением, которое не должно уйти. "
+                "Выйди, НИЧЕГО не сохранив, даже если случайно что-то напечатал.",
+                wrong=("TERMIT_VIM_EX='wq' ./commit.sh",),
+                alternatives=("ZQ — выйти без сохранения, без двоеточия",)),
+        Variant("Нажми Enter — откроется vim, а в сообщении уже есть чья-то несохранённая "
+                "правка. Выйди, ничего не сохранив. Обычный :q тут откажется.",
+                hints=("vim не выпустит по :q, пока в файле есть несохранённые правки: "
+                       "внизу появится E37.",
+                       "Восклицательный знак после q значит «выйти и выбросить правки».",
+                       "Esc → :q! → Enter"),
+                solution="Esc → :q! → Enter",
+                solution_script="TERMIT_VIM_EX='q!' ./commit.sh",
+                wrong=("TERMIT_VIM_EX='wq' ./commit.sh",),
+                alternatives=(":qa! — выйти без сохранения, даже если открыто несколько "
+                              "файлов",)),
+        Variant("Нажми Enter — vim откроется сразу в режиме печати: всё, что наберёшь, станет "
+                "текстом. Выйди, ничего не сохранив.",
+                hints=("Внизу горит -- INSERT --: сейчас буквы — это текст, а не команды.",
+                       "Сначала Esc — он вернёт в режим команд. Без него :q! ляжет в текст.",
+                       "Esc → :q! → Enter (успел что-то напечатать — всё равно :q!)"),
+                solution="Esc → :q! → Enter",
+                solution_script="TERMIT_VIM_EX='q!' ./commit.sh",
+                # второе — «набрал :q! в режиме вставки, текст лёг в буфер, потом с досады
+                # :wq» (сам :wq допишет commit.sh): :x тут не годится — буфер без правок
+                # он не пишет и засчитался бы
+                wrong=("TERMIT_VIM_EX='wq' ./commit.sh",
+                       "TERMIT_VIM_EX='normal i:q!' ./commit.sh"),
+                alternatives=("Ctrl+[ — то же, что Esc, если до Esc тянуться далеко",)),
+    )
+    par = 30
+    hints = ("Выход без сохранения в vim — двоеточие, q и восклицательный знак.",
+             "Сначала Esc (на всякий случай), потом в английской раскладке :q!",
+             "Esc → :q! → Enter")
+    solution = "Esc → :q! → Enter"
+    solution_script = "TERMIT_VIM_EX='q!' ./commit.sh"
+    explain = ":q! — выйти и выбросить правки. Застрял в vim — Esc, потом :q!"
+    spell = "vim: :q! — выйти без сохранения; застрял — Esc, :q!"
+
+    # стартовые -c под вариант: B — буфер уже изменён (:q откажет), C — сразу режим вставки
+    VIM_ARGS = ("", "-c 'normal GoWIP: не отправлять'", "-c startinsert")
+
+    def setup_variant(self, box, rng, variant):
+        # без финального перевода строки: :wq допишет его, и даже «пустой» :wq виден в хэше
+        _commit_sh(box, "Это сообщение не должно уйти"
+                        "\n# Выйди БЕЗ сохранения: Esc, потом :q! и Enter.", no_eol=True,
+                   vim_args=self.VIM_ARGS[variant])
+        return {}
+
+    def check(self, ctx):
+        h = ctx.box / ".msg_hash"
+        if not h.exists():
+            return Verdict(False)
+        before, _, after = h.read_text().strip().partition(" ")
+        if before == after:
+            return Verdict(True)
+        return Verdict(False, "Сообщение изменилось — значит, сохранил. Запусти ./commit.sh "
+                              "и выйди через :q!")
+
+
+class VimPurge(Task):
+    id = "vim_purge"
+    track = "tools"
+    title = "Чистка строк в vim"
+    scroll = ("vim ФАЙЛ — открыть файл. В режиме команд: /слово и Enter — поиск, n — следующее, "
+              "dd — удалить строку, u — отменить последнее, :wq — сохранить и выйти.\n"
+              "Не знаешь, в каком ты режиме, — нажми Esc. ^ в поиске — начало строки: /^# найдёт "
+              "только строки, которые начинаются с #. Пробел в поиске — тоже символ.")
+    variants = (
+        Variant("В rules.txt завёлся спам: строки, начинающиеся с «SPAM » (с пробелом). "
+                "Вычисти их в vim. Строку «SPAM: фильтр включён» не трогать — "
+                "удалил по ошибке, верни через u.",
+                wrong=("vim -Es -u NONE '+g/SPAM/d' +wq rules.txt",),
+                alternatives=(":g/^SPAM /d — vim сам удалит все строки по образцу, одной "
+                              "командой",)),
+        Variant("В list.txt некоторые строки повторяются дважды подряд. Удали в vim вторые "
+                "копии — каждая такая строка должна остаться один раз. Строки «---» "
+                "повторяются не подряд: это разделители, их не трогай.",
+                hints=("vim list.txt — повторы видно глазами: листай вниз стрелкой или j.",
+                       "Встань на вторую копию и нажми dd; удалил не то — u.",
+                       "vim list.txt → на каждой второй копии dd → :wq"),
+                solution="vim list.txt → dd на каждой второй копии → :wq",
+                solution_script="vim -Es -u NONE '+g/^\\(.*\\)\\n\\1$/d' +wq list.txt",
+                wrong=("sort -u -o list.txt list.txt",
+                       "awk '!seen[$0]++' list.txt > t.txt && mv t.txt list.txt"),
+                alternatives=("uniq list.txt > t.txt && mv t.txt list.txt — uniq убирает "
+                              "повторы подряд без редактора, > t.txt пишет вывод в файл t.txt",)),
+        Variant("В script.sh слишком много комментариев. Удали в vim все строки, которые "
+                "начинаются с #. Первую строку #!/bin/sh оставь: это не комментарий, а "
+                "указание, чем запускать скрипт. Решётку внутри строки тоже не трогай.",
+                hints=("vim script.sh, потом /^# — ^ значит «начало строки»: найдутся только "
+                       "строки, которые начинаются с #.",
+                       "dd — удалить строку, n — к следующей находке. До #!/bin/sh поиск тоже "
+                       "дойдёт — её пропусти.",
+                       "vim script.sh → /^# → dd → n → dd … (#!/bin/sh пропустить) → :wq"),
+                solution="vim script.sh → /^# → dd → n → … (кроме #!/bin/sh) → :wq",
+                solution_script="vim -Es -u NONE '+2,$g/^#/d' +wq script.sh",
+                wrong=("vim -Es -u NONE '+g/^#/d' +wq script.sh",
+                       "vim -Es -u NONE '+2,$g/#/d' +wq script.sh"),
+                alternatives=(":2,$g/^#/d — со второй строки до конца удалить всё, что "
+                              "начинается с #",)),
+    )
+    par = 90
+    hints = ("vim rules.txt, потом /SPAM — найти первую.",
+             "dd — удалить строку, n — к следующей находке.",
+             "/SPAM → dd → n → dd … (нужную строку удалил — u) → :wq")
+    solution = "vim rules.txt → /SPAM → dd → n → … → :wq"
+    solution_script = "vim -Es -u NONE '+g/^SPAM /d' +wq rules.txt"
+    explain = "Поиск, dd, n — и строки чистятся пачкой; промахнулся — u спасёт."
+    spell = "vim: /слово — поиск, n — дальше, dd — удалить строку, u — отменить"
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 1:
+            return self._list(box, rng)
+        if variant == 2:
+            return self._script(box, rng)
+        n = rng.randint(40, 80)
+        bad = set(rng.sample(range(n), rng.randint(3, 5)))
+        special = rng.choice([i for i in range(n) if i not in bad])
+        out, want = [], []
+        for i in range(n):
+            if i in bad:
+                out.append(f"SPAM {kit.latin(rng)}{rng.randint(10, 99)}")
+            rule = f"Правило {i + 1}: {kit.word(rng)} и {kit.word(rng)}"
+            out.append(rule)
+            want.append(rule)
+            if i == special:
+                out.append("SPAM: фильтр включён")
+                want.append("SPAM: фильтр включён")
+        return self._write(box, "rules.txt", out, want)
+
+    def _write(self, box, name, out, want):
+        f = kit.write(box / name, "\n".join(out) + "\n")
+        return {"file": name, "want": "\n".join(want) + "\n", "orig": kit.sha(f)}
+
+    def _list(self, box, rng):
+        n = rng.randint(30, 45)
+        dup = set(rng.sample(range(n), rng.randint(3, 5)))
+        out, want, since = [], [], 0
+        for i in range(n):
+            item = f"{i + 1}. {kit.word(rng)} — {kit.latin(rng)}"
+            out.append(item)
+            want.append(item)
+            if i in dup:
+                out.append(item)
+            since += 1
+            if since >= rng.randint(5, 8) and i < n - 1:     # разделители — не подряд
+                out.append("---")
+                want.append("---")
+                since = 0
+        return self._write(box, "list.txt", out, want)
+
+    def _script(self, box, rng):
+        cmds = [f'echo "шаг {i + 1}: {kit.latin(rng)}"' for i in range(rng.randint(8, 12))]
+        cmds += ["set -e", f"mkdir -p out/{kit.latin(rng)}", "date",
+                 f'echo "Задача #{rng.randint(2, 99)}"']           # решётка внутри строки
+        rng.shuffle(cmds)
+        notes = ["# Сборка отчёта", "#--------", "# TODO: убрать отладку",
+                 f"# автор: {kit.latin(rng)}", "#  старый вариант: rm -rf out", "# конец"]
+        out, want = ["#!/bin/sh"], ["#!/bin/sh"]
+        for c in cmds:
+            if notes and rng.random() < 0.5:
+                out.append(notes.pop(0))
+            out.append(c)
+            want.append(c)
+        out += notes
+        return self._write(box, "script.sh", out, want)
+
+    def check(self, ctx):
+        return check_edit(ctx.box / ctx.state.get("file", "rules.txt"), ctx.state)
+
+
+# Кэш страниц tlrc владельца: dirs::cache_dir() на macOS = ~/Library/Caches (cache.rs: Cache::locate).
+# Вычисляется в родителе, где HOME — настоящий дом.
+TLRC_CACHE = Path.home() / "Library" / "Caches" / "tlrc"
+
+
+def tlrc_offline(box) -> None:
+    """tldr без сети: копия кэша tlrc (только чтение) в .termit/tlrc — переживает reset — и
+    конфиг tlrc в доме песочницы ($HOME/Library/Application Support/tlrc/config.toml, это
+    dirs::config_dir()) с выключенным автообновлением."""
+    dst = Path(box) / ".termit" / "tlrc"
+    if not dst.exists() and (TLRC_CACHE / "pages.en").is_dir():
+        shutil.copytree(TLRC_CACHE, dst, symlinks=True)    # ссылки не раскрываем — наружу не ведут
+        for dirpath, dirnames, filenames in os.walk(dst):
+            for f in filenames:
+                p = os.path.join(dirpath, f)
+                if not os.path.islink(p):
+                    os.chmod(p, 0o444)
+    if not dst.is_dir():
+        return
+    langs = sorted(p.name[len("pages."):] for p in dst.glob("pages.*")
+                   if p.is_dir() and p.name != "pages.en")    # английский tlrc добавит сам
+    kit.write(kit.home(box) / "Library" / "Application Support" / "tlrc" / "config.toml",
+              "[cache]\n"
+              f"dir = {json.dumps(str(dst))}\n"
+              "auto_update = false\n"
+              f"languages = {json.dumps(langs)}\n")
+
+
+# Учебный brew (termit_app/brewstub.py) ведёт себя как настоящий. Вариант B: команда и
+# формула называются по-разному (как в каталоге Homebrew): (команда, формула, что делает,
+# слово из описания формулы для brew search --desc). brew which-formula по каждой команде
+# даёт ровно одну формулу (tests/test_brewstub.py). Пример rg → ripgrep — в scroll и уроке.
+BREW_BY_CMD = [("http", "httpie", "запросы к веб-API из терминала", "HTTP client"),
+               ("gsed", "gnu-sed", "sed, как на Linux", "stream editor"),
+               ("delta", "git-delta", "цветной diff для git", "diff")]
+# формулы, у которых имя совпадает с командой: их «ставят» в варианте C
+BREW_PLAIN = ["bat", "fd", "jq", "tree"]
+BREW_LISTED = ["htop", "jq", "tree", "wget"]
+
+
+class BrewLesson(AnswerTask):
+    id = "brew_lesson"
+    track = "tools"
+    title = "Склад программ"
+    scroll = ("brew search ТЕКСТ — пакеты (программы Homebrew) по имени, brew search --desc "
+              "ТЕКСТ (description) — по описанию. brew info ФОРМУЛА — карточка (Replacement — "
+              "замена). brew which-formula КОМАНДА — чья (rg — из ripgrep).\n"
+              "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА — без обновления списка; brew "
+              "list — что стоит; which КОМАНДА — где лежит. Тут brew учебный, без сети: "
+              "/opt/homebrew/bin/brew не сработает.")
+    variants = (
+        Variant("Нужна команда tldr. Формулу с таким же именем Homebrew отключил. Что он сам "
+                "советует поставить взамен? Загляни в карточку формулы и сдай: ans ФОРМУЛА",
+                wrong=("print -r -- tldr", "print -r -- tealdeer"),
+                alternatives=("brew install tldr — откажет и в ошибке напишет ту же замену",)),
+        Variant("Нужна команда {cmd} — {what}. Ставят её формулой с другим именем. Узнай, "
+                "какой, и сдай: ans ФОРМУЛА",
+                hints=("Имя команды и имя формулы бывают разные. brew умеет искать формулу "
+                       "по команде.",
+                       "brew which-formula КОМАНДА — какая формула её ставит.",
+                       "brew which-formula {cmd} → в выводе {answer} → ans {answer}"),
+                solution="brew which-formula {cmd} → ans {answer}",
+                solution_script="brew which-formula {cmd}",
+                wrong=("print -r -- {cmd}",),
+                alternatives=("brew search --desc '{desc}' — поиск по описаниям: {answer} "
+                              "найдётся по тому, что делает",)),
+        Variant("Поставь (учебно) {formula} так, чтобы brew не полез обновлять список формул: сети "
+                "тут нет. Установка выдаст квитанцию — её номер и сдай: ans НОМЕР",
+                hints=("Попробуй просто brew install {formula} и прочти, на чём он обрывается.",
+                       "Переменная перед командой действует только на неё: "
+                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА",
+                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula} → номер из строки "
+                       "«Квитанция» → ans НОМЕР"),
+                solution="HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula} → ans НОМЕР",
+                solution_script=("HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula} "
+                                 "| sed -n 's/^Квитанция: //p'"),
+                wrong=("brew install {formula} >/dev/null 2>&1; print -r -- {receipt}",
+                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install {decoy} >/dev/null; "
+                       "print -r -- {receipt}"),
+                alternatives=("export HOMEBREW_NO_AUTO_UPDATE=1 — один раз на весь сеанс "
+                              "терминала, дальше просто brew install; export подробно — в "
+                              "треке про переменные",)),
+    )
+    par = 45
+    hints = ("Карточка формулы — brew info ИМЯ. У отключённой там написано, почему и чем "
+             "заменить.",
+             "Ищи в выводе строку Replacement: под ней команда установки замены.",
+             "brew info tldr → Replacement: brew install tlrc → ans tlrc")
+    solution = "brew info tldr → Replacement: brew install tlrc → ans tlrc"
+    solution_script = "brew info tldr | sed -n 's/^ *brew install //p'"
+    explain = ("Homebrew — склад программ для Mac: search ищет формулу по имени, which-formula — "
+               "по команде, info показывает карточку, а с HOMEBREW_NO_AUTO_UPDATE=1 brew не тратит "
+               "минуту на обновление списка формул.")
+    spell = ("brew search ТЕКСТ / --desc; brew info ФОРМУЛА; brew which-formula КОМАНДА; "
+             "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА")
+
+    def setup_variant(self, box, rng, variant):
+        state = {"brew_list": sorted(rng.sample(BREW_LISTED, rng.randint(1, 3)))}
+        if variant == 0:
+            state.update(cmd="tldr", answer="tlrc", traps=[["off", "tldr"]])
+        elif variant == 1:
+            cmd, formula, what, desc = rng.choice(BREW_BY_CMD)
+            state.update(cmd=cmd, answer=formula, what=what, desc=desc, traps=[["cmd", cmd]])
+        else:
+            formula, decoy = rng.sample(BREW_PLAIN, 2)
+            receipt = str(rng.randint(100000, 999999))
+            state.update(formula=formula, decoy=decoy, receipt=receipt, answer=receipt)
+        return state
+
+    trap_messages = {
+        "off": "Формула tldr как раз отключена — нужна та, что Homebrew советует взамен: "
+               "Replacement в brew info tldr.",
+        "cmd": "Это имя команды, а формула называется иначе: спроси brew which-formula {cmd}.",
+    }
+
+    def answer_kind(self, state):
+        return "number" if state.get("_variant") == 2 else "text"
+
+    def wrong_message(self, given, ctx):
+        if ctx.state.get("_variant") == 0 and textnorm.same_text(given, "tealdeer"):
+            return ("tealdeer тоже ставит tldr, но Homebrew в карточке отключённой формулы "
+                    "советует другую. Найди там Replacement.")
+        return super().wrong_message(given, ctx)
+
+    def check(self, ctx):
+        verdict = super().check(ctx)
+        if (verdict.solved and ctx.state.get("_variant") == 2
+                and not brewstub.installed_with_flag(ctx.box, ctx.state["formula"])):
+            return Verdict(False, f"Номер верный, а учебной установки {ctx.state['formula']} с "
+                                  "HOMEBREW_NO_AUTO_UPDATE=1 в журнале brew нет. Поставь — и "
+                                  "сдай снова.")
+        return verdict
+
+
+class TldrTar(Task):
+    id = "tldr_tar"
+    track = "tools"
+    title = "tldr и архив"
+    implant = "tldr"      # близнец: решается и без tldr (man tar), tldr — подарок после
+    scroll = ("tldr КОМАНДА — живые примеры вместо длинного man (нет tldr — man tar, /extract). "
+              "tar -xzf архив.tar.gz -C папка — распаковать в папку; tar -tzf архив.tar.gz — "
+              "оглавление; tar -xzf архив.tar.gz ПУТЬ — один файл; tar -czf архив.tar.gz папка "
+              "— собрать. -C — Change directory; x — extract, c — create, t — table, z — gzip, "
+              "f — file.\n"
+              "В tldr {{…}} или path/to/… — твоё имя; --wildcards — для Linux.")
+    variants = (
+        Variant("В backup.tar.gz — архив с файлами. Распакуй его в папку backup/ — как "
+                "именно, подскажет tldr tar, а если tldr не стоит — man tar.",
+                wrong=("tar -xzf backup.tar.gz",),
+                alternatives=("cd backup && tar -xzf ../backup.tar.gz — зайти и распаковать "
+                              "на месте",)),
+        Variant("В release.tar.gz целый проект, а нужен один файл — readme.txt, он лежит "
+                "где-то внутри. Достань сюда только его: путь из архива пишется после имени "
+                "архива. Где он лежит, покажет оглавление архива, а как распаковывать вообще — "
+                "tldr tar или man tar.",
+                hints=("Сначала оглавление: tar -tzf release.tar.gz — там виден полный путь к "
+                       "readme.txt.",
+                       "Этот путь целиком допиши после имени архива: tar -xzf release.tar.gz ПУТЬ",
+                       "tar -tzf release.tar.gz, затем tar -xzf release.tar.gz {path} "
+                       "(примеры — в tldr tar или man tar)"),
+                solution="tar -tzf release.tar.gz → tar -xzf release.tar.gz {path}",
+                solution_script="tar -xzf release.tar.gz {path}",
+                wrong=("tar -xzf release.tar.gz", "tar -xzf release.tar.gz readme.txt"),
+                alternatives=("tar -xzf release.tar.gz '*/readme.txt' — tar на Mac понимает "
+                              "шаблон и без --wildcards",)),
+        Variant("Собери из папки notes/ сжатый архив notes.tar.gz — здесь, рядом с папкой. "
+                "Как — подскажет tldr tar, а если tldr не стоит — man tar.",
+                hints=("tldr tar — короткие примеры, ищи create; если tldr не стоит — man tar, "
+                       "/create",
+                       "c — создать, z — сжать gzip, f — имя архива; за ним — что упаковать.",
+                       "tar -czf notes.tar.gz notes — этот пример есть и в tldr tar"),
+                solution="tldr tar (или man tar) → tar -czf notes.tar.gz notes",
+                solution_script="tar -czf notes.tar.gz notes",
+                wrong=("tar -cf notes.tar.gz notes",),
+                alternatives=("tar -czvf notes.tar.gz notes — -v печатает каждый файл, "
+                              "который лёг в архив",)),
+    )
+    par = 60
+    hints = ("tldr tar — короткие примеры; если tldr не стоит — man tar, /extract",
+             "Распаковка — tar -xzf, папка назначения — ключ -C.",
+             "tar -xzf backup.tar.gz -C backup — этот пример есть и в tldr tar")
+    solution = "tldr tar (или man tar) → tar -xzf backup.tar.gz -C backup"
+    solution_script = "tar -xzf backup.tar.gz -C backup"
+    explain = "x — извлечь, z — gzip, f — файл архива, -C — куда. tldr выдаст это за пару секунд."
+    spell = "tldr команда — примеры; tar -xzf архив.tar.gz -C папка — распаковать"
+
+    def _files(self, rng, folder, names):
+        shas = {}
+        for name in names:
+            shas[name] = kit.sha(kit.write(folder / name, f"файл {name} {rng.random()}\n"))
+        return shas
+
+    def _pack(self, box, archive, src, shas):
+        with tarfile.open(box / archive, "w:gz") as tf:
+            for name in shas:
+                tf.add(src / name, arcname=name)
+        shutil.rmtree(src)
+
+    def setup_variant(self, box, rng, variant):
+        # Сети в песочнице нет: tldr (если стоит) берёт страницы из копии кэша tlrc владельца.
+        # Нет tldr или кэша — задача всё равно решается: man tar.
+        if implants.which("tldr"):
+            tlrc_offline(box)
+        names = [f"{kit.latin(rng)}_{i}.txt" for i in range(rng.randint(3, 5))]
+        if variant == 2:
+            return {"files": self._files(rng, box / "notes", names)}
+        src = box / ".termit" / "backupsrc"
+        if variant == 1:
+            proj = kit.latin(rng)
+            path = f"{proj}/docs/readme.txt"
+            names = ([path, f"{proj}/docs/changelog.txt"] +
+                     [f"{proj}/src/{n}" for n in names])
+            shas = self._files(rng, src, names)
+            self._pack(box, "release.tar.gz", src, shas)
+            return {"files": shas, "path": path}
+        shas = self._files(rng, src, names)
+        self._pack(box, "backup.tar.gz", src, shas)
+        (box / "backup").mkdir()
+        return {"files": shas}
+
+    def check(self, ctx):
+        v, files = ctx.state.get("_variant", 0), ctx.state["files"]
+        if v == 1:
+            path = ctx.state["path"]
+            readme = ctx.box / path
+            got = readme.is_file() and kit.sha(readme) == files[path]
+            extra = [n for n in files if n != path and (ctx.box / n).exists()]
+            if got and extra:
+                return Verdict(False, "readme.txt на месте, но вылезло и лишнее: "
+                                      f"{', '.join(sorted(extra))}. Набери reset и достань "
+                                      "только его.")
+            return Verdict(got and not extra)
+        if v == 2:
+            return self._check_packed(ctx.box / "notes.tar.gz", files)
+        d = ctx.box / "backup"
+        return Verdict(all((d / n).is_file() and kit.sha(d / n) == h
+                           for n, h in files.items()))
+
+    @staticmethod
+    def _check_packed(archive, files) -> Verdict:
+        """Архив — именно gzip (r:gz), внутри все файлы папки с тем же содержимым; путь
+        внутри (notes/a.txt или ./a.txt) не важен, служебные ._файлы macOS не в счёт."""
+        if not archive.is_file():
+            return Verdict(False)
+        try:
+            with tarfile.open(archive, "r:gz") as tf:
+                got = {}
+                for m in tf.getmembers():
+                    # ._имя — AppleDouble: tar на Mac сам кладёт туда расширенные атрибуты
+                    if m.isfile() and not os.path.basename(m.name).startswith("._"):
+                        got[os.path.basename(m.name)] = hashlib.sha1(
+                            tf.extractfile(m).read()).hexdigest()
+        except (tarfile.TarError, OSError, EOFError):
+            return Verdict(False, "notes.tar.gz — не сжатый tar-архив. Сжатие gzip даёт ключ z.")
+        if got != files:
+            return Verdict(False, "В архиве не те файлы: нужно всё из notes/, и ничего лишнего.")
+        return Verdict(True)
+
+
+class BatLines(AnswerTask):
+    """Пара «до/после» к less_search (часть 5): номера строк встроенными (cat -n, grep -n,
+    sed -n), утилита bat — только быстрее и нагляднее."""
+    id = "bat_lines"
+    track = "tools"
+    title = "Строка по номеру"
+    implant = "bat"
+    after = ("less_search", "boss_tools")
+    scroll = ("cat -n ФАЙЛ — с номерами строк (n — number); grep -n 'слово' ФАЙЛ — номер "
+              "строки, где нашлось; grep -n -e 'a' -e 'b' — два шаблона (e — expression).\n"
+              "sed -n '12p' ФАЙЛ — только строка 12 (-n — no print: остальные не печатать); "
+              "grep -n '' a b — строки нескольких файлов: имя:номер:текст.\n"
+              "Утилита bat -n ФАЙЛ — номера и подсветка, bat -r 12:12 — range, только строка "
+              "12.")
+    variants = (
+        Variant("В config.yaml несколько блоков настроек, и в каждом есть свой timeout. "
+                "На какой строке файла стоит timeout блока {block}? Ответ: ans НОМЕР",
+                wrong=("grep -n timeout config.yaml | head -1 | cut -d: -f1",),
+                alternatives=("cat -n config.yaml — и найти глазами",
+                              "less -N config.yaml — -N покажет номера строк прямо в less")),
+        Variant("В events.log {total} строк, и все разные. Какая из них стоит под номером "
+                "{n}? Сдай её целиком: ans СТРОКА",
+                hints=("Считать строки глазами не нужно — номера печатает cat -n.",
+                       "Одну строку по номеру вырежет sed -n '{n}p': p — напечатать, -n — "
+                       "молчать про остальные.",
+                       "sed -n '{n}p' events.log — утилитой: bat -r {n}:{n} events.log"),
+                solution="sed -n '{n}p' events.log",
+                solution_script="sed -n '{n}p' events.log",
+                implant_script="bat -pp -r {n}:{n} events.log",
+                wrong=("sed -n '{prev}p' events.log", "cat -n events.log | grep {n}"),
+                alternatives=("head -n {n} events.log | tail -1 — head -n {n} даст первые {n} "
+                              "строк, tail -1 — последнюю из них",)),
+        Variant("Вот три копии одного конфига: {f1}, {f2} и {f3}. В одной из них строка {n} "
+                "не такая, как в двух других. В какой? Ответ: ans ИМЯ_ФАЙЛА",
+                hints=("Строку {n} одного файла покажет sed -n '{n}p' ФАЙЛ — сравни все три по "
+                       "очереди.",
+                       "Или разом: grep -n '' печатает каждую строку как файл:номер:текст — "
+                       "останется отобрать ':{n}:'.",
+                       "grep -n '' {f1} {f2} {f3} | grep ':{n}:' — утилитой: "
+                       "bat -r {n}:{n} {f1} {f2} {f3}"),
+                solution="grep -n '' {f1} {f2} {f3} | grep ':{n}:'",
+                solution_script="grep -lxF \"$(for f in {f1} {f2} {f3}; do sed -n '{n}p' $f; "
+                                "done | sort | uniq -u)\" {f1} {f2} {f3}",
+                implant_script="grep -lxF \"$(bat -pp -r {n}:{n} {f1} {f2} {f3} | sort | "
+                               "uniq -u)\" {f1} {f2} {f3}",
+                wrong=("grep -lxF \"$(for f in {f1} {f2} {f3}; do sed -n '{m}p' $f; done | "
+                       "sort | uniq -u)\" {f1} {f2} {f3}",),
+                alternatives=("sed -n '{n}p' {f1}; sed -n '{n}p' {f2}; sed -n '{n}p' {f3} — "
+                              "по очереди",)),
+    )
+    par = 45
+    hints = ("Номер строки покажет grep -n — но timeout есть в каждом блоке.",
+             "Два шаблона сразу: grep -n -e '^[a-z]' -e timeout — заголовки блоков (они без "
+             "отступа) и их timeout по порядку.",
+             "grep -n -e '^[a-z]' -e timeout config.yaml — номер под {block}:; утилитой: "
+             "bat -n config.yaml")
+    solution = "grep -n -e '^[a-z]' -e timeout config.yaml"
+    solution_script = ("grep -n -e '^{block}:' -e 'timeout:' config.yaml | grep -A1 '{block}:' "
+                       "| tail -1 | cut -d: -f1")
+    implant_script = ("bat --decorations=always --color=never -n config.yaml | "
+                      "sed -n '/ {block}:/,$p' | grep -m1 'timeout:' | awk '{{print $1}}'")
+    explain = ("Номера строк покажут cat -n, grep -n и less -N, а одну строку по номеру "
+               "выдернет sed -n 'Np'. bat — то же самое, только нагляднее.")
+    spell = "sed -n '12p' файл — строка номер 12; grep -n — номера найденных строк"
+
+    BLOCKS = ("database", "cache", "queue", "mailer", "search")
+    KEYS = ("host", "port", "timeout", "retries", "user")
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 1:
+            total, n = rng.randint(210, 260), rng.randint(10, 99)
+            pairs = [f"{w} {lat}" for w in kit.WORDS for lat in kit.LATIN]
+            lines = rng.sample(pairs, total)
+            kit.write(box / "events.log", "\n".join(lines) + "\n")
+            return {"total": total, "n": n, "prev": n - 1, "answer": lines[n - 1],
+                    "traps": [["prev", lines[n - 2]]]}
+        if variant == 2:
+            names = [f"{x}.conf" for x in rng.sample(kit.LATIN, 3)]
+            keys = rng.sample([f"{lat}_{k}" for lat in kit.LATIN for k in ("on", "max", "min")],
+                              rng.randint(30, 40))
+            base = [f"{k} = {rng.randint(1, 90)}" for k in keys]
+            n, m = rng.sample(range(5, len(base) + 1), 2)
+            odd, other = rng.sample(range(3), 2)
+            for i, name in enumerate(names):
+                lines = list(base)
+                if i == odd:
+                    lines[n - 1] = f"{keys[n - 1]} = {rng.randint(91, 99)}"
+                if i == other:      # вторая разница — на другой строке, в другом файле
+                    lines[m - 1] = f"{keys[m - 1]} = {rng.randint(91, 99)}"
+                kit.write(box / name, "\n".join(lines) + "\n")
+            return {"f1": names[0], "f2": names[1], "f3": names[2], "n": n, "m": m,
+                    "answer": names[odd], "traps": [["other", names[other]]]}
+        blocks = rng.sample(self.BLOCKS, rng.randint(3, 5))
+        target = rng.choice(blocks[1:])
+        lines, answer, first = ["# настройки сервиса"], 0, 0
+        for b in blocks:
+            lines += ["", f"{b}:"]
+            for k in rng.sample(self.KEYS, len(self.KEYS)):
+                value = {"host": f"{b}.local", "port": rng.randint(1000, 9999),
+                         "user": kit.latin(rng)}.get(k, rng.randint(2, 60))
+                lines.append(f"  {k}: {value}")
+                if b == target and k == "timeout":
+                    answer = len(lines)
+                if k == "timeout" and not first:
+                    first = len(lines)
+        kit.write(box / "config.yaml", "\n".join(lines) + "\n")
+        return {"block": target, "answer": answer, "traps": [["first", first]]}
+
+    trap_messages = {
+        "first": "Это timeout первого блока, а нужен блок {block}: смотри, под каким заголовком "
+                 "стоит строка.",
+        "prev": "Это строка {prev}: нужна ровно {n}-я — номера у cat -n начинаются с 1.",
+        "other": "Этот файл отличается на другой строке, а не на {n}-й.",
+    }
+
+    def answer_kind(self, state):
+        return ("number", "text", "path")[variant_index(state.get("_variant"), 3)]
+
+    def matches(self, given, ctx):
+        v = variant_index(ctx.state.get("_variant"), len(self.variants))
+        if v == 0:
+            return textnorm.same_number(given, ctx.state["answer"])
+        if v == 2:
+            return textnorm.same_path(given, ctx.box / ctx.state["answer"], ctx.box)
+        return super().matches(given, ctx)
+
+
+JSON_KEYS = [("name", lambda r: f'"{kit.latin(r)}-{r.randint(1, 9)}"'),
+             ("version", lambda r: f'"{r.randint(1, 4)}.{r.randint(0, 9)}"'),
+             ("port", lambda r: str(r.randint(2000, 9999))),
+             ("debug", lambda r: r.choice(["true", "false"])),
+             ("owner", lambda r: f'"{kit.latin(r)}"'),
+             ("timeout", lambda r: str(r.randint(5, 120))),
+             ("retries", lambda r: str(r.randint(1, 9))),
+             ("region", lambda r: r.choice(['"eu"', '"us"', '"asia"'])),
+             ("tags", lambda r: f'["{kit.latin(r)}", "{kit.latin(r)}"]'),
+             ("cache", lambda r: r.choice(["true", "false"]))]
+
+
+def json_lines(rng, n: int) -> List[str]:
+    """Строки объекта JSON (без скобок и запятых): name и ещё n-1 разных ключей вперемешку."""
+    pairs = [JSON_KEYS[0]] + rng.sample(JSON_KEYS[1:], n - 1)
+    rng.shuffle(pairs)
+    return [f'  "{k}": {make(rng)}' for k, make in pairs]
+
+
+def json_text(lines: List[str], skip_comma: int = -1) -> str:
+    """Объект целиком; skip_comma — у этой строки (номер в lines) запятая потеряна."""
+    body = [ln + ("" if i == len(lines) - 1 or i == skip_comma else ",")
+            for i, ln in enumerate(lines)]
+    return "{\n" + "\n".join(body) + "\n}\n"
+
+
+class JsonCheck(AnswerTask):
+    """Практика перед «Сломанным конфигом» (П3.1 приёмки-1): jq . и правила JSON — до
+    стража. Вариант 0 (первая встреча): прочитать у jq номер строки с ошибкой."""
+    id = "json_check"
+    track = "tools"
+    title = "Проверка JSON"
+    scroll = ("jq . файл.json — проверить JSON: цел — jq напечатает его красиво, сломан — "
+              "скажет parse error … at line N. N — строка, где jq споткнулся: ошибка в ней "
+              "или строкой выше.\n"
+              "Правила JSON: текст и ключи — в двойных кавычках, числа и true/false — без "
+              "кавычек, между элементами запятая, после последнего — нет.")
+    secret_keys = AnswerTask.secret_keys + ("fixed", "good", "bad1")
+    variants = (
+        Variant("Конфиг {file} не грузится — где-то в нём ошибка. Спроси у jq, на какой строке "
+                "он споткнулся, и сдай номер: ans НОМЕР",
+                wrong=("wc -l < {file}",),
+                alternatives=("jq . {file} 2>&1 | grep -o 'line [0-9]*' — -o оставит только "
+                              "совпадение: номер, без остального сообщения",)),
+        Variant("Из трёх конфигов {f1}, {f2} и {f3} цел только один — два других jq не "
+                "читает. Какой цел? Ответ: ans ИМЯ_ФАЙЛА",
+                hints=("Проверь каждый файл: jq . ИМЯ — цел, если напечатал его красиво.",
+                       "Сломанный файл jq не печатает, а пишет parse error. Таких два.",
+                       "jq . {f1}; jq . {f2}; jq . {f3} — сдай тот, что без parse error"),
+                solution="jq . {f1}; jq . {f2}; jq . {f3} → цел тот, что без parse error",
+                solution_script=("for f in {f1} {f2} {f3}; do jq . $f >/dev/null 2>&1 && "
+                                 "print -r -- $f; done"),
+                wrong=("print -r -- {bad1}",),
+                alternatives=("jq . {f1} >/dev/null — >/dev/null выбросит вывод файла: цел — "
+                              "молчит, сломан — пишет parse error",)),
+        Variant("{file} сломан одной ошибкой — jq . его не читает. Почини файл в nano или vim, "
+                "чтобы jq . читал его без ошибок. Значения не меняй.",
+                hints=("Сначала спроси jq: jq . {file} — он назовёт строку, где споткнулся.",
+                       "Ошибка в той строке или строкой выше. Сверь с правилами: кавычки "
+                       "двойные, true/false маленькими, запятая между элементами, после "
+                       "последнего — нет.",
+                       "nano {file} → исправить строку, которую назвал jq → сохранить → "
+                       "jq . {file}"),
+                solution="nano {file} → исправить ошибку в строке, которую назвал jq → "
+                         "jq . {file}",
+                solution_script="print -r -- '{fixed}' > {file}",
+                wrong=("print -r -- '{{}}' > {file}",),
+                alternatives=("vim {file} — тот же ремонт в vim: x удаляет символ под "
+                              "курсором",)),
+    )
+    par = 40
+    hints = ("JSON проверяет jq: jq . ФАЙЛ.",
+             "Сломанный файл jq не печатает, а пишет parse error … at line N.",
+             "jq . {file} → номер после «at line» → ans НОМЕР")
+    solution = "jq . {file} → номер после «at line» → ans НОМЕР"
+    solution_script = "jq . {file} 2>&1 | grep -o 'line [0-9]*' | cut -d' ' -f2"
+    explain = ("jq . — быстрая проверка JSON: цел — напечатает красиво, сломан — назовёт "
+               "строку, где споткнулся; ошибка там или строкой выше.")
+    spell = "jq . файл.json — цел ли JSON (сломан — at line N)"
+
+    # вариант 2: ошибка → (как испортить строку, подсказка не нужна — её назовёт jq)
+    BREAKS = ("quotes", "case", "trailing")
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 1:
+            names = [f"{x}.json" for x in rng.sample(kit.LATIN, 3)]
+            good = rng.randrange(3)
+            bad = [i for i in range(3) if i != good]
+            for i, name in enumerate(names):
+                lines = json_lines(rng, rng.randint(5, 7))
+                if i == bad[0]:
+                    text = json_text(lines, skip_comma=rng.randint(0, len(lines) - 2))
+                elif i == bad[1]:
+                    text = json_text(lines).replace("\n}", ",\n}")     # запятая в конце
+                else:
+                    text = json_text(lines)
+                kit.write(box / name, text)
+            return {"f1": names[0], "f2": names[1], "f3": names[2], "answer": names[good],
+                    "bad1": names[bad[0]], "traps": [["broken", names[i]] for i in bad]}
+        file = rng.choice(["implant.json", "service.json", "deck.json"])
+        lines = json_lines(rng, rng.randint(6, 8))
+        if variant == 2:
+            good_text = json_text(lines)
+            kind = rng.choice(self.BREAKS)
+            if kind == "trailing":
+                broken = good_text.replace("\n}", ",\n}")
+            elif kind == "case" and any(": true" in x or ": false" in x for x in lines):
+                broken = good_text.replace(": true", ": True", 1).replace(": false", ": False", 1)
+            else:
+                i = next(n for n, x in enumerate(lines) if '": "' in x)
+                bad = lines[i].replace('"', "'", 2)
+                broken = good_text.replace(lines[i], bad, 1)
+            kit.write(box / file, broken)
+            good = json.loads(good_text)
+            return {"file": file, "good": good, "fixed": json.dumps(good, indent=2,
+                                                                     ensure_ascii=False)}
+        k = rng.randint(1, len(lines) - 3)          # не последние: wc -l ответа не даст
+        kit.write(box / file, json_text(lines, skip_comma=k))
+        # строка lines[k] — номер k + 2 в файле (первая — «{»); jq спотыкается на следующей
+        return {"file": file, "answer": k + 3, "accept": [k + 2, k + 3],
+                "traps": [["lines", len(lines) + 2]]}
+
+    trap_messages = {
+        "lines": "Это число строк файла, а нужен номер из сообщения jq — после «at line».",
+        "broken": "Этот файл jq не читает — parse error. Нужен целый.",
+    }
+
+    def answer_kind(self, state):
+        return "number" if variant_index(state.get("_variant"), 3) == 0 else "text"
+
+    def matches(self, given, ctx):
+        v = variant_index(ctx.state.get("_variant"), len(self.variants))
+        if v == 0:
+            return any(textnorm.same_number(given, n) for n in ctx.state["accept"])
+        if v == 1:
+            exp = str(ctx.state["answer"])
+            return (textnorm.same_text(given, exp) or
+                    textnorm.same_text(given, exp[:-len(".json")]))
+        return False
+
+    def wrong_message(self, given, ctx):
+        if ctx.state.get("_variant") == 2:
+            return "Здесь ответ сдавать не нужно — почини файл, и проверка заметит сама."
+        return super().wrong_message(given, ctx)
+
+    def check(self, ctx):
+        if variant_index(ctx.state.get("_variant"), len(self.variants)) != 2:
+            return super().check(ctx)
+        raw = sandbox.read_in_box(ctx.box, ctx.state["file"], kit.BOX_READ_CAP)
+        try:
+            data = json.loads((raw or b"").decode("utf-8"))
+        except ValueError:
+            data = None
+        if data == ctx.state["good"]:
+            return Verdict(True)
+        if ctx.answer is not None:
+            return Verdict(False, self.wrong_message(ctx.answer, ctx))
+        if isinstance(data, dict):
+            return Verdict(False, "JSON снова читается, но значения уже не те — верни их как "
+                                  "были (reset, если запутался).")
+        return Verdict(False)
+
+
+class BossTools(Task):
+    id = "boss_tools"
+    track = "tools"
+    title = "Сломанный конфиг"
+    boss = True
+    par = 300
+    scroll = ("jq . файл.json — проверить JSON: сломан — jq скажет, где: at line N (номер строки); "
+              "цел — напечатает его красиво.\n"
+              "Правила JSON: текст — в двойных кавычках, числа и true/false — без кавычек, "
+              "между элементами запятая, после последнего — нет.\n"
+              "Править — в nano или vim, как в прошлых задачах; после правки снова jq . файл.json")
+    steps = ("файл снова читается: jq . без ошибок",
+             "число из записки note.txt — на месте и без кавычек",
+             "остальное по записке и правилам JSON исправлено",
+             "то, что велено не трогать, — на месте")
+    variants = (
+        Variant("Конфиг service.json сломан — в нём 4 ошибки. Почини его в nano или vim "
+                "по записке note.txt. name и workers не трогай.",
+                wrong=("print -r -- '{{}}' > service.json",
+                       "print -r -- '{half}' > service.json"),
+                alternatives=("vim service.json — тот же ремонт в vim: x удаляет символ под "
+                              "курсором",)),
+        Variant("База не стартует: db.json сломан. В нём три ошибки JSON, а ещё два значения "
+                "расходятся с запиской note.txt. Почини файл в nano или vim. name и "
+                "replicas не трогай.",
+                hints=("Начни с проверки: jq . db.json — он покажет строку, где JSON сломан.",
+                       "Ключи и текст в JSON — только в двойных кавычках, после последнего "
+                       "элемента запятой нет. Числа и true/false — без кавычек.",
+                       "nano db.json → одинарные кавычки на двойные → ключ host взять в "
+                       "кавычки → убрать последнюю запятую → порт из записки → в readonly "
+                       "поставить true → jq . db.json"),
+                solution="nano db.json: кавычки везде двойные, ключ host в кавычках, без "
+                         "запятой в конце, порт {port}, в readonly — true; проверить: "
+                         "jq . db.json",
+                solution_script="print -r -- '{fixed}' > db.json",
+                wrong=("print -r -- '{{}}' > db.json",
+                       "print -r -- '{half}' > db.json"),
+                alternatives=("jq . db.json после каждой правки — ошибка сдвинется на "
+                              "следующую строку",)),
+        Variant("api.json сломан: в нём три ошибки JSON, а записка note.txt требует "
+                "добавить ещё одно поле. Почини файл в nano или vim. name, port и paths "
+                "не трогай.",
+                hints=("Начни с проверки: jq . api.json — покажет строку с первой ошибкой. "
+                       "Исправил — проверь снова.",
+                       "Между элементами — запятая, после последнего — нет; true пишется "
+                       "маленькими буквами. Новое поле — ещё одна пара «ключ: значение».",
+                       "nano api.json → запятая после строки name → True на true → убрать "
+                       "запятую в конце списка → добавить \"timeout\": {timeout} → "
+                       "jq . api.json"),
+                solution="nano api.json: запятая после name, True на true, без запятой в "
+                         "конце списка, добавить \"timeout\": {timeout}; проверить: "
+                         "jq . api.json",
+                solution_script="print -r -- '{fixed}' > api.json",
+                wrong=("print -r -- '{{}}' > api.json",
+                       "print -r -- '{half}' > api.json"),
+                alternatives=("jq .timeout api.json — проверить одно поле после правки",)),
+    )
+    hints = ("Начни с проверки: jq . service.json — он покажет строку, где JSON сломан.",
+             "После последнего элемента в JSON запятую не ставят — ни в списке, ни в объекте. "
+             "Порт — число, пиши без кавычек. Второй host удали целиком.",
+             "nano service.json → убрать 2 лишние запятые → \"5432\" заменить на порт из записки → "
+             "true на false → удалить второй host → оставшийся host → 127.0.0.1 → сохранить → "
+             "jq . service.json")
+    solution = ("nano service.json: убрать лишние запятые, порт {port} без кавычек, debug false, "
+                "один host 127.0.0.1; проверить: jq . service.json")
+    solution_script = "print -r -- '{fixed}' > service.json"
+    explain = ("jq . файл — лучшая проверка JSON: ткнёт пальцем, где сломано, а целый файл "
+               "напечатает красиво.")
+    spell = "jq . файл.json — проверить и красиво показать JSON"
+
+    MODE_STEPS = (
+        ("service.json снова читается: jq . service.json без ошибок",
+         "port — число из записки note.txt (без кавычек)",
+         "debug выключен: false",
+         "host ровно один, и он 127.0.0.1"),
+        ("db.json снова читается: jq . db.json без ошибок",
+         "port — число из записки note.txt (без кавычек)",
+         "readonly включён: true",
+         "name и host на месте, ключи в двойных кавычках"),
+        ("api.json снова читается: jq . api.json без ошибок",
+         "timeout — число из записки note.txt (без кавычек)",
+         "retry — true, маленькими буквами",
+         "name, port и paths не тронуты"),
+    )
+
+    def steps_for(self, state):
+        return list(self.MODE_STEPS[variant_index(state.get("_variant", 0),
+                                                  len(self.MODE_STEPS))])
+
+    def setup_variant(self, box, rng, variant):
+        name_rand = kit.latin(rng)
+        if variant == 1:
+            port, name = rng.randint(6000, 6999), f"db-{name_rand}"
+            broken = ('{\n'
+                      f"  'name': '{name}',\n"
+                      '  host: "127.0.0.1",\n'
+                      '  "port": 5432,\n'
+                      '  "replicas": [1, 2],\n'
+                      '  "readonly": false,\n'
+                      '}\n')
+            note = (f"База должна слушать порт {port}. Режим только для чтения (readonly) — "
+                    "включить.\n")
+            good = {"name": name, "host": "127.0.0.1", "port": port, "replicas": [1, 2],
+                    "readonly": True}
+            half = dict(good, port=5432)
+            keep = {"name": name, "host": "127.0.0.1", "replicas": [1, 2]}
+            return self._write(box, "db", "db.json", broken, note, good, half, keep,
+                               port=port)
+        if variant == 2:
+            timeout, name = rng.randint(5, 120), f"api-{name_rand}"
+            broken = ('{\n'
+                      f'  "name": "{name}"\n'
+                      '  "retry": True,\n'
+                      '  "paths": ["/v1", "/v2",],\n'
+                      '  "port": 8080\n'
+                      '}\n')
+            note = f"Добавь в api.json таймаут: поле timeout, {timeout} секунд, числом.\n"
+            good = {"name": name, "retry": True, "paths": ["/v1", "/v2"], "port": 8080,
+                    "timeout": timeout}
+            half = dict(good, timeout=str(timeout))
+            keep = {"name": name, "port": 8080, "paths": ["/v1", "/v2"]}
+            return self._write(box, "api", "api.json", broken, note, good, half, keep,
+                               timeout=timeout)
+        port, name = rng.randint(6000, 6999), f"service-{name_rand}"
+        broken = ('{\n'
+                  f'  "name": "{name}",\n'
+                  '  "host": "0.0.0.0",\n'
+                  '  "port": "5432",\n'
+                  '  "debug": true,\n'
+                  '  "host": "0.0.0.0",\n'
+                  '  "workers": [1, 2, 3,],\n'
+                  '}\n')
+        note = f"Сервис должен слушать порт {port} на хосте 127.0.0.1. Отладку — выключить.\n"
+        good = {"name": name, "host": "127.0.0.1", "port": port, "debug": False,
+                "workers": [1, 2, 3]}
+        half = dict(good, port=str(port))
+        keep = {"name": name, "workers": [1, 2, 3]}
+        return self._write(box, "service", "service.json", broken, note, good, half, keep,
+                           port=port)
+
+    @staticmethod
+    def _write(box, mode, file, broken, note, good, half, keep, **extra):
+        kit.write(box / file, broken)
+        kit.write(box / "note.txt", note)
+        state = {"mode": mode, "file": file, "name": good["name"], "keep": keep,
+                 "fixed": json.dumps(good, indent=2), "half": json.dumps(half, indent=2)}
+        state.update(extra)
+        return state
+
+    def _parse(self, ctx):
+        f = ctx.box / ctx.state.get("file", "service.json")
+        if not f.is_file():
+            return None, ""
+        text = f.read_text("utf-8", errors="replace")
+        try:
+            return json.loads(text), text
+        except ValueError:
+            return None, text
+
+    def progress(self, ctx):
+        s = ctx.state
+        data, text = self._parse(ctx)
+        ok = isinstance(data, dict)
+        get = data.get if ok else (lambda k, d=None: d)
+        mode = s.get("mode", "service")
+        if mode == "db":
+            port = type(get("port")) is int and get("port") == s["port"]
+            return [ok, port, get("readonly") is True,
+                    get("name") == s["name"] and get("host") == "127.0.0.1"]
+        if mode == "api":
+            timeout = type(get("timeout")) is int and get("timeout") == s["timeout"]
+            return [ok, timeout, get("retry") is True,
+                    all(get(k) == v for k, v in s["keep"].items())]
+        port = type(get("port")) is int and get("port") == s["port"]
+        host = ok and text.count('"host"') == 1 and get("host") == "127.0.0.1"
+        return [ok, bool(port), get("debug") is False, bool(host)]
+
+    def check(self, ctx):
+        if not all(self.progress(ctx)):
+            return Verdict(False)
+        data, _ = self._parse(ctx)
+        keep = ctx.state.get("keep") or {"name": ctx.state["name"], "workers": [1, 2, 3]}
+        lost = sorted(k for k, v in keep.items() if data.get(k) != v)
+        if lost:
+            return Verdict(False, f"Пропали или изменились {', '.join(lost)} — верни их как "
+                                  "были (reset, если всё сломалось).")
+        return Verdict(True)
+
+
+TASKS = [ManFlag(), FlagUse(), LessSearch(), NanoConfig(), VimTrap(), VimEscape(), VimPurge(),
+         BrewLesson(), TldrTar(), JsonCheck(), BatLines(), BossTools()]
