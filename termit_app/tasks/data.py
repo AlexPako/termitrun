@@ -84,10 +84,8 @@ class HeadTail(_DataAnswer):
               "посчитает и её. Колонки разделены запятыми; первая здесь — id.")
     variants = (
         Variant("В orders.csv выгрузка заказов. Сколько в ней заказов — строк данных без "
-                "заголовка? И какой id у самого последнего? Ответ: ans ЧИСЛО ID",
-                wrong=("print -r -- $(wc -l < orders.csv) $(tail -n 1 orders.csv | cut -d, -f1)",
-                       "print -r -- $(( $(wc -l < orders.csv) - 1 )) "
-                       "$(head -n 2 orders.csv | tail -n 1 | cut -d, -f1)"),
+                "заголовка? Ответ: ans ЧИСЛО",
+                wrong=("print -r -- $(wc -l < orders.csv)",),
                 alternatives=("tail -n +2 orders.csv | wc -l — строки без заголовка сразу, "
                               "вычитать не нужно",)),
         Variant("Глянь на края orders.csv: какой id у самого первого заказа — первой строки под "
@@ -120,13 +118,12 @@ class HeadTail(_DataAnswer):
                 alternatives=("cat day_*.csv | wc -l — то же число, что total; заголовки вычти "
                               "сам",)),
     )
-    hints = ("Края файла показывают head и tail, строки считает wc -l.",
-             "wc -l orders.csv считает и заголовок — вычти 1. Последняя строка — tail -n 1, id "
-             "стоит до первой запятой.",
-             "wc -l orders.csv → минус 1; tail -n 1 orders.csv → первое поле. Сдай: ans ЧИСЛО ID")
-    solution = "wc -l orders.csv; tail -n 1 orders.csv"
-    solution_script = ("print -r -- $(( $(wc -l < orders.csv) - 1 )) "
-                       "$(tail -n 1 orders.csv | cut -d, -f1)")
+    hints = ("Строки файла считает wc -l, а начало файла покажет head.",
+             "wc -l orders.csv считает и заголовок — первую строку с названиями колонок. "
+             "Вычти 1.",
+             "wc -l orders.csv → минус 1. Сдай: ans ЧИСЛО")
+    solution = "wc -l orders.csv"
+    solution_script = "print -r -- $(( $(wc -l < orders.csv) - 1 ))"
     explain = ("Любую выгрузку первым делом меряй: head — что за колонки, tail — чем кончается, wc "
                "-l — сколько строк. Только помни: заголовок wc -l тоже считает. Заказов в файле на "
                "строку меньше, чем строк, а в total сидит по заголовку на каждый файл — вычти их "
@@ -163,8 +160,8 @@ class HeadTail(_DataAnswer):
             kit.write(Path(box) / ORDERS, datakit.render_orders(rows))
             return {"answer": [first["id"], last["date"]],
                     "traps": [["name", "id"], ["first", first["date"]]]}
-        return {"answer": [len(rows), last["id"]],
-                "traps": [["header", len(rows) + 1], ["first", first["id"]]]}
+        # FB12 (N21): первая задача места — один вопрос: только число заказов
+        return {"answer": len(rows), "traps": [["header", len(rows) + 1]]}
 
 
 # --- D6 ------------------------------------------------------------------------------------
@@ -1831,7 +1828,8 @@ class SedFix(Task):
     solution = r"sed -e 's/;/,/g' -e 's/\./-/g' excel.csv > fixed.csv"
     explain = ("sed правит строки по шаблону: s/было/стало/g, а в sed -E группы ( ) с \\1 "
                "переставляют куски. Результат сваливай через > в новый файл; на месте — sed -i '' "
-               "(на Mac без пустых кавычек никак).")
+               "(на Mac без пустых кавычек никак). Замена всех точек годится, только пока точки "
+               "есть лишь в датах; в жизни меняй по шаблону даты.")
     spell = (r"sed 's/было/стало/g' файл > новый — замена; sed -E 's/(..)-(..)/\2-\1/' — группы; "
              "sed -i '' — на месте")
 

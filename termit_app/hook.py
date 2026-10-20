@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 
 from termit_app import book as book_mod
-from termit_app import edition, extensions, judge, loot, progress, sandbox, shop, story, theme, tui, ui
+from termit_app import (edition, extensions, judge, layout, loot, progress, sandbox, shop,
+                        story, syserrors, theme, tui, ui)
 from termit_app.tasks import registry
 from termit_app.tasks.base import AnswerTask, Verdict, grep_recursive, grep_waits
 
@@ -125,7 +126,12 @@ def precmd(box, rc, pwd) -> int:
     cmds = sandbox.read_cmds(box)
     if not cmds:
         return 0          # первое приглашение — владелец ещё ничего не делал
+    fresh = len(cmds) > sandbox.counter(box, "seen_cmds")     # не пустой Enter после команды
     _interrupted(box, rc, cmds)
+    if fresh:             # FB12 (N6): системная ошибка впервые — перевод одной строкой
+        note = syserrors.explain_once(box, rc, pwd, cmds[-1].line)
+        if note:
+            ui.say(note)
     task, state = _load(box)
     if not sandbox.inside(Path(pwd), box):
         ui.warn(f"ты вне песочницы: {pwd} — вернуться: cd $TERMIT_BOX")
@@ -517,6 +523,11 @@ def main(argv) -> int:
         if cmd == "keys":       # FB2: шпаргалка клавиш — задачу не трогает; keys hacks — FB10
             ui.say(ui.keys_sheet(args))
             return 0
+        if cmd == "layout":     # FB5 п. 40: «ды» вместо ls — подсказка про раскладку
+            note = layout.hint(" ".join(args))
+            if note:
+                ui.say(note)
+            return 0 if note else 1
         if cmd == "ext":        # FB3: копилка расширений — задачу не трогает
             ui.say(extensions.sheet(extensions.read_box(box)))
             return 0

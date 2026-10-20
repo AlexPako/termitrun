@@ -76,7 +76,9 @@ def empty() -> dict:
             # FB3: копилка расширений — встреченные в заданиях, по порядку (termit_app.extensions)
             "extensions": [],
             # FB5: команды ./termit СЛОВО, которым уже показана строка «что это» (ui.glossary)
-            "cmds_seen": []}
+            "cmds_seen": [],
+            # FB12 (N6): системные ошибки, которые игрок уже видел с переводом (syserrors)
+            "errors_seen": []}
 
 
 def _reserve_backup(path: Path) -> Path:
@@ -162,6 +164,12 @@ def _normalize(p: dict) -> None:
                        if isinstance(ext, list) else [])
     seen = p.get("cmds_seen")                    # FB5: встреченные команды — список строк
     p["cmds_seen"] = [x for x in seen if isinstance(x, str)] if isinstance(seen, list) else []
+    tasks = p.get("tasks") if isinstance(p.get("tasks"), dict) else {}
+    for rec in tasks.values():                   # FB12 (п. 34): выпавшие варианты — числа
+        if isinstance(rec, dict) and "seen_variants" in rec:
+            rec["seen_variants"] = seen_variants(rec)
+    errs = p.get("errors_seen")                  # FB12 (N6): переведённые ошибки — строки
+    p["errors_seen"] = [x for x in errs if isinstance(x, str)] if isinstance(errs, list) else []
     owned = p.get("owned")
     p["owned"] = [x for x in owned if isinstance(x, str)] if isinstance(owned, list) else []
     from termit_app import weekly                # C2 М5: испорченный контракт — пустой
@@ -317,7 +325,7 @@ def variant_history(rec: Optional[dict], n: int) -> List[int]:
 
 
 def pick_variant(rec: Optional[dict], n: int, rng,
-                 allowed: Optional[Iterable[int]] = None) -> int:
+                 allowed: Optional[Iterable[int]] = None, prefer: Optional[int] = None) -> int:
     """Какой вариант выдать на повторе: сначала ни разу не выпадавшие, иначе наименее
     недавний; тот же, что в прошлый раз, — никогда (если вариантов больше одного).
     Среди равных решает rng. allowed — какие варианты можно выдать здесь (Task.allowed_variants:
@@ -328,6 +336,8 @@ def pick_variant(rec: Optional[dict], n: int, rng,
         or list(range(n))
     if len(pool) == 1:
         return pool[0]
+    if prefer in pool:          # FB12 (п. 34): вариант-практика стража — на первом повторе
+        return prefer
     history = variant_history(rec, n)
     unseen = [v for v in pool if v not in history]
     if unseen:
@@ -362,11 +372,24 @@ def note_review(rec: dict, variant: Optional[int], solution: str, alts: List[str
 
 
 def note_variant(rec: dict, variant: Optional[int]) -> None:
-    """Дописать выданный вариант в историю записи (последние VARIANTS_KEEP)."""
+    """Дописать выданный вариант в историю записи (последние VARIANTS_KEEP) и в множество
+    когда-либо выпавших (seen_variants: история короткая, а страж ждёт вариант-практику)."""
     if variant is None:
         return
+    rec["seen_variants"] = sorted(set(seen_variants(rec)) | {int(variant)})
     hist = rec.get("variants") if isinstance(rec.get("variants"), list) else []
     rec["variants"] = (hist + [int(variant)])[-VARIANTS_KEEP:]
+
+
+def seen_variants(rec: Optional[dict]) -> List[int]:
+    """Какие варианты задачи у игрока хоть раз выпадали (FB12, п. 34). Старое сохранение без
+    seen_variants — по истории variants; запись без истории — только вариант 0."""
+    if not rec:
+        return []
+    raw = rec.get("seen_variants")
+    if not isinstance(raw, list):
+        raw = rec.get("variants") if isinstance(rec.get("variants"), list) else [0]
+    return sorted({v for v in raw if isinstance(v, int) and not isinstance(v, bool) and v >= 0})
 
 
 def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, today: date,

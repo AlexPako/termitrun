@@ -135,9 +135,9 @@ class FlagUse(AnswerTask):
     track = "tools"
     title = "Найди флаг и примени"
     scroll = ("Флаг не помнишь — найди сам: man КОМАНДА, /слово и Enter, q — выйти. Не "
-              "системные программы покажут флаги и по --help: jq --help; примеры даст tldr (он позже).\n"
-              "Значение флага идёт следом: head -n 3 — три строки (n — number, число). Длинные "
-              "флаги — словами: grep --ignore-case = grep -i.\n"
+              "системные — по --help: jq --help; примеры даст tldr (он позже).\n"
+              "Значение флага идёт следом: head -n 3 — три строки (n — number). grep СЛОВО "
+              "файл — строки со словом; длинно: grep --ignore-case = grep -i.\n"
               "-- — конец флагов: в rm -- -old.txt имя с минусом — файл, а не флаг.")
     variants = (
         Variant("Сколько строк со словом ERROR в server.log? grep умеет сам считать совпавшие "
@@ -378,7 +378,8 @@ class NanoConfig(Task):
     hints = ("Открой файл: nano app.conf",
              "Ctrl+W port — найти строку (попал на backup_port — Ctrl+W и Enter ищут дальше); "
              "исправь число; на строке debug нажми Ctrl+K.",
-             "Ctrl+O, Enter — сохранить; Ctrl+X — выйти. Проверить: cat app.conf")
+             "nano app.conf: исправь port, Ctrl+K на строке debug, Ctrl+O, Enter — сохранить, "
+             "Ctrl+X — выйти. Проверить: cat app.conf")
     solution = "nano app.conf, исправить port, Ctrl+K на строке debug, Ctrl+O, Enter, Ctrl+X"
     solution_script = "sed -i '' -e 's/^port = 5432$/port = 6432/' -e '/^debug = /d' app.conf"
     explain = "Так конфиги на серверах и правят: открыл, нашёл, поправил, сохранил."
@@ -650,7 +651,7 @@ class VimPurge(Task):
                 hints=("vim list.txt — повторы видно глазами: листай вниз стрелкой или j "
                        "(в vim это тоже «вниз»).",
                        "Встань на вторую копию и нажми dd; удалил не то — u.",
-                       "vim list.txt, на каждой второй копии dd, :wq"),
+                       "vim list.txt, dd на каждой второй копии, :wq"),
                 solution="vim list.txt, dd на каждой второй копии, :wq",
                 solution_script="vim -Es -u NONE '+g/^\\(.*\\)\\n\\1$/d' +wq list.txt",
                 wrong=("sort -u -o list.txt list.txt",
@@ -675,7 +676,7 @@ class VimPurge(Task):
     par = 90
     hints = ("vim rules.txt, потом /SPAM — найти первую.",
              "dd — удалить строку, n — к следующей находке.",
-             "/SPAM, dd, n, dd … (нужную строку удалил — u), :wq")
+             "vim rules.txt, /SPAM, dd, n, dd … (нужную строку удалил — u), :wq")
     solution = "vim rules.txt, /SPAM, dd, n, …, :wq"
     solution_script = "vim -Es -u NONE '+g/^SPAM /d' +wq rules.txt"
     explain = "Поиск, dd, n — и строки чистятся пачкой; промахнулся — u спасёт."
@@ -1013,7 +1014,8 @@ class TldrTar(Task):
 
 class BatLines(AnswerTask):
     """Пара «до/после» к less_search (часть 5): номера строк встроенными (cat -n, grep -n,
-    sed -n), утилита bat — только быстрее и нагляднее."""
+    sed -n), утилита bat — только быстрее и нагляднее. FB12 (N12): эталон варианта 0 —
+    cat -n и глазами, grep -e с двумя шаблонами — «можно и так»."""
     id = "bat_lines"
     track = "tools"
     title = "Строка по номеру"
@@ -1029,7 +1031,9 @@ class BatLines(AnswerTask):
         Variant("В config.yaml несколько блоков настроек, и в каждом есть свой timeout. "
                 "На какой строке файла стоит timeout блока {block}? Ответ: ans НОМЕР",
                 wrong=("grep -n timeout config.yaml | head -1 | cut -d: -f1",),
-                alternatives=("cat -n config.yaml — и найти глазами",
+                alternatives=("grep -n -e '^[a-z]' -e timeout config.yaml — только заголовки "
+                              "блоков и их timeout, по порядку (e — expression, ^[a-z] — "
+                              "строка с буквы, без отступа)",
                               "less -N config.yaml — -N покажет номера строк прямо в less")),
         Variant("В events.log {total} строк, и все разные. Какая из них стоит под номером "
                 "{n}? Сдай её целиком: ans СТРОКА",
@@ -1062,13 +1066,11 @@ class BatLines(AnswerTask):
                               "по очереди",)),
     )
     par = 45
-    hints = ("Номер строки покажет grep -n — но timeout есть в каждом блоке.",
-             "Два шаблона сразу: grep -n -e '^[a-z]' -e timeout — заголовки блоков и их timeout "
-             "по порядку. ^[a-z] — строка начинается с буквы (от a до z), без отступа: так "
-             "выглядят заголовки.",
-             "grep -n -e '^[a-z]' -e timeout config.yaml — номер под {block}:; утилитой: "
-             "bat -n config.yaml")
-    solution = "grep -n -e '^[a-z]' -e timeout config.yaml"
+    hints = ("Номера строк печатает cat -n — весь файл с номерами слева.",
+             "timeout есть в каждом блоке: найди глазами заголовок {block}: (строка без "
+             "отступа) и первый timeout под ним.",
+             "cat -n config.yaml — номер timeout под {block}:; утилитой: bat -n config.yaml")
+    solution = "cat -n config.yaml"
     solution_script = ("grep -n -e '^{block}:' -e 'timeout:' config.yaml | grep -A1 '{block}:' "
                        "| tail -1 | cut -d: -f1")
     implant_script = ("bat --decorations=always --color=never -n config.yaml | "

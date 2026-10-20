@@ -349,7 +349,8 @@ class CsvByHand(_Sheet):
 
 
 class CsvTop(_Sheet):
-    """Пара к qsv: самое частое и уникальное. Встроенный путь — sort | uniq -c | sort -n."""
+    """Пара к qsv: самое частое и уникальное. Встроенный путь — sort | uniq -c | sort -n.
+    FB12 (N10): в варианте 0 адреса без кавычек — новое только частотный словарь."""
     id = "csv_top"
     title = "Самое частое"
     implant = "qsv"
@@ -365,9 +366,10 @@ class CsvTop(_Sheet):
         Variant("В orders.csv — заказы за полгода. Из какого города заказывают чаще всего? "
                 "Ответ — название, как в таблице: ans ГОРОД",
                 wrong=("cut -d, -f5 orders.csv | tail -n +2 | sort | uniq -c | sort -n | "
-                       "tail -1 | awk '{{print $2}}'",),
-                alternatives=("qsv frequency -s city orders.csv — частоты колонки с учётом "
-                              "кавычек",)),
+                       "head -1 | awk '{{print $2}}'",),
+                alternatives=("qsv frequency -s city orders.csv — частоты колонки сразу",
+                              "awk -F, '{{print $(NF-2)}}' вместо cut -f5 — то же счётом "
+                              "справа: выручит, когда в адресах будут кавычки")),
         Variant("Сколько разных клиентов в orders.csv? Клиент — код в колонке customer. Гостевой "
                 "заказ без кода (пустая ячейка) — не клиент, заголовок — тоже. Ответ — число: "
                 "ans ЧИСЛО",
@@ -385,7 +387,9 @@ class CsvTop(_Sheet):
                 wrong=("cut -d, -f3 orders.csv | sort -u | wc -l",
                        "cut -d, -f3 orders.csv | tail -n +2 | sort -u | wc -l"),
                 alternatives=("qsv select customer orders.csv | qsv dedup | qsv count — и "
-                              "вычесть пустую ячейку, если она есть",)),
+                              "вычесть пустую ячейку, если она есть",),
+                explain="customer левее адреса с кавычками — тут cut не врёт; sort -u "
+                        "оставляет каждого по разу, grep -c . считает только непустые."),
         Variant("Какой статус чаще всего у заказов за {month}? Дата — в колонке date, вид "
                 "ГГГГ-ММ-ДД. Ответ — статус, как в таблице: ans СТАТУС",
                 hints=("Заказы месяца оставит grep ',{month}-': дата — вторая колонка, перед ней "
@@ -406,26 +410,25 @@ class CsvTop(_Sheet):
                        "awk -F, 'NR>1 {{print $(NF-1)}}' orders.csv | sort | uniq -c | sort -n | "
                        "tail -1 | awk '{{print $2}}'"),
                 alternatives=("qsv search -s date '^{month}' orders.csv | qsv frequency -s "
-                              "status",)),
+                              "status",),
+                explain="awk -F, режет по каждой запятой и кавычек не понимает; спасает счёт "
+                        "справа ($NF), пока капризная колонка одна. Если лишние запятые в двух "
+                        "колонках — нужен разборщик CSV: qsv или duckdb."),
     )
     par = 90
-    hints = ("Самое частое значение колонки: вырезать её, sort | uniq -c посчитает одинаковые, "
-             "sort -n поставит самое частое в конец.",
-             "cut тут врёт: в адресах кавычки с запятыми, всё правее адреса съезжает. Город — "
-             "третье поле с конца: awk -F, '{{print $(NF-2)}}'.",
-             "awk -F, '{{print $(NF-2)}}' orders.csv | tail -n +2 | sort | uniq -c | sort -n | "
-             "tail -1 — утилитой: qsv frequency -s city orders.csv")
-    solution = ("awk -F, '{{print $(NF-2)}}' orders.csv | tail -n +2 | sort | uniq -c | "
-                "sort -n | tail -1")
+    hints = ("Самое частое значение колонки: вырежи её (city — пятая: cut -d, -f5) и срежь "
+             "заголовок — tail -n +2.",
+             "sort | uniq -c посчитает одинаковые, sort -n поставит самое частое в конец, "
+             "tail -1 — последняя строка.",
+             "cut -d, -f5 orders.csv | tail -n +2 | sort | uniq -c | sort -n | tail -1 — "
+             "утилитой: qsv frequency -s city orders.csv")
+    solution = "cut -d, -f5 orders.csv | tail -n +2 | sort | uniq -c | sort -n | tail -1"
     solution_script = solution + " | awk '{{print $2}}'"
     # без --limit: значений меньше 10 (лимит по умолчанию), строки Other нет; вывод — по
     # убыванию, вторая строка (после шапки field,value,count,…) — лидер
     implant_script = "qsv frequency -s city orders.csv | sed -n 2p | cut -d, -f2"
-    explain = ("sort | uniq -c | sort -n — частотный словарь из трёх команд. awk -F, режет по "
-               "каждой запятой и кавычек не понимает; спасает счёт справа ($NF), пока капризная "
-               "колонка одна. Проверь это: awk -F, '{print NF}' f | sort | uniq -c — без "
-               "кавычек 7 полей, с ними 8–9. Лишние запятые в двух колонках — справа тоже врёт, "
-               "нужен разборщик CSV: qsv или duckdb.")
+    explain = ("sort | uniq -c | sort -n — частотный словарь из трёх команд: uniq -c считает "
+               "одинаковые строки подряд, поэтому сначала sort.")
     spell = "sort | uniq -c | sort -n | tail -1 — самое частое значение"
 
     def setup_variant(self, box, rng, variant):
@@ -438,11 +441,12 @@ class CsvTop(_Sheet):
                     "traps": [["head_empty", answer + 2], ["empty", answer + 1]]}
         if variant == 2:
             return self._month(box, rng, rows)
+        # FB12 (N10): первая встреча — один новый приём, частотный словарь; адреса без
+        # запятых, cut -f5 честен. Кавычки и счёт справа — повторы (вариант 2)
+        for r in rows:
+            r["address"] = r["address"].replace(",", "")
         city = rng.choice(CITIES)
         push_top(rows, "city", city, rng)
-        # cut -d, -f5 | sort | uniq -c: у строк с кавычками в поле 5 — кусок адреса
-        sink_naive(rows, [r for r in rows if r["city"] == city], city, rng,
-                   lambda r: (naive_row(r, 5), 1))
         write(box, finish(rows))
         return {"answer": city}
 

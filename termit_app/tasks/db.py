@@ -606,18 +606,18 @@ class SqliteOpen(_DbAnswer):
               "сначала ls.\n"
               "Застрял на ...> (нет ;) — ; и Enter или Ctrl+D. ans и hint в sqlite> не работают.")
     variants = (
-        Variant("В папке — учебная база records.db. Сколько в ней таблиц и в какой из них "
-                "есть колонка {col}? Ответ: ans ЧИСЛО ТАБЛИЦА",
-                hints=("Таблицы перечислит .tables, их колонки — .schema.",
-                       ".schema без имени печатает все таблицы сразу — ищи в ней {col}.",
-                       "sqlite3 records.db \".tables\" \".schema\""),
-                solution='sqlite3 records.db ".tables" ".schema"',
-                solution_script=('print -r -- $(sqlite3 records.db "' + _COUNT_TABLES +
-                                 '") $(sqlite3 records.db "' + _TABLE_OF + '")'),
-                wrong=('print -r -- $(sqlite3 record.db ".tables" | wc -w) {goal}',
-                       'print -r -- $(sqlite3 records.db ".tables" | wc -w)'),
-                alternatives=("sqlite3 records.db, а внутри по очереди .tables, .schema и .quit — "
-                              "то же изнутри",)),
+        # FB12 (N21): первая задача места — один вопрос (сколько таблиц); колонки (.schema)
+        # — повторы 1 и 2
+        Variant("В папке — учебная база records.db. Сколько в ней таблиц? Ответ: ans ЧИСЛО",
+                hints=("Таблицы перечислит .tables — прямо из оболочки, без захода в базу.",
+                       "sqlite3 records.db \".tables\" печатает имена таблиц — пересчитай их.",
+                       "sqlite3 records.db \".tables\" — и сдай число имён: ans ЧИСЛО"),
+                solution='sqlite3 records.db ".tables"',
+                solution_script='sqlite3 records.db "' + _COUNT_TABLES + '"',
+                wrong=('sqlite3 record.db ".tables" | wc -w',),
+                alternatives=("sqlite3 records.db, а внутри .tables и .quit — то же изнутри",
+                              "| wc -w после .tables — пересчитать имена командой: wc -w "
+                              "считает слова")),
         Variant("Сколько колонок в таблице {table} базы records.db? Ответ: ans ЧИСЛО",
                 hints=("Колонки таблицы показывает .schema с её именем.",
                        "В скобках после CREATE TABLE {table} — колонки через запятую.",
@@ -679,10 +679,7 @@ class SqliteOpen(_DbAnswer):
                             and sum(_WHAT[x][1] in cols[y] for y in names) == 1])
             what, col = _WHAT[t]
             return dict(st, goal=t, what=what, col=col, answer=t, traps=[["column", col]])
-        seen = Counter(c for t in names for c in cols[t])
-        col = rng.choice(sorted(c for c, n in seen.items() if n == 1 and c not in busy))
-        t = next(t for t in names if col in cols[t])
-        return dict(st, col=col, goal=t, answer=[len(names), t], traps=[])
+        return dict(st, answer=len(names), traps=[])
 
 
 def _catalog_rows(data: bytes, names) -> dict:

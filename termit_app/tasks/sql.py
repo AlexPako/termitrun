@@ -559,19 +559,6 @@ _NAV_EXTRA = {
         "CREATE TABLE branches (id integer PRIMARY KEY, district text NOT NULL, opened_on date "
         "NOT NULL, meta jsonb NOT NULL)"),
 }
-# тип графы, как его печатает \d (PostgreSQL): только однословные — их и спрашиваем
-NAV_TYPES = {
-    ("customers", "district"): "text", ("customers", "email"): "text",
-    ("invoices", "amount"): "integer", ("invoices", "status"): "text",
-    ("payments", "invoice_id"): "integer", ("employees", "dept"): "text",
-    ("employees", "manager_id"): "integer", ("rates", "rate"): "integer",
-    ("rates", "note"): "text", ("events", "payload"): "jsonb", ("ledger", "kind"): "text",
-    ("audit_log", "actor"): "text",
-    ("archive_2025", "closed_on"): "date", ("archive_2025", "amount"): "integer",
-    ("flags", "active"): "boolean", ("flags", "code"): "text",
-    ("limits", "cap"): "numeric", ("branches", "opened_on"): "date",
-    ("branches", "meta"): "jsonb",
-}
 # таблицы общей схемы, где ровно одна графа разрешает NULL (вариант B)
 NAV_NULLABLE = {"customers": "email", "payments": "invoice_id", "employees": "manager_id",
                 "audit_log": "row_id"}
@@ -580,10 +567,6 @@ NAV_DATABASES = 4                        # postgres, template0, template1, vault
 # лишние пустые базы сервера задачи (от 1 до 3, ревью B2 M3): число баз в \l — от зерна
 NAV_EXTRA_DBS = ("archive", "reports", "staging", "legacy")
 NAV_DT_FRAME = 5                         # строк рамки у psql -c "\dt": заголовок, шапка, черта, итог, пустая
-
-_NAV_TYPES_SQL = ("SELECT format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = "
-                  "'{table}'::regclass AND attname = '{col}'")
-
 
 def _nav_extra_rows(rng, table: str, n: int) -> List[dict]:
     out = []
@@ -619,20 +602,20 @@ class PsqlNav(SqlAnswer):
               "Без захода — флаг -c (command): psql -c \"\\dt\"; два запроса — два -c: psql -c "
               "\"\\dt\" -c \"\\d invoices\".")
     variants = (
-        Variant("Учебная база vault уже ждёт: psql — и ты внутри. Сколько в ней таблиц (\\dt) и "
-                "какого типа графа {col} в таблице {table}? Ответ: ans ЧИСЛО ТИП",
-                hints=("Таблицы перечислит \\dt, графы одной таблицы и их типы — \\d с её "
-                       "именем.",
-                       "Таблиц столько, сколько написано внизу: (N rows). Тип — во второй "
-                       "колонке вывода \\d, напротив {col}.",
-                       "psql -c \"\\dt\" -c \"\\d {table}\""),
-                solution='psql -c "\\dt" -c "\\d {table}"',
-                solution_script=('print -r -- $(psql -At -c "SELECT COUNT(*) FROM pg_tables '
-                                 "WHERE schemaname = 'public'\") $(psql -At -c \"" +
-                                 _NAV_TYPES_SQL + '")'),
-                wrong=('print -r -- $(psql -c "\\dt" | wc -l) {ctype}',
-                       'psql -At -c "\\dt" | wc -l'),
-                alternatives=("psql, внутри \\dt и \\d {table}, выход \\q — то же изнутри",)),
+        # FB12 (N21): первая задача места — один вопрос (сколько таблиц); тип графы (\\d) —
+        # повтор, вариант 1
+        Variant("Учебная база vault уже ждёт: psql — и ты внутри. Сколько в ней таблиц (\\dt)? "
+                "Ответ: ans ЧИСЛО",
+                hints=("Таблицы перечислит \\dt — внутри psql или снаружи: psql -c \"\\dt\".",
+                       "Таблиц столько, сколько написано внизу вывода: (N rows).",
+                       "psql -c \"\\dt\" — и сдай число из (N rows): ans ЧИСЛО"),
+                solution='psql -c "\\dt"',
+                solution_script=('psql -At -c "SELECT COUNT(*) FROM pg_tables '
+                                 "WHERE schemaname = 'public'\""),
+                wrong=('psql -c "\\dt" | wc -l',),
+                alternatives=("psql, внутри \\dt, выход \\q — то же изнутри",
+                              "psql -At -c \"\\dt\" | wc -l — без рамок (-A) и шапки (-t) "
+                              "строк ровно столько, сколько таблиц")),
         Variant("В таблице {table} учебной базы одна графа может остаться пустой: у остальных "
                 "в \\d стоит not null — графа обязательна. Какая это графа? Ответ: ans ГРАФА",
                 hints=("Графы таблицы с пометками покажет \\d и имя таблицы.",
@@ -708,12 +691,8 @@ class PsqlNav(SqlAnswer):
             n = NAV_DATABASES + len(data.databases)
             return {"ndb": n, "answer": [n, pgkit.RUNNER],
                     "traps": [["owner", [n, pgkit.SUPERUSER]]]}
-        pick = sorted(k for k in NAV_TYPES if k[0] in tables)
-        table, col = rng.choice(pick)
-        ctype = NAV_TYPES[(table, col)]
         n = len(tables)
-        return {"table": table, "col": col, "ctype": ctype, "answer": [n, ctype],
-                "traps": [["lines", [n + NAV_DT_FRAME, ctype]]]}
+        return {"answer": n, "traps": [["lines", n + NAV_DT_FRAME]]}
 
 
 # --- 2. psql_pipe ---------------------------------------------------------------------------------

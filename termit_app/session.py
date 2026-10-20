@@ -14,7 +14,7 @@ from termit_app import book as book_mod
 from termit_app import (contracts, cosmetics, edition, extensions, field, freezes, goal,
                         hideout, hook, implants, judge, lifehacks,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
-                        repute, sound, story, theme, ui, warehouse, weekly)
+                        repute, sound, story, syserrors, theme, ui, warehouse, weekly)
 from termit_app.tasks import dbkit, registry
 from termit_app.tasks.base import variant_index
 
@@ -99,7 +99,8 @@ def next_new(p: dict, limit: int) -> List[str]:
         fresh = [t.id for t in ts if not t.boss and available(t) and not progress.seen(p, t.id)
                  and after_done(p, t)]
         if not fresh:
-            fresh = [t.id for t in ts if t.boss and not progress.seen(p, t.id)]
+            fresh = [t.id for t in ts if t.boss and not progress.seen(p, t.id)
+                     and not registry.practice_missing(p, t)]       # FB12: ждёт практику
         if fresh:
             lines.append(fresh)
     out = []
@@ -500,7 +501,8 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
             if in_master else None)
     variant = (0 if first else held if held is not None else
                progress.pick_variant(p["tasks"].get(task.id), len(task.variants),
-                                     random.Random(seed), allowed=allowed))
+                                     random.Random(seed), allowed=allowed,
+                                     prefer=registry.practice_prefer(p, task)))
     shard = story.shard_for(task, p, seed)
     found = story.found_for(task, p, seed)      # найденный скрипт (часть 7, E20): разбор ниже
     # хабар данных: только в задаче, выбранной на этот ран (loot.plant_for_run), и один раз
@@ -568,6 +570,9 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
         new_ext = [] if opts.rehearsal else extensions.collect(p, box)
         sandbox.write_box_file(box, extensions.BOX_FILE, extensions.box_text(p["extensions"]))
         sandbox.write_box_file(box, book_mod.BOX_FILE, book_mod.box_text(book_mod.sections(p)))
+        # FB12 (N6): какие системные ошибки игрок уже видел с переводом — хуку файлом
+        sandbox.write_box_file(box, syserrors.BOX_KNOWN,
+                               syserrors.box_text(p.get("errors_seen", ())))
         if mode == "job" and not opts.rehearsal and not in_master and not tally.get("warned"):
             tally["warned"] = True          # раз за ран: дальше таймер идёт сразу
             ui.say("\n" + ui.story_fill(COMBAT_WARNING, "", "   "))
@@ -575,7 +580,8 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
         ui.task_card(n, total, tr, task, state, first, mode, unsolved=unsolved, par=par,
                      rehearsal=opts.rehearsal, urgent=urgent,
                      owl=bridge is not None and (not task.boss or opts.rehearsal),
-                     master=_master_label(best_before) if in_master else None)
+                     master=_master_label(best_before) if in_master else None,
+                     key_turn=key_turn(p))
         # пара «до/после» без утилиты: одна строка на карточке — только в тренировке
         nudged = None if mode != "train" or opts.rehearsal else implants.nudge(task, p)
         if nudged:
@@ -628,6 +634,7 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
             # zsh закрыт: всё, что игрок оставил в фоне (nohup … &!), гасим сразу (В1)
             sandbox.reap(box)
         outcome, hints = verdict
+        syserrors.collect(p, box)       # FB12 (N6): новые переводы ошибок — в прогресс
         owl_paid = owl_asked = 0
         if bridge is not None:          # мост закрыт до подсчёта: счётчики окончательные
             bridge.stop()
@@ -1392,6 +1399,13 @@ def rehearse(boss_id: str, opts: Options) -> None:
         else:
             p["rehearsal_free_used"].append(boss_id)
     progress.save(opts.progress_path, p)
+
+
+def key_turn(p: dict) -> int:
+    """FB5 п. 45: счётчик показов карточек — по нему подвал меняет группу клавиш по очереди
+    (не случайно): сколько всего раз задачи выдавались."""
+    return sum(int(r.get("attempts") or 0) for r in p.get("tasks", {}).values()
+               if isinstance(r, dict))
 
 
 def boss_waiting(p: dict, task) -> List[str]:

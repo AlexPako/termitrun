@@ -8,6 +8,7 @@ from typing import Optional
 
 from termit_app import (commands, diagrams, icons, lifehacks, origins, progress, textnorm, theme,
                         tui, zsh_only)
+from termit_app.tasks.base import variant_index
 
 
 def _color() -> bool:
@@ -125,14 +126,35 @@ def _wrap(text: str, indent: str = "   ", width: int = 78) -> str:
 NBSP = "\u00a0"    # textwrap не рвёт строку на неразрывном пробеле
 
 
+LESSON_INDENT = "   "
+LESSON_HANG = "     "       # продолжение абзаца — глубже: начало абзаца видно глазом (E1)
+
+
+def lesson_paragraphs(text: str) -> list:
+    """Абзацы урока (E1): в теме их разделяет пустая строка «\\n\\n»; без неё — один абзац."""
+    # пробелы и переводы строк — в один пробел; неразрывный пробел (клавиши «← →») — как есть
+    return [re.sub(r"[ \t\n]+", " ", p).strip() for p in text.split("\n\n") if p.strip()]
+
+
 def lesson_block(text: str, width: int = 78) -> str:
-    """Мини-урок одним абзацем: команда в `…` не рвётся, тире не начинает строку."""
-    parts = " ".join(text.split()).split("`")
-    for i in range(1, len(parts), 2):                 # нечётные куски — внутри `…`
-        parts[i] = parts[i].replace(" ", NBSP)
-    glued = "`".join(parts).replace(" — ", NBSP + "— ")
-    return textwrap.fill(glued, width, initial_indent="   ", subsequent_indent="   ",
-                         break_long_words=False, break_on_hyphens=False).replace(NBSP, " ")
+    """Мини-урок: команда в `…` не рвётся, тире не начинает строку. Урок из нескольких абзацев
+    (E1: приём в начале абзаца, ход игрока — последней строкой) — каждый абзац с новой строки,
+    продолжение абзаца — с отступом поглубже; урок одним абзацем — как раньше, ровным краем."""
+    paras = lesson_paragraphs(text)
+    hang = LESSON_HANG if len(paras) > 1 else LESSON_INDENT
+    out = []
+    for para in paras:
+        parts = para.split("`")
+        for i in range(1, len(parts), 2):                 # нечётные куски — внутри `…`
+            parts[i] = parts[i].replace(" ", NBSP)
+        glued = "`".join(parts).replace(" — ", NBSP + "— ")
+        head, sep, tail = glued.rpartition(" ")     # последнее слово абзаца — не сирота
+        if sep and len(tail) < 20:
+            glued = head + NBSP + tail
+        out.append(textwrap.fill(glued, width, initial_indent=LESSON_INDENT,
+                                 subsequent_indent=hang, break_long_words=False,
+                                 break_on_hyphens=False).replace(NBSP, " "))
+    return "\n".join(out)
 
 
 CODE = re.compile(r"`([^`\n]+)`")
@@ -166,11 +188,54 @@ def header(title: str, streak: int, rank: str, count: int, money: int = None) ->
                             tui.STORY, "  ", "    ")))
 
 
+# FB5 п. 45: подвал карточки — постоянное напоминание о клавишах, одна группа на карточку,
+# по очереди (key_turn — счётчик показов), а урок про группу показывает свою. Каждая клавиша
+# целиком и глаголом (п. 40), заголовок группы — словами в начале строки
+KEY_GROUPS = (
+    ("Ходить по строке", ("Ctrl+A — в начало", "Ctrl+E — в конец",
+                          "Option+←/→ — по словам (iTerm2)")),
+    ("Стирать", ("Ctrl+W — слово слева", "Ctrl+U — всю строку", "Ctrl+K — всё справа",
+                 "Ctrl+_ — отменить")),
+    ("Найти команду", ("↑/↓ — прошлые", "Ctrl+R — поиск по истории",
+                       "Esc, точка — слово из прошлой", "!! — повторить")),
+    ("Вывод на экране", ("Cmd+F — найти", "Cmd+Shift+↑/↓ — к прошлой команде (iTerm2)",
+                         "колесо — листать")),
+)
+# урок про группу — её и показать: {задача: группа} или {"задача:вариант": группа}
+KEY_GROUP_OF = {"line_edit": 0, "line_edit:1": 1, "history_recall": 2, "quick_fix": 2,
+                "screen_scroll": 3, "screen_find": 3}
+
+
+def key_group(task_id: str, variant: int, turn: int) -> int:
+    """Какую группу клавиш показать в подвале: свою для урока клавиш, иначе по очереди."""
+    own = KEY_GROUP_OF.get(f"{task_id}:{variant}", KEY_GROUP_OF.get(task_id))
+    return own if own is not None else turn % len(KEY_GROUPS)
+
+
+def key_group_rows(index: int, width: int = 78, one_line: bool = False) -> list:
+    """«⌨ Заголовок: клавиша — что · …» по ширине, пункт не рвётся; one_line — одна строка
+    из того, что в неё влезло (длинная карточка, п. 43)."""
+    title, items = KEY_GROUPS[index]
+    rows, line, fresh = [], f"   ⌨ {title}:", True
+    for k, item in enumerate(items):
+        last = k == len(items) - 1
+        cand = line + (" " if fresh else " · ") + item
+        if tui.vlen(cand) + (0 if last else 2) <= width:
+            line, fresh = cand, False
+        elif not one_line:
+            rows.append(line + " ·")
+            line, fresh = "     " + item, False
+    return rows + [line]
+
+
 def task_card(n, total, track, task, state, first_time: bool, mode: str = "train",
               unsolved: bool = False, par: float = None, rehearsal: bool = False,
-              urgent: bool = False, owl: bool = False, master: str = None) -> None:
+              urgent: bool = False, owl: bool = False, master: str = None,
+              key_turn: int = 0) -> None:
     """Карточка приёмов — при первой встрече, в тренировке и пока задача ни разу не решена.
-    master — строка режима круга мастера (рекорд вместо таймера), вместо метки тренировки."""
+    master — строка режима круга мастера (рекорд вместо таймера), вместо метки тренировки.
+    FB5 п. 43: карточка выше CARD_ROWS строк (длинный урок) — подвал одной строкой, а задание
+    повторяется коротко в самом конце, прямо перед вводом: не уезжает вверх."""
     say()
     name = theme.title(task)
     label = f"[{n}/{total}] {theme.place(track.key)} · " + \
@@ -190,8 +255,10 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     mark = "▸ " if cp.level == "rich" else "> " if cp.level == "basic" else ""
     wide = 78 if cp.level == "plain" else min(78, cp.width - 1)    # текст — по окну 60–78
     tw = tui.STORY if cp.level == "plain" else min(tui.STORY, cp.width - 2)
+    shown_lesson = None
     if task.scroll and not master and (first_time or mode == "train" or unsolved):
         lesson = theme.lesson(task, state)
+        shown_lesson = lesson or task.scroll_for(state) or task.scroll
         # «новая прога» — только при первой встрече; повтор стража, выгодный ран, тренировка
         # после провала — «напомню приёмы» (P2 Б7: на экзамене «новое» само поднимает тревогу)
         spell = theme.word("new_spell" if first_time else "remind_spell")
@@ -221,7 +288,10 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     timer = f"   {theme.word('timer')} {fmt_time(par)}" if job else ""
     hint = (f"hint — {theme.word('soft_label')} за {theme.word('money')}" if job
             else "hint — бесплатно")
-    keys = f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ · reset · giveup · skip · quit · bug — замечание"
+    tall = card_rows(task, state, shown_lesson) + CARD_TAIL > CARD_ROWS
+    keys = (f"task — задание снова · {hint} · ans ОТВЕТ · quit" if tall else
+            f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ · reset · giveup · "
+            "skip · quit · bug — замечание")
     if cp.level == "plain":     # Н3.8: в 80 колонок — переносом, таймер не отрывается
         items = (keys + timer.replace("   ", " · ", 1)).split(" · ")
         # по экранной ширине: 💳 и ⏱ — две клетки (textwrap считал их за одну)
@@ -234,6 +304,10 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         glued = (NBSP + "· ").join(x.replace(" ", NBSP) for x in items)
         rows = tui.fill(glued, tw, "   ", "   ")
         say("\n".join(tui.style(r.replace(NBSP, " "), "dim", c=cp) for r in rows))
+    group = key_group(task.id, variant_index(state.get("_variant"), len(task.variants) or 1),
+                      key_turn)
+    for row in key_group_rows(group, wide, one_line=tall):
+        say(c("2", row) if cp.level == "plain" else tui.style(row, "dim", c=cp))
     notes = [answer_form(task, state)]
     if job:             # отсчёт — с открытия задания (FB5)
         notes.append(TIMER_RUNS)
@@ -251,6 +325,44 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             say("\n".join(tui.style(r, "dim", c=cp) for r in tui.fill(note, tw, "   ", "   ")))
     if owl:             # мост Совы запущен (Ollama есть и Сова не выключена)
         say(c("2", f"   ask ВОПРОС — {theme.word('owl')}: наводка, не ответ"))
+    if tall:            # FB5 п. 43: задание — последний смысловой блок длинной карточки
+        say(tui.style(task_reminder(task.text(state), wide), "bold", c=cp))
+
+
+def card_rows(task, state: dict, lesson: Optional[str]) -> int:
+    """Высота карточки до подвала — по ширине 78, одинаково для всех уровней экрана (что
+    сказано в plain, сказано и в rich): шапка, урок, рисунок, реплика, задание, шаги."""
+    rows = 4 + len(_wrap(task.text(state), width=78).split("\n")) + len(task.steps_for(state))
+    if lesson:
+        rows += 1 + len(lesson_block(lesson, 78).split("\n"))
+        rows += len(diagrams.rows(task.id))
+    return rows
+
+
+CARD_ROWS = 24      # экран новичка: выше — задание повторяется в конце карточки
+CARD_TAIL = 4       # подвал и заметки под заданием — примерно столько строк
+REMINDER_LINES = 2
+
+
+def task_reminder(text: str, width: int = 78) -> str:
+    """«📋 Задание: …» — одна-две строки. Длинное задание — его конец: там то, что делать
+    и как сдать (ans …); начало заменяет «…»."""
+    whole = " ".join(text.split())
+
+    def rows(tail: str) -> list:
+        head = "📋 Задание: " + ("" if tail == whole else "… ")
+        return textwrap.wrap(head + tail, width - 1, break_long_words=False,
+                             break_on_hyphens=False)
+    words = whole.split()
+    starts = range(len(words))
+    # сначала — с начала фразы (после «.», «!», «?», «:»), если не влезает — просто хвост
+    for whole_sentence in (True, False):
+        for start in starts:
+            boundary = start == 0 or words[start - 1][-1] in ".!?:"
+            tail = " ".join(words[start:])
+            if (boundary or not whole_sentence) and len(rows(tail)) <= REMINDER_LINES:
+                return "\n".join(rows(tail))
+    return "\n".join(rows(words[-1]))
 
 
 # FB9c: рисунок в уроке (diagrams.py) — отступ 2: строка до 76 знаков влезает в 78 колонок
@@ -595,8 +707,8 @@ KEY_TIPS = {
     "back_up": "⌨ Ctrl+R (R — Reverse, поиск назад) и кусок команды — найти её в истории, "
                "Enter — выполнить. Ctrl+G — передумал (в старых терминалах это был звонок: «стоп»). "
                "Все клавиши — keys.",
-    "home_tilde": "⌨ Ctrl+U — стереть всю строку (запоминай как Undo), Ctrl+W — слово "
-                  "слева от курсора (W — Word). Все клавиши — keys.",
+    "home_tilde": "⌨ Ctrl+U — стереть всю строку (U — ASCII NAK, «отказ»), Ctrl+W — "
+                  "стереть слово слева (W — Word). Все клавиши — keys.",
     "hidden_cache": "⌨ Вывод уехал вверх — прокрути колесом мыши или двумя пальцами по "
                     "трекпаду. Cmd+K — очистить экран. Все клавиши — keys.",
     "mkdir_p": "⌨ Option+← → — прыжок через слово. Вывод длиннее экрана — допиши | less: "
@@ -605,14 +717,17 @@ KEY_TIPS = {
 
 KEYS_SHEET = """\
 Клавиши терминала. Они же работают в Claude Code и почти везде, где есть
-строка ввода.
+строка ввода. Все — в английской раскладке: переключение — Ctrl+Пробел или
+клавиша 🌐 (Fn); подробно — keys iterm.
 
 Строка ввода
   ← →             курсор по строке: исправить опечатку, не стирая всё
-  Option+← →      прыжок через слово
+  Option+← →      прыжок через слово (в игре сразу; вне игры — только iTerm2
+                  после настройки: keys iterm)
   Ctrl+A, Ctrl+E  в начало строки (A — первая буква), в конец (E — End)
   Ctrl+W          стереть слово слева (W — Word)
-  Ctrl+U          стереть всю строку (запоминай как Undo)
+  Ctrl+U          стереть всю строку (U — ASCII NAK, «отказ»; в bash — до
+                  курсора); отменить правку — Ctrl+_
   Ctrl+K          стереть до конца (K — Kill, вырезать: Ctrl+Y вернёт)
   Tab             дописать имя папки или файла (дважды — показать варианты)
   Ctrl+C          бросить строку или остановить повисшую команду (Cancel)
@@ -630,7 +745,8 @@ KEYS_SHEET = """\
   колесо мыши или два пальца по трекпаду — прокрутить вывод вверх и обратно
   iTerm2: Cmd+↑ ↓ — по строке, Shift+fn+↑ ↓ — по странице,
           Cmd+fn+← → — в самое начало и в конец,
-          Cmd+Shift+↑ — к прошлой команде (если включена интеграция iTerm2)
+          Cmd+Shift+↑ — к прошлой команде (только iTerm2 с интеграцией:
+          keys iterm — как включить за 3 минуты)
   Cmd+K или clear (Ctrl+L) — очистить экран; L — «новый лист» у принтеров
   длинный вывод — команда | less: пробел — дальше, b — назад, /слово — поиск,
                   q — выйти (подробно — в «Инструментах»)
@@ -667,10 +783,14 @@ KEYS_SHEET = """\
 
 def keys_sheet(args=()) -> str:
     """Шпаргалка клавиш: keys в задаче и ./termit keys. FB10: keys hacks [РАЗДЕЛ] — весь
-    каталог лайфхаков (termit_app/lifehacks.py) или один его раздел."""
+    каталог лайфхаков (termit_app/lifehacks.py) или один его раздел. FB12: keys iterm —
+    экран настройки iTerm2."""
     words = " ".join(args).split()
     if words and words[0] == "hacks":
         return lifehacks.sheet(lifehacks.sections_of(words[1:]))
+    if words and words[0] == "iterm":       # FB12 (N9): настройка iTerm2 по шагам
+        from termit_app import iterm_setup
+        return iterm_setup.screen()
     return KEYS_SHEET
 
 
@@ -682,9 +802,11 @@ def keys_sheet(args=()) -> str:
 BOARD_WIDTH = 78
 BOARD_CARD_WIDTH = 74
 BOARD_CARDS = {
-    "keys-line": "⌨ Ctrl+A начало · E End · W Word · U Undo · K Kill · Option+←→ слово · Tab",
-    "keys-history": "⌨ ↑↓ прошлые команды · Ctrl+R Reverse — поиск по истории · !! повторить",
-    "keys-screen": "⌨ Cmd+↑↓ прокрутка · Cmd+K или clear (Ctrl+L — «новый лист») очистить",
+    # FB5 п. 40: каждая клавиша целиком и глаголом, не больше 4 пунктов; мнемоники букв —
+    # только в keys и origins (обрывки «E End · U Undo» владелец не понял)
+    "keys-line": "⌨ Ctrl+A — в начало строки · Ctrl+E — в конец · Ctrl+W — стереть слово",
+    "keys-history": "⌨ ↑↓ — прошлые команды · Ctrl+R — поиск по истории · !! — повторить",
+    "keys-screen": "⌨ Cmd+↑↓ — прокрутить вывод · clear или Cmd+K — очистить экран",
     "game": "task задание · hint подсказка · book выученное · keys клавиши · skip · bug",
 }
 

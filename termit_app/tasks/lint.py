@@ -151,8 +151,13 @@ SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
     "boss_finder:0": ("skip", None, "схема «mkdir + mv по маскам», точный скрипт — в reference"),
     "rg_hunt:0": ("read", None, "grep -rn печатает ФАЙЛ:СТРОКА:текст, ФАЙЛ:СТРОКА игрок сдаёт "
                                 "сам (эталон отрезает текст через cut)"),
-    "bat_lines:0": ("read", None, "grep -n печатает заголовки блоков и их timeout с номерами, "
-                                  "номер под нужным блоком игрок сдаёт сам"),
+    # FB12 (N25): эталон разбора совпадает с третьей подсказкой — правка первой строки в nano
+    "shebang_run:0": ("skip", None, "первую строку правят руками в nano; скрипт для тестов "
+                                    "(reference) делает то же sed'ом"),
+    "shebang_run:2": ("skip", None, "первую строку дописывают руками в nano; скрипт для тестов "
+                                    "(reference) делает то же через временный файл"),
+    "bat_lines:0": ("read", None, "cat -n печатает весь файл с номерами, номер timeout под "
+                                  "нужным блоком игрок сдаёт сам"),
     "bat_lines:2": ("read", None, "grep -n '' | grep ':N:' печатает строку N всех трёх файлов, "
                                   "непохожую выбирает игрок"),
     "fzf_pick:2": ("skip", None, "правка слова руками в nano, Ctrl+O, Ctrl+X"),
@@ -401,6 +406,11 @@ def _theme_entry(task) -> dict:
 
 def _lesson(task) -> Optional[str]:
     return _theme_entry(task).get("lesson") or None
+
+
+def _variant_lessons(task) -> dict:
+    """FB12 (п. 38): уроки вариантов {номер: текст} темы по умолчанию (без варианта 0)."""
+    return dict(_theme_entry(task).get("variant_lessons") or {})
 
 
 def _intro_lines(task) -> Sequence[str]:
@@ -826,7 +836,9 @@ def _check_scroll(task, add) -> None:
     if not lesson:
         add("S001", "error", "у задачи со scroll нет урока в теме по умолчанию")
         return
+    extra = "\n".join(_variant_lessons(task).values())    # FB12: уроки вариантов — тоже урок
     for where, scroll, text in _scroll_pairs(task, lesson):
+        text = text + "\n" + extra
         for tok in sorted(scroll_tokens(scroll)):
             if not re.search(r"(?<![\w-])" + re.escape(tok) + r"(?!\w)", text):
                 add("S001", "error", f"команда {tok!r} из scroll не прозвучала в уроке темы"
@@ -1270,6 +1282,8 @@ def static_issues(task, seeds=(1, 2, 3), min_variants: int = 3,
     _check_scroll(task, add)
     _check_sql_texts(task, add)
     _check_scroll_sql(task, add)
+    from termit_app.tasks import lint_lessons     # FB12: E1, N10, N11, N21, N25
+    lint_lessons.static_issues(task, _lesson(task), add)
     for state in _states(task, seeds, add, engine):
         _format_checks(task, state, add)
         _py_checks(task, state, add)

@@ -671,6 +671,8 @@ def _lost_files(box, shas) -> Verdict:
 
 
 class BatchRename(Task):
+    """Первый цикл игры. FB12 (N10, N17): первая встреча — приставка "2025_$f" (один приём:
+    цикл); отрезать хвост ${f%.ext} — повторы 1 и 2."""
     id = "batch_rename"
     track = "finder"
     title = "Пакетное переименование"
@@ -680,19 +682,23 @@ class BatchRename(Task):
               'Проверь без риска: поставь echo перед mv — цикл только напечатает команды.\n'
               "Опытные в zsh берут zmv: autoload zmv; zmv '(*).JPEG' '$1.jpg'")
     variants = (
-        Variant("Снимки пришли как «Photo 12.JPEG». Переименуй все в .jpg — имена "
-                "сохрани, пробелы тоже. Скриншоты .png не трогай.",
-                wrong=("mv *.JPEG *.jpg",),
-                alternatives=("autoload zmv; zmv '(*).JPEG' '$1.jpg' — то же одной строкой",)),
         Variant("Ко всем .txt здесь допиши спереди 2025_: «report march.txt» → «2025_report "
                 "march.txt». Другие файлы не трогай. Новое имя склеивается прямо в кавычках: "
                 "\"2025_$f\".",
-                hints=("Много файлов — цикл for по *.txt, как в карточке.",
-                       "Внутри цикла: mv \"$f\" \"2025_$f\" — приставка просто пишется перед $f.",
-                       "for f in *.txt; do mv \"$f\" \"2025_$f\"; done"),
-                solution='for f in *.txt; do mv "$f" "2025_$f"; done',
                 wrong=('for f in *; do mv "$f" "2025_$f"; done',),
                 alternatives=("autoload zmv; zmv '(*.txt)' '2025_$1' — то же через zmv",)),
+        Variant("Снимки пришли как «Photo 12.JPEG». Переименуй все в .jpg — имена "
+                "сохрани, пробелы тоже. Скриншоты .png не трогай.",
+                wrong=("mv *.JPEG *.jpg",),
+                alternatives=("autoload zmv; zmv '(*).JPEG' '$1.jpg' — то же одной строкой",),
+                hints=("Одной командой mv много файлов не переименовать — нужен цикл for.",
+                       "Внутри цикла: mv \"$f\" \"${{f%.JPEG}}.jpg\" — отрезать хвост и "
+                       "приклеить новый.",
+                       "for f in *.JPEG; do mv \"$f\" \"${{f%.JPEG}}.jpg\"; done"),
+                solution='for f in *.JPEG; do mv "$f" "${{f%.JPEG}}.jpg"; done',
+                explain="Цикл for и отрезанный хвост ${f%.ext} — и сотня файлов переименована "
+                        "без всяких программ. В zsh есть и zmv: autoload zmv; "
+                        "zmv '(*).JPEG' '$1.jpg'"),
         Variant("Копии пришли с лишним хвостом: «report.txt.bak». Убери у всех хвост .bak — "
                 "должно стать «report.txt». Расширение перед .bak у всех разное, остальные "
                 "файлы не трогай.",
@@ -704,17 +710,16 @@ class BatchRename(Task):
                 alternatives=("autoload zmv; zmv '(*).bak' '$1' — то же через zmv",)),
     )
     par = 75
-    hints = ("Одной командой mv много файлов не переименовать — нужен цикл for.",
-             "Внутри цикла: mv \"$f\" \"${{f%.JPEG}}.jpg\" — отрезать хвост и приклеить новый.",
-             "for f in *.JPEG; do mv \"$f\" \"${{f%.JPEG}}.jpg\"; done")
-    solution = 'for f in *.JPEG; do mv "$f" "${{f%.JPEG}}.jpg"; done'
-    explain = ("Цикл for и отрезанный хвост ${f%.ext} — и сотня файлов переименована без "
-               "всяких программ. "
-               "В zsh есть и zmv: autoload zmv; zmv '(*).JPEG' '$1.jpg'")
+    hints = ("Много файлов — цикл for по *.txt, как в карточке.",
+             "Внутри цикла: mv \"$f\" \"2025_$f\" — приставка просто пишется перед $f.",
+             "for f in *.txt; do mv \"$f\" \"2025_$f\"; done")
+    solution = 'for f in *.txt; do mv "$f" "2025_$f"; done'
+    explain = ("Цикл for повторяет mv для каждого файла по маске, $f — имя текущего; кавычки "
+               "\"2025_$f\" склеивают приставку с именем и берегут пробелы.")
     spell = 'for f in *.JPEG; do mv "$f" "${f%.JPEG}.jpg"; done — переименовать все разом'
 
     def setup_variant(self, box, rng, variant):
-        if variant == 1:
+        if variant == 0:
             stems = rng.sample(["report march", "plan", "todo list", "results", "notes",
                                 "contract 7", "estimate"], rng.randint(4, 6))
             want, keep, gone = {}, {}, []
@@ -753,7 +758,8 @@ class BatchRename(Task):
     def check(self, ctx):
         b, s = ctx.box, ctx.state
         gone = s.get("gone")
-        if gone is None:        # вариант A (и старый task.json): не осталось ни одного .JPEG
+        # снимки .JPEG (вариант 1, старый task.json): не осталось ни одного .JPEG
+        if gone is None:
             files = {**s["want"], **s.get("png", {})}
             if any(p.name.endswith(".JPEG") for p in b.iterdir()):
                 return _lost_files(b, files.values())
@@ -1125,7 +1131,8 @@ class TopHog(Task):
                        "в первом столбце. Выход — q.",
                        "Сверь кандидата: ps aux -m | head — у нужного в команде путь "
                        ".termit/procs. PID — во втором столбце.",
-                       "ps aux -m | head, строка с .termit/procs наверху, kill PID"),
+                       "top -o mem или ps aux -m | head, строка с .termit/procs наверху, "
+                       "kill PID"),
                 solution=("top -o mem, PID в первой строке; сверка: ps aux -m | head (в команде "
                           ".termit/procs), kill PID"),
                 solution_script=("sleep 1; kill $(ps aux -m | grep \"$TERMIT_BOX/.termit/procs\" "
@@ -1139,7 +1146,8 @@ class TopHog(Task):
                        "верхние строки. Выход — q.",
                        "Сверь: ps aux -r | head — у обоих в команде путь .termit/procs. kill "
                        "принимает несколько PID сразу.",
-                       "ps aux -r | head, два PID с .termit/procs наверху, kill PID1 PID2"),
+                       "top -o cpu или ps aux -r | head, два PID с .termit/procs наверху, kill "
+                       "PID1 PID2"),
                 solution=("top -o cpu, два PID сверху; сверка: ps aux -r | head (в команде "
                           ".termit/procs), kill PID1 PID2"),
                 solution_script=("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | "
@@ -1154,7 +1162,7 @@ class TopHog(Task):
              "первом столбце. Выход — q.",
              "Сверь кандидата: ps aux -r | head — у нужного процесса в команде путь "
              ".termit/procs. PID — во втором столбце.",
-             "ps aux -r | head, строка с .termit/procs наверху, kill PID")
+             "top -o cpu или ps aux -r | head, строка с .termit/procs наверху, kill PID")
     solution = ("top -o cpu, PID в первой строке; сверка: ps aux -r | head (в команде "
                 ".termit/procs), kill PID")
     solution_script = ("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
@@ -1266,7 +1274,9 @@ def _git_project(proj: Path, rng, ignore: str) -> None:
 
 class DiskSweep(Task):
     """Практика перед «Уборкой Загрузок» (П3.1 приёмки-1): find -type -empty -delete,
-    ls -S, вывод в файл через > и маска без учёта регистра — до стража, а не на нём."""
+    ls -S и вывод в файл через > — до стража, а не на нём. FB12 (N10, п. 34): первая встреча
+    — один приём (ls -S в файл), вся уборка — вариант-практика 1: страж ждёт, пока он выпадет
+    (practice_variant), а первый повтор выдаёт именно его. Маска без регистра — вариант 2."""
     id = "disk_sweep"
     track = "finder"
     title = "Чистка диска"
@@ -1277,31 +1287,31 @@ class DiskSweep(Task):
               "Без учёта регистра (zsh): setopt extendedglob, потом ls *.(#i)jpg (i — "
               "insensitive) — и jpg, и JPG.")
     variants = (
-        Variant("Диск junk — помойка. Наведи порядок по правилам: недокачанные *.part — "
-                "стереть во всех папках; пустые файлы (0 байт) — стереть, а потом убрать "
-                "опустевшие папки; снимки .jpg из корня junk — любым регистром (.jpg, .JPG, "
-                ".Jpg) — перенести в photos (она есть). Имя самого тяжёлого из оставшихся в "
-                "корне junk файлов запиши в heavy.txt рядом со junk.",
-                wrong=("find junk -name '*.part' -delete; find junk -type f -empty -delete; "
-                       "find junk -type d -empty -delete; mv junk/*.jpg photos/; "
-                       "ls -S junk | head -1 > heavy.txt",
-                       "find junk -name '*.part' -delete; find junk -type f -empty -delete; "
-                       "setopt extendedglob; mv junk/*.(#i)jpg photos/; "
-                       "ls -S junk | head -1 > heavy.txt",
-                       "find junk -name '*.part' -delete; find junk -type f -empty -delete; "
-                       "find junk -type d -empty -delete; setopt extendedglob; "
-                       "mv junk/*.(#i)jpg photos/; ls junk | head -1 > heavy.txt"),
-                alternatives=("find junk -empty -delete — пустые файлы и папки за один "
-                              "проход",
-                              "ls -lS junk | head -3 — с размерами, чтобы сверить глазами")),
         Variant("В папке docs свалены файлы. Запиши имя самого тяжёлого из них в файл "
                 "heavy.txt — рядом с docs, одной строкой.",
-                hints=("Размер покажет ls с флагом: -S ставит тяжёлые сверху.",
-                       "Первая строка — | head -1, а > файл запишет вывод в файл.",
-                       "ls -S docs | head -1 > heavy.txt"),
-                solution="ls -S docs | head -1 > heavy.txt",
                 wrong=("ls docs | head -1 > heavy.txt", "ls -S docs | tail -1 > heavy.txt"),
                 alternatives=("ls -lS docs — с размерами, чтобы сверить глазами",)),
+        Variant("Диск junk — помойка. Наведи порядок по правилам: недокачанные *.part — "
+                "стереть во всех папках; пустые файлы (0 байт) — стереть, а потом убрать "
+                "опустевшие папки. Имя самого тяжёлого из оставшихся в корне junk файлов "
+                "запиши в heavy.txt рядом со junk.",
+                wrong=("find junk -name '*.part' -delete; find junk -type f -empty -delete; "
+                       "ls -S junk | head -1 > heavy.txt",
+                       "find junk -name '*.part' -delete; find junk -type f -empty -delete; "
+                       "find junk -type d -empty -delete; ls junk | head -1 > heavy.txt"),
+                alternatives=("find junk -empty -delete — пустые файлы и папки за один "
+                              "проход",
+                              "ls -lS junk | head -3 — с размерами, чтобы сверить глазами"),
+                hints=("Иди по правилам: find junk -name '*.part' -delete, потом пустые файлы "
+                       "— find junk -type f -empty -delete, потом пустые папки — -type d.",
+                       "Самый тяжёлый — ls -S, первая строка — | head -1, в файл — > heavy.txt.",
+                       "find junk -name '*.part' -delete; find junk -type f -empty -delete; "
+                       "find junk -type d -empty -delete; ls -S junk | head -1 > heavy.txt"),
+                solution="find junk -name '*.part' -delete; find junk -type f -empty -delete; "
+                         "find junk -type d -empty -delete; ls -S junk | head -1 > heavy.txt",
+                explain="find не только ищет, но и сносит найденное (-delete); ls -S ставит "
+                        "тяжёлых сверху; > сваливает вывод в файл.",
+                par=120),
         Variant("В папке mixed снимки вперемешку с документами, а расширения у снимков кто "
                 "как написал: .jpg, .JPG, .Jpg. Перенеси все снимки .jpg любым регистром в "
                 "папку photos (она есть). Остальное не трогай.",
@@ -1316,22 +1326,20 @@ class DiskSweep(Task):
                               "без zsh: -exec выполнит mv для каждого найденного, -iname — как "
                               "в поиске файла",)),
     )
-    par = 150
-    hints = ("Иди по правилам: find junk -name '*.part' -delete, потом пустые файлы — "
-             "find junk -type f -empty -delete, потом пустые папки — -type d.",
-             "Снимки любым регистром: setopt extendedglob, потом маска *.(#i)jpg. Самый "
-             "тяжёлый — ls -S, первая строка — | head -1, в файл — > heavy.txt.",
-             "find junk -name '*.part' -delete; find junk -type f -empty -delete; find junk -type d -empty -delete; setopt extendedglob; mv junk/*.(#i)jpg photos/; ls -S junk | head -1 > heavy.txt")
-    solution = "find junk -name '*.part' -delete; find junk -type f -empty -delete; find junk -type d -empty -delete; setopt extendedglob; mv junk/*.(#i)jpg photos/; ls -S junk | head -1 > heavy.txt"
-    explain = ("find не только ищет, но и сносит найденное (-delete); ls -S ставит тяжёлых "
-               "сверху; > сваливает вывод в файл; с (#i) маске zsh всё равно, большие буквы "
-               "или маленькие.")
+    practice_variant = 1
+    par = 60
+    hints = ("Размер покажет ls с флагом: -S ставит тяжёлые сверху.",
+             "Первая строка — | head -1, а > файл запишет вывод в файл.",
+             "ls -S docs | head -1 > heavy.txt")
+    solution = "ls -S docs | head -1 > heavy.txt"
+    explain = ("ls -S ставит тяжёлых сверху, head -1 берёт первую строку, а > сваливает "
+               "вывод в файл.")
     spell = ("find папка -type f -empty -delete — стереть пустышки; ls -S — тяжёлые сверху; "
              "команда > файл")
 
     def setup_variant(self, box, rng, variant):
         rel = lambda p: str(p.relative_to(box))
-        if variant == 1:
+        if variant == 0:
             names = [f"{kit.latin(rng)}_{i}.{rng.choice(['pdf', 'txt', 'zip'])}"
                      for i in range(rng.randint(6, 9))]
             sizes = sorted(rng.sample(range(2, 60), len(names)))
@@ -1364,52 +1372,48 @@ class DiskSweep(Task):
         ghost = root / "blanks"
         empty_files += [kit.write(ghost / f"nol_{i}.log", "") for i in range(3)]
         (root / "empty" / "deeper").mkdir(parents=True)
-        # корень: снимки любым регистром и документы; самый тяжёлый — документ, и по
-        # алфавиту он не первый (ls без -S его не угадает)
+        # корень: документы; самый тяжёлый по алфавиту не первый (ls без -S его не угадает)
         sizes = sorted(rng.sample(range(3, 60), 8))
-        shots = [f"shot_{kit.latin(rng)}_{i}.{ext}"
-                 for i, ext in enumerate(rng.sample(["jpg", "JPG", "Jpg", "jpg"], 4))]
-        docs = [f"{kit.latin(rng)}_{i}.{rng.choice(['pdf', 'txt'])}" for i in range(3)]
+        docs = [f"{kit.latin(rng)}_{i}.{rng.choice(['pdf', 'txt', 'jpg'])}" for i in range(7)]
         heavy = f"notes_{kit.latin(rng)}.pdf"
-        small = shots + docs
-        rng.shuffle(small)
-        for name, kb in zip(small + [heavy], sizes):
-            p = kit.write_random(root / name, kb * 1024, rng)
-            if name in docs or name == heavy:
-                full.append(p)
-        (box / "photos").mkdir()
+        rng.shuffle(docs)
+        for name, kb in zip(docs + [heavy], sizes):
+            full.append(kit.write_random(root / name, kb * 1024, rng))
         return {"empty": [rel(p) for p in empty_files + parts],
-                "full": [rel(p) for p in full], "move": shots, "heavy": heavy}
+                "full": [rel(p) for p in full], "heavy": heavy}
 
     def check(self, ctx):
         b, s = ctx.box, ctx.state
-        v = variant_index(s.get("_variant"), len(self.variants))
-        if v == 1:
+        # вид варианта — по ключам state (FB12: номера 0 и 1 поменялись местами, а task.json
+        # старой песочницы помнит прежний номер)
+        if "empty" in s:
+            return self._sweep(b, s)
+        if "keep" not in s:
             if self._heavy_ok(b, s["heavy"]):
                 return Verdict(True)
             if (b / "heavy.txt").is_file():
                 return Verdict(False, "В heavy.txt не то имя: нужен самый тяжёлый файл из docs. "
                                       "ls -S ставит тяжёлые сверху, первую строку берёт head -1.")
             return Verdict(False)
-        if v == 2:
-            inside = {p.name for p in (b / "photos").iterdir()} if (b / "photos").is_dir() else set()
-            if inside == set(s["move"]) and all((b / "mixed" / n).exists() for n in s["keep"]):
-                return Verdict(True)
-            lost = [n for n in s["keep"] + s["move"]
-                    if not (b / "mixed" / n).exists() and n not in inside]
-            if lost:
-                return Verdict(False, f"Стёрто то, что трогать было нельзя: "
-                                      f"{kit.names_line(lost)}. " + kit.RESET_TAIL)
-            extra = sorted(inside - set(s["move"]))
-            if extra:
-                return Verdict(False, f"В photos попало не то: {kit.names_line(extra)} — верни "
-                                      f"обратно: mv photos/{extra[0]} mixed/")
-            if inside:
-                return Verdict(False, self.RULES["move"])
-            return Verdict(False)
-        return self._sweep(b, s)
+        photos = b / "photos"
+        inside = {p.name for p in photos.iterdir()} if photos.is_dir() else set()
+        if inside == set(s["move"]) and all((b / "mixed" / n).exists() for n in s["keep"]):
+            return Verdict(True)
+        lost = [n for n in s["keep"] + s["move"]
+                if not (b / "mixed" / n).exists() and n not in inside]
+        if lost:
+            return Verdict(False, f"Стёрто то, что трогать было нельзя: "
+                                  f"{kit.names_line(lost)}. " + kit.RESET_TAIL)
+        extra = sorted(inside - set(s["move"]))
+        if extra:
+            return Verdict(False, f"В photos попало не то: {kit.names_line(extra)} — верни "
+                                  f"обратно: mv photos/{extra[0]} mixed/")
+        if inside:
+            return Verdict(False, self.RULES["move"])
+        return Verdict(False)
 
-    # вариант 0 — шесть правил (N1 ревью C1a): нарушение, которое не исправить, — reset;
+    # вариант 1 (практика стража) — правила уборки (N1 ревью C1a): нарушение, которое не
+    # исправить, — reset;
     # лишнее в photos — сразу; а когда невыполненное правило осталось одно — назвать его
     # правило и инструмент, без готовой строки: в «деле» команда стоит денег (M1 ревью C1b)
     RULES = {
@@ -1429,10 +1433,11 @@ class DiskSweep(Task):
         if lost:
             return Verdict(False, f"Стёрт нужный файл: {kit.names_line(lost)} — это не "
                                   "пустышка. " + kit.RESET_TAIL)
-        old = "move" not in s               # старые task.json варианта 0 — без шагов ниже
-        inside = {p.name for p in (b / "photos").iterdir()} if (b / "photos").is_dir() else set()
+        moves = "move" in s                 # FB12: снимки в варианте 0 больше не переносят
+        inside = ({p.name for p in (b / "photos").iterdir()}
+                  if moves and (b / "photos").is_dir() else set())
         extra = sorted(inside - set(s.get("move", ())))
-        if extra and not old:
+        if extra:
             return Verdict(False, f"В photos попало не то: {kit.names_line(extra)} — верни в "
                                   f"junk: mv photos/{extra[0]} junk/")
         left = []
@@ -1446,12 +1451,10 @@ class DiskSweep(Task):
                 left.append("dirs")
         except OSError:
             left.append("dirs")
-        if not old:
-            if inside != set(s["move"]):
-                left.append("move")
-            f = b / "heavy.txt"
-            if not self._heavy_ok(b, s["heavy"]):
-                left.append("heavy_bad" if f.exists() else "heavy")
+        if moves and inside != set(s["move"]):
+            left.append("move")
+        if "heavy" in s and not self._heavy_ok(b, s["heavy"]):
+            left.append("heavy_bad" if (b / "heavy.txt").exists() else "heavy")
         if not left:
             return Verdict(True)
         if len(left) == 1 or left == ["heavy_bad"]:
@@ -1469,8 +1472,9 @@ class DiskSweep(Task):
 
 class DupSort(Task):
     """Практика перед «Уборкой Загрузок» (P2 Б9, psych 3.1): экранирование скобок \\(1\\),
-    «a или b» — (jpg|png) — и *(.) «только файлы» до стража, а не впервые на нём. Вариант 0
-    (первая встреча) требует всех трёх приёмов."""
+    «a или b» — (jpg|png) — и *(.) «только файлы» до стража, а не впервые на нём. FB12 (N10,
+    п. 34): первая встреча — один приём, экранирование; все три сразу — вариант-практика 1,
+    страж ждёт, пока он выпадет."""
     id = "dup_sort"
     track = "finder"
     title = "Дубли и снимки"
@@ -1480,6 +1484,10 @@ class DupSort(Task):
               "extendedglob, потом ls *.(#i)(jpg|png).\n"
               "*(.) — только файлы, без папок: ls *.jpg(.) не зацепит папку с именем на .jpg.")
     variants = (
+        Variant("В downloads лежат дубли «имя (1).расширение» — точные копии. Сотри их все, "
+                "оригиналы не трогай.",
+                wrong=("rm downloads/*1*",),
+                alternatives=("rm downloads/*' (1).'* — то же в кавычках",)),
         Variant("В downloads бардак: у части файлов есть дубли «имя (1).расширение» — точные "
                 "копии, их сотри. Потом все снимки .jpg и .png — любым регистром — перенеси в "
                 "новую папку downloads/photos. Папку wallpaper.jpg не трогай: это папка, а не снимок.",
@@ -1489,15 +1497,19 @@ class DupSort(Task):
                        "mv downloads/*.(jpg|png)(.) downloads/photos/"),
                 alternatives=("rm downloads/*' (1).'* — кавычки вместо \\ перед пробелом и "
                               "скобками",
-                              "ls downloads/*.(#i)(jpg|png)(.) — сначала увидеть, кого заденет")),
-        Variant("В downloads лежат дубли «имя (1).расширение» — точные копии. Сотри их все, "
-                "оригиналы не трогай.",
-                hints=("Маска *(1)* zsh не поймёт: скобки в маске — особые знаки.",
-                       "Пробел и скобки экранируй обратной косой: \\ перед каждым.",
-                       "rm downloads/*\\ \\(1\\).*"),
-                solution="rm downloads/*\\ \\(1\\).*",
-                wrong=("rm downloads/*1*",),
-                alternatives=("rm downloads/*' (1).'* — то же в кавычках",)),
+                              "ls downloads/*.(#i)(jpg|png)(.) — сначала увидеть, кого заденет"),
+                hints=("Начни с дублей: скобки и пробел в имени экранируй — "
+                       "rm downloads/*\\ \\(1\\).*",
+                       "Снимки любым регистром: setopt extendedglob и маска *.(#i)(jpg|png). "
+                       "Папку wallpaper.jpg маска тоже заденет — допиши (.) «только файлы».",
+                       "setopt extendedglob; rm downloads/*\\ \\(1\\).*; mkdir downloads/photos; "
+                       "mv downloads/*.(#i)(jpg|png)(.) downloads/photos/"),
+                solution="setopt extendedglob; rm downloads/*\\ \\(1\\).*; "
+                         "mkdir downloads/photos; mv downloads/*.(#i)(jpg|png)(.) downloads/photos/",
+                explain="\\ снимает с пробела и скобок особый смысл; (a|b) — «a или b» прямо в "
+                        "маске; с (#i) всё равно, большие буквы или маленькие, а (.) в конце "
+                        "маски оставляет только файлы.",
+                par=120),
         Variant("В downloads документы вперемешку с остальным. Перенеси все .pdf и .docx в "
                 "папку downloads/documents (она есть) одной командой mv. Остальное не трогай.",
                 hints=("Две маски можно слить в одну: (a|b) значит «a или b».",
@@ -1508,17 +1520,14 @@ class DupSort(Task):
                 alternatives=("mv downloads/*.pdf downloads/*.docx downloads/documents/ — "
                               "две маски подряд",)),
     )
-    par = 120
-    hints = ("Начни с дублей: скобки и пробел в имени экранируй — rm downloads/*\\ \\(1\\).*",
-             "Снимки любым регистром: setopt extendedglob и маска *.(#i)(jpg|png). Папку "
-             "wallpaper.jpg маска тоже заденет — допиши (.) «только файлы».",
-             "setopt extendedglob; rm downloads/*\\ \\(1\\).*; mkdir downloads/photos; "
-             "mv downloads/*.(#i)(jpg|png)(.) downloads/photos/")
-    solution = ("setopt extendedglob; rm downloads/*\\ \\(1\\).*; mkdir downloads/photos; "
-                "mv downloads/*.(#i)(jpg|png)(.) downloads/photos/")
-    explain = ("\\ снимает с пробела и скобок особый смысл; (a|b) — «a или b» прямо в маске; "
-               "с (#i) всё равно, большие буквы или маленькие, а (.) в конце маски оставляет "
-               "только файлы.")
+    practice_variant = 1
+    par = 60
+    hints = ("Маска *(1)* zsh не поймёт: скобки в маске — особые знаки.",
+             "Пробел и скобки экранируй обратной косой: \\ перед каждым.",
+             "rm downloads/*\\ \\(1\\).*")
+    solution = "rm downloads/*\\ \\(1\\).*"
+    explain = ("\\ снимает с пробела и скобок особый смысл: zsh видит в них просто буквы "
+               "имени, и маска ловит только «(1)».")
     spell = "rm *\\ \\(1\\).* — дубли; *.(jpg|png) — «или»; *(.) — только файлы (zsh)"
 
     PICS = ("jpg", "JPG", "Jpg", "png", "PNG")
@@ -1545,7 +1554,7 @@ class DupSort(Task):
                 kit.write(z / n, f"{n}\n")
             (z / "documents").mkdir()
             return {"move": sorted(docs), "keep": sorted(rest)}
-        exts = self.PICS + self.OTHER if variant == 0 else self.OTHER + ("jpg", "png")
+        exts = self.PICS + self.OTHER if variant == 1 else self.OTHER + ("jpg", "png")
         orig = [name(exts) for _ in range(rng.randint(10, 14))]
         keep = {}
         for n in orig:
@@ -1560,7 +1569,7 @@ class DupSort(Task):
         # имя с «1» без скобок — не дубль: маска *1* его заденет, *\ \(1\).* — нет
         tricky = name(("txt",)).replace(".txt", " 1.txt")
         keep[tricky] = kit.sha(kit.write(z / tricky, "не дубль\n"))
-        if variant == 1:
+        if variant == 0:
             return {"keep": keep, "dups": dups}
         # снимки обоих видов, и хоть один — большими буквами: без (#i) маска его не увидит
         for exts in (("JPG", "PNG", "Jpg"), ("jpg",), ("png", "PNG")):
@@ -1574,8 +1583,9 @@ class DupSort(Task):
     def check(self, ctx):
         b, s = ctx.box, ctx.state
         z = b / "downloads"
-        v = variant_index(s.get("_variant"), len(self.variants))
-        if v == 2:
+        # вид варианта — по ключам state (FB12: номера 0 и 1 поменялись местами, а task.json
+        # старой песочницы помнит прежний номер)
+        if "move" in s:
             d = z / "documents"
             inside = {p.name for p in d.iterdir()} if d.is_dir() else set()
             lost = [n for n in s["move"] + s["keep"]
@@ -1605,7 +1615,7 @@ class DupSort(Task):
             return Verdict(False, "Стёрто то, что трогать было нельзя: " + kit.names_line(lost) +
                            " — это не дубль. " + kit.RESET_TAIL)
         dups_left = [d for d in s["dups"] if (z / d).exists() or (photos / d).exists()]
-        if v == 1:
+        if "dir" not in s:
             return Verdict(not dups_left)
         if (photos / s["dir"]).exists():
             return Verdict(False, f"Папка {s['dir']} уехала в photos: маска захватила и папку. "

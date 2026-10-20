@@ -106,6 +106,10 @@ class Task:
     # него она недоступна через missing(), без штрафа (R004: только обычные задачи трека sql)
     stand: Optional[str] = None
     after: Sequence[str] = ()          # что должно быть решено до выдачи (близнец, страж)
+    # FB12 (п. 34): вариант-практика стража. Первая встреча — простой вариант 0, составная
+    # практика — повтор; страж места не выдаётся, пока этот вариант у игрока не выпал
+    # (registry.practice_missing), а первый повтор задачи выдаёт именно его (practice_prefer)
+    practice_variant: Optional[int] = None
     uses_clipboard = False
     uses_paste = False                 # pbpaste (читать буфер): только урокам, что его проверяют
     uses_gui = False                   # open/LaunchServices: иначе песочница их запрещает

@@ -84,11 +84,35 @@ def unlocked(bosses) -> List[Track]:
     return [t for t in shown_tracks() if set(t.requires) <= have and edition.track_open(t.key)]
 
 
+def practice_missing(p: dict, boss) -> List[str]:
+    """FB12 (п. 34): задачи места стража, у которых вариант-практика (practice_variant) ещё ни
+    разу не выпадал. Взломанного или уже встреченного стража это не держит (старые
+    сохранения, проваленный страж ждёт реванша)."""
+    from termit_app import progress
+    if not getattr(boss, "boss", False) or boss.id in p.get("bosses", ()):
+        return []
+    if isinstance(p.get("tasks", {}).get(boss.id), dict):
+        return []
+    return [t.id for t in tasks_of(boss.track)
+            if getattr(t, "practice_variant", None) is not None
+            and t.practice_variant not in progress.seen_variants(p.get("tasks", {}).get(t.id))]
+
+
+def practice_prefer(p: dict, task) -> Optional[int]:
+    """Вариант-практика для повтора, пока он не выпадал (None — выбирать как обычно)."""
+    from termit_app import progress
+    v = getattr(task, "practice_variant", None)
+    if v is None or v in progress.seen_variants(p.get("tasks", {}).get(task.id)):
+        return None
+    return v
+
+
 def missing_after(p: dict, task) -> List[str]:
     """Что из task.after ещё не выполнено: обычная задача — не решена ни разу
-    (rec["solved"]), страж — не взломан (нет в p["bosses"]; тренировка стража не в счёт)."""
+    (rec["solved"]), страж — не взломан (нет в p["bosses"]; тренировка стража не в счёт).
+    Стражу ещё — задачи-практики его места без выпавшего варианта-практики (FB12)."""
     tasks = all_tasks()
-    out = []
+    out = list(practice_missing(p, task))
     for tid in getattr(task, "after", ()):
         if getattr(tasks.get(tid), "boss", False):
             done = tid in p.get("bosses", ())

@@ -231,6 +231,21 @@ if [[ -n $TERMIT_LINGER ]]; then
   }
 fi
 
+# FB5 п. 40: русская раскладка. Команда кириллицей («ды», «св») — подсказка «это ls», иначе
+# обычное «command not found». _termit_layout_hint — отдельная функция: хаб (блок HUB-WORDS)
+# зовёт её первой строкой своего command_not_found_handler, и обработчики склеиваются.
+_termit_layout_hint() {
+  [[ $1 == *[А-Яа-яЁё]* ]] || return 1
+  _tr layout "$1"
+}
+command_not_found_handler() {
+  _termit_layout_hint "$1" && return 127
+  print -u2 -r -- "zsh: command not found: $1"
+  return 127
+}
+# Esc, потом «.» в русской раскладке приходит как Esc, «ю» — то же «последнее слово»
+bindkey '\eю' insert-last-word 2>/dev/null
+
 # Служебные команды не попадают в историю — иначе !! повторит task.
 typeset -ga _tr_service=(task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson)
 [[ -n $TERMIT_LINGER ]] && _tr_service+=(next)

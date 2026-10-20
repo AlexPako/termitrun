@@ -246,10 +246,26 @@ def title(task) -> str:
 def lesson(task, state: Optional[dict] = None) -> Optional[str]:
     """Мини-урок персонажа к новой команде; нет в выбранной теме — None (покажем scroll).
     state с движком БД (_engine) — урок этого движка, если тема его задала (lessons, финал M3:
-    страж Хранилища в SQLite не называет pg_dump)."""
+    страж Хранилища в SQLite не называет pg_dump). FB12 (п. 38): урок учит то, что нужно
+    текущему варианту — state с _variant берёт variant_lessons[номер], если тема его задала;
+    вариант 0 и вызов без state — общий урок."""
     entry = _entry(task)
-    engine = (state or {}).get("_engine")
-    return (entry.get("lessons") or {}).get(engine) or entry.get("lesson") or None
+    state = state or {}
+    by_variant = entry.get("variant_lessons") or {}
+    try:
+        own = by_variant.get(int(state.get("_variant", 0)))
+    except (TypeError, ValueError):
+        own = None
+    engine = state.get("_engine")
+    return own or (entry.get("lessons") or {}).get(engine) or entry.get("lesson") or None
+
+
+def lesson_texts(task) -> list:
+    """Все уроки задачи: общий (вариант 0) и уроки вариантов — для охран «в уроке названо»."""
+    entry = _entry(task)
+    out = [entry.get("lesson")] + list((entry.get("lessons") or {}).values())
+    out += [text for _, text in sorted((entry.get("variant_lessons") or {}).items())]
+    return [t for t in out if t]
 
 
 def intro(task, state: dict, lore: bool = True) -> Optional[str]:

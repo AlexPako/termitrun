@@ -254,10 +254,10 @@ class ClimbDown(AnswerTask):
     track = "basics"
     title = "Записка в глубине"
     # FB5-plain: «в чём отличие cat от echo?» — сравнение там, где игрок видит обе команды
+    # FB12 (N2): && — в уроке back_up, здесь — только поясняется в подсказке и разборе
     scroll = ("cd ПАПКА — войти (можно по пути a/b/c); ls — что в папке; cat ФАЙЛ — что в "
               "файле: echo notes.txt печатает само слово, а cat notes.txt — то, что внутри.\n"
-              "Две-три буквы имени и Tab — терминал допишет. cd папка && cat файл — войти и сразу "
-              "прочесть: && запускает вторую команду, только если первая удалась.\n"
+              "Две-три буквы имени и Tab — терминал допишет.\n"
               "ans $(cat note.txt) подставит слово. Повисло (cat ждёт ввода) — Ctrl+C.")
     variants = (
         Variant("Глубоко в {path} лежит файл note.txt. Зайди туда и прочти, "
@@ -289,9 +289,11 @@ class ClimbDown(AnswerTask):
     par = 40
     hints = ("Сначала войди в папку командой cd, потом прочти файл командой cat.",
              "Имена длинные — набери cd old и жми Tab.",
-             "cd {path} && cat note.txt — потом ans $(cat note.txt)")
+             "cd {path} && cat note.txt (&& пустит cat, только если cd удался) — потом "
+             "ans $(cat note.txt)")
     solution = "cd {path} && cat note.txt"
-    explain = "cd меняет текущую папку, cat печатает файл. Длинные имена за тебя добьёт Tab."
+    explain = ("cd меняет текущую папку, cat печатает файл. Длинные имена за тебя добьёт Tab, а "
+               "&& пускает вторую команду, только если первая удалась.")
     spell = "cd путь — войти в папку; cat файл — прочесть файл целиком"
     trap_messages = {"decoy": "Это записка-обманка. Какая настоящая — сказано в readme.txt."}
 
@@ -325,7 +327,9 @@ class BackUp(Task):
     track = "basics"
     title = "Наверх по лестнице"
     scroll = (".. — папка на уровень выше. cd .. — подняться на этаж, cd ../.. — на два. "
-              "cd без аргумента (слова после команды) — домой (~), cd - — туда, где был только что.")
+              "cd без аргумента (слова после команды) — домой (~), cd - — туда, где был "
+              "только что.\n"
+              "cd .. && ls — две команды подряд: && пускает вторую, только если первая удалась.")
     variants = (
         Variant("Ты стоишь в archive/{year}/q3/docs. Поднимись на три уровня вверх — "
                 "в саму папку archive — одной командой.",
@@ -820,7 +824,7 @@ class FileExt(AnswerTask):
                 hints=("Расширение — часть имени: файла с именем ровно {stem} здесь нет.",
                        "ls покажет полные имена. .bak — резервная копия (что значит "
                        "расширение, подскажет ext).",
-                       "cat {stem}.txt — и ans СЛОВО"),
+                       "ls, затем cat {stem}.txt — и ans СЛОВО"),
                 solution="ls && cat {stem}.txt", solution_script="cat {stem}.txt | cut -d: -f2",
                 wrong=("cat {stem}.bak | cut -d: -f2",),
                 alternatives=("двойной щелчок по слову в выводе cat, Cmd+C, потом ans, пробел "
@@ -1155,7 +1159,8 @@ def _copies_check(ctx, dest_name: str = "") -> Verdict:
 class DeepDig(Task):
     """FB4: «искать вглубь» — первая из двух задач на глубину (вторая — deep_rm). * — одна
     папка без скрытых, ** — любая глубина, откуда стартует поиск, ls -R и (D). Вариант 0
-    (первая встреча) требует ** и (D) — приёмы стража; удаление — в deep_rm."""
+    (первая встреча) — только ** (FB12, N10: первая встреча — самый простой вариант); (D)
+    требуют повторы 1 и 2; удаление — в deep_rm."""
     id = "deep_dig"
     track = "basics"
     title = "Поиск вглубь"
@@ -1165,11 +1170,11 @@ class DeepDig(Task):
               "(D) — и скрытые: в конце маски, вплотную: ls **/*.log(D). D — Dot (точка); "
               "только большая, (d) — ошибка.")
     variants = (
-        Variant("Папка archive — свалка: отчёты *.pdf разбросаны по вложенным папкам, а один "
-                "спрятан в скрытой. Скопируй все .pdf в папку collected (она уже есть) — "
-                "плоско, без подпапок. Оригиналы пусть остаются на местах.",
-                wrong=("cp archive/**/*.pdf collected/", "cp archive/*.pdf(D) collected/"),
-                alternatives=("ls archive/**/*.pdf(D) — сначала увидеть всю добычу, потом "
+        Variant("Папка archive — свалка: отчёты *.pdf разбросаны по вложенным папкам. "
+                "Скопируй все .pdf в папку collected (она уже есть) — плоско, без подпапок. "
+                "Оригиналы пусть остаются на местах.",
+                wrong=("cp archive/*.pdf collected/",),
+                alternatives=("ls archive/**/*.pdf — сначала увидеть всю добычу, потом "
                               "копировать",
                               "ls -R archive — всё дерево разом, чтобы понять, где что лежит")),
         Variant("Ты стоишь в верхней папке проекта. Скопируй все таблицы .csv — отсюда и со всех "
@@ -1199,11 +1204,11 @@ class DeepDig(Task):
     )
     par = 50
     hints = ("Отчёты лежат глубоко: всё дерево покажет ls -R archive.",
-             "** — любые вложенные папки, (D) — и скрытые тоже: ls archive/**/*.pdf(D)",
-             "ls archive/**/*.pdf(D) — проверить, затем cp archive/**/*.pdf(D) collected/")
-    solution = "cp archive/**/*.pdf(D) collected/"
-    explain = ("* видит одну папку, ** спускается во все вложенные, (D) добавляет скрытые. "
-               "Маска с папкой впереди ищет от неё, без папки — от текущей.")
+             "* видит одну папку, ** — любые вложенные: ls archive/**/*.pdf",
+             "ls archive/**/*.pdf — проверить, затем cp archive/**/*.pdf collected/")
+    solution = "cp archive/**/*.pdf collected/"
+    explain = ("* видит одну папку, ** спускается во все вложенные. Маска с папкой впереди "
+               "ищет от неё, без папки — от текущей.")
     spell = "**/*.pdf(D) — на любой глубине, со скрытыми (zsh); ls -R — всё дерево"
     start_dir = "{start}"
 
@@ -1241,9 +1246,6 @@ class DeepDig(Task):
             name = f"{kit.latin(rng)}_{i}.pdf"
             p = kit.write(rng.choice(dirs[1:]) / name, f"отчёт {name} {rng.random()}\n")
             want[name], loc = kit.sha(p), loc + [_rel(box, p)]
-        name = f"{kit.latin(rng)}_secret.pdf"
-        p = kit.write(rng.choice(dirs) / ".stash" / name, f"скрытый отчёт {rng.random()}\n")
-        want[name], loc = kit.sha(p), loc + [_rel(box, p)]
         for i in range(rng.randint(3, 5)):
             kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}{rng.choice(['.pdf.part', '.txt'])}",
                       "не отчёт\n")
@@ -1263,8 +1265,8 @@ class DeepDig(Task):
 
 class DeepRm(Task):
     """FB4: «удалять вглубь» — сразу после deep_dig. rm с маской на любой глубине, rm -r —
-    папка целиком; привычка «сначала ls той же маской». Вариант 0 требует обоих приёмов
-    стража: rm по маске **(D) и rm -r."""
+    папка целиком; привычка «сначала ls той же маской». Вариант 0 (первая встреча, FB12 N10)
+    — один приём: rm по маске **(D); оба приёма стража сразу (маска и rm -r) — вариант 1."""
     id = "deep_rm"
     track = "basics"
     title = "Удаление вглубь"
@@ -1275,23 +1277,28 @@ class DeepRm(Task):
               "Привычка: сначала ls с той же маской (или ls -R папка) — посмотреть, что "
               "исчезнет, — и только потом rm.")
     variants = (
+        Variant("Ты стоишь в папке сборки. Сотри все файлы *.tmp — отсюда и на любой глубине, "
+                "в том числе в скрытых папках. Всё остальное не трогай.",
+                wrong=("rm *.tmp", "rm **/*.tmp"),
+                alternatives=("ls **/*.tmp(D) && rm **/*.tmp(D) — с проверкой",)),
         Variant("В проекте project на любой глубине валяются временные файлы *.tmp — есть "
                 "они и в скрытых папках. Сотри их все, остальное в project не трогай. А "
                 "папку trash рядом удали целиком, со всем, что внутри.",
+                hints=("Временные файлы на всех уровнях: ** — любая глубина, (D) — и скрытые "
+                       "папки.",
+                       "Папку целиком удаляет rm с флагом -r. Сначала проверь: "
+                       "ls project/**/*.tmp(D)",
+                       "ls project/**/*.tmp(D) — проверить, затем rm project/**/*.tmp(D) && "
+                       "rm -r trash"),
+                solution="rm project/**/*.tmp(D) && rm -r trash",
                 wrong=("rm project/**/*.tmp && rm -r trash",
                        "rm project/**/*.tmp(D) && rm trash/*(D)"),
                 alternatives=("ls project/**/*.tmp(D) && rm project/**/*.tmp(D) — сначала "
                               "посмотреть, кого заденет",
-                              "ls -R trash — что исчезнет вместе с папкой")),
-        Variant("Ты стоишь в папке сборки. Сотри все файлы *.tmp — отсюда и на любой глубине, "
-                "в том числе в скрытых папках. Всё остальное не трогай.",
-                hints=("Маска без папки впереди ищет там, где стоишь; ** — на любой глубине.",
-                       "Скрытые папки ** пропускает, пока после маски не стоит (D). "
-                       "Сначала посмотри: ls **/*.tmp(D)",
-                       "ls **/*.tmp(D) — проверить, затем rm **/*.tmp(D)"),
-                solution="rm **/*.tmp(D)",
-                wrong=("rm *.tmp", "rm **/*.tmp"),
-                alternatives=("ls **/*.tmp(D) && rm **/*.tmp(D) — с проверкой",)),
+                              "ls -R trash — что исчезнет вместе с папкой"),
+                explain="rm берёт те же маски, что ls: **/*.tmp(D) — на любой глубине, со "
+                        "скрытыми. rm -r удаляет папку со всем, что внутри. Сначала ls той "
+                        "же маской."),
         Variant("Папка old — старый проект: внутри вложенные папки и скрытые файлы. Снеси её "
                 "целиком одной командой. Соседнюю new не трогай.",
                 hints=("Голый rm папку не удаляет — ему нужен флаг.",
@@ -1304,12 +1311,13 @@ class DeepRm(Task):
                               "скрытым",)),
     )
     par = 50
-    hints = ("Временные файлы на всех уровнях: ** — любая глубина, (D) — и скрытые папки.",
-             "Папку целиком удаляет rm с флагом -r. Сначала проверь: ls project/**/*.tmp(D)",
-             "ls project/**/*.tmp(D) — проверить, затем rm project/**/*.tmp(D) && rm -r trash")
-    solution = "rm project/**/*.tmp(D) && rm -r trash"
-    explain = ("rm берёт те же маски, что ls: **/*.tmp(D) — на любой глубине, со скрытыми. "
-               "rm -r удаляет папку со всем, что внутри. Сначала ls той же маской.")
+    hints = ("Маска без папки впереди ищет там, где стоишь; ** — на любой глубине.",
+             "Скрытые папки ** пропускает, пока после маски не стоит (D). "
+             "Сначала посмотри: ls **/*.tmp(D)",
+             "ls **/*.tmp(D) — проверить, затем rm **/*.tmp(D)")
+    solution = "rm **/*.tmp(D)"
+    explain = ("rm берёт те же маски, что ls: **/*.tmp(D) — отсюда на любой глубине, со "
+               "скрытыми папками. Сначала ls той же маской — потом rm.")
     spell = "rm **/*.tmp(D) — удалить по маске вглубь; rm -r папка — папку целиком"
     start_dir = "{start}"
 
@@ -1322,7 +1330,7 @@ class DeepRm(Task):
             keep = [kit.write(box / "new" / f"{kit.latin(rng)}_{i}.txt", "новое\n")
                     for i in range(rng.randint(3, 5))]
             return {"start": ".", "gone": ["old"], "keep": [_rel(box, p) for p in keep]}
-        root = "build" if variant == 1 else "project"
+        root = "build" if variant == 0 else "project"
         dirs = _tree(box / root, rng, rng.randint(8, 12))
         hidden = rng.choice(dirs) / ".cache"
         gone = [kit.write(rng.choice(dirs[1:]) / f"{kit.latin(rng)}_{i}.tmp", "мусор\n")
@@ -1335,13 +1343,13 @@ class DeepRm(Task):
                  kit.write(rng.choice(dirs) / "plan.tmp.bak", "дело\n"),
                  kit.write(hidden / "index.db", "дело\n")]
         gone = [_rel(box, p) for p in gone]
-        if variant == 0:
+        if variant == 1:
             tdirs = _tree(box / "trash", rng, rng.randint(2, 4))
             for i in range(rng.randint(3, 6)):
                 kit.write(rng.choice(tdirs) / f"{kit.latin(rng)}_{i}.txt", "хлам\n")
             kit.write(box / "trash" / ".leftover", "хлам\n")
             gone.append("trash")
-        return {"start": "build" if variant == 1 else ".", "gone": gone,
+        return {"start": "build" if variant == 0 else ".", "gone": gone,
                 "keep": [_rel(box, p) for p in keep]}
 
     def check(self, ctx):
@@ -1644,7 +1652,8 @@ class ScreenScroll(AnswerTask):
     solution = "cat journal.txt"
     solution_script = "head -n 1 journal.txt | cut -d' ' -f3"
     explain = ("Вывод не пропадает, он уезжает вверх: колесо, Cmd+↑ ↓, Shift+fn+↑ ↓ и "
-               "Cmd+fn+← → возвращают его. clear или Cmd+K — чистый экран.")
+               "Cmd+fn+← → возвращают его. Нашёл командой — тоже честно; "
+               "прокрутка — когда вывод уже на экране и повторять команду дорого.")
     spell = "Cmd+↑ ↓, Shift+fn+↑ ↓ — прокрутка; Cmd+fn+← — в начало; clear — очистить экран"
     trap_messages = {"old": "Это слово из другой строки — нужное записано там, где сказано в "
                             "задании. Прокрути вывод."}
@@ -1731,7 +1740,8 @@ class ScreenFind(AnswerTask):
     solution = "cat stock.txt"
     solution_script = "grep 'ПРОПУСК' stock.txt | cut -d' ' -f4"
     explain = ("Искать глазами — долго: Cmd+F находит слово в выводе, Cmd+Shift+↑ ↓ прыгает от "
-               "команды к команде, Cmd+Shift+A берёт вывод последней целиком.")
+               "команды к команде. Нашёл командой — тоже честно; Cmd+F — когда вывод "
+               "уже на экране.")
     spell = "Cmd+F — поиск по выводу; Cmd+Shift+↑ ↓ — от команды к команде; Cmd+Shift+A — вывод"
     trap_messages = {"old": "Это слово из другой строки — нужное там, где сказано в задании. "
                             "Найди его поиском Cmd+F."}
@@ -2291,7 +2301,8 @@ class BossBasics(Task):
     variants = (
         Variant("На старом диске old_disk спрятаны ключи *.key. Собери КОПИИ всех настоящих "
                 "ключей в новую папку keys — плоско, без подпапок. Подделки .key.fake и .key~ "
-                "не брать. Потом удали папку-ловушку trap.",
+                "(хвост ~ в конце имени — копия редактора) не брать. Потом удали "
+                "папку-ловушку trap.",
                 wrong=("mkdir keys && cp old_disk/**/*.key keys/ && rm -r old_disk/**/trap",
                        "mkdir keys && mv old_disk/**/*.key(D) keys/ && rm -r old_disk/**/trap(D)"),
                 alternatives=("mkdir -p keys — не ругается, если папка уже создана",)),

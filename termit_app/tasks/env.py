@@ -923,7 +923,7 @@ class PathWhich(Task):
                 hints=("Оболочка ищет команды по папкам из PATH: echo $PATH | tr : '\\n'",
                        "Добавь ~/tools/bin в PATH впереди: export PATH=… — и набери просто "
                        "stamp.",
-                       _EXPORT_PATH + "; stamp"),
+                       _EXPORT_PATH + "; which stamp; stamp"),
                 # M6 ревью P5: which — в показанном эталоне варианта 0 (страж зовёт which -a)
                 solution=_EXPORT_PATH + "; which stamp; stamp",
                 wrong=("~/tools/bin/stamp",),
@@ -1130,11 +1130,17 @@ class ShebangRun(Task):
                        "nano (или sed -i '' '1s|.*|…|').",
                        "nano count.py: первую строку замени на #!/usr/bin/env python3, Ctrl+O, "
                        "Enter, Ctrl+X; chmod +x count.py; ./count.py orders.csv > count.txt"),
-                solution="sed -i '' '1s|.*|#!/usr/bin/env python3|' count.py; chmod +x "
-                         "count.py; ./count.py orders.csv > count.txt",
+                # FB12 (N25): эталон разбора — тот же путь, что третья подсказка (nano);
+                # скрипт для тестов правит строку sed'ом (lint.SHOWN_RULES)
+                solution="nano count.py: первую строку замени на #!/usr/bin/env python3, "
+                         "Ctrl+O, Enter, Ctrl+X; chmod +x count.py; ./count.py orders.csv > "
+                         "count.txt",
+                solution_script="sed -i '' '1s|.*|#!/usr/bin/env python3|' count.py; chmod +x "
+                                "count.py; ./count.py orders.csv > count.txt",
                 wrong=("python3 count.py orders.csv > count.txt",
                        "chmod +x count.py; ./count.py orders.csv > count.txt"),
-                alternatives=("nano count.py — поправить первую строку руками (Ctrl+O, Ctrl+X)",
+                alternatives=("sed -i '' '1s|.*|#!/usr/bin/env python3|' count.py — поправить "
+                              "первую строку без редактора",
                               "python3 count.py orders.csv > count.txt — тот же вывод, но цель "
                               "задачи — запуск через ./")),
         Variant("Сделай backup.sh запускаемым и сохрани им копию notes.txt: ./backup.sh "
@@ -1154,11 +1160,16 @@ class ShebangRun(Task):
                        "потом chmod +x.",
                        "nano stats.py: первой строкой допиши #!/usr/bin/env python3, Ctrl+O, "
                        "Enter, Ctrl+X; chmod +x stats.py; ./stats.py prices.txt > stats.txt"),
-                solution="print -r -- '#!/usr/bin/env python3' > s.tmp; cat stats.py >> s.tmp; "
-                         "mv s.tmp stats.py; chmod +x stats.py; ./stats.py prices.txt > "
+                solution="nano stats.py: первой строкой допиши #!/usr/bin/env python3, "
+                         "Ctrl+O, Enter, Ctrl+X; chmod +x stats.py; ./stats.py prices.txt > "
                          "stats.txt",
+                solution_script="print -r -- '#!/usr/bin/env python3' > s.tmp; cat stats.py "
+                                ">> s.tmp; mv s.tmp stats.py; chmod +x stats.py; ./stats.py "
+                                "prices.txt > stats.txt",
                 wrong=("chmod +x stats.py; ./stats.py prices.txt > stats.txt",),
-                alternatives=("nano stats.py — дописать первую строку руками",)),
+                alternatives=("print -r -- '#!/usr/bin/env python3' > s.tmp; cat stats.py >> "
+                              "s.tmp; mv s.tmp stats.py — первая строка через временный файл, "
+                              "без редактора",)),
     )
     hints = variants[0].hints
     solution = variants[0].solution
@@ -1960,7 +1971,9 @@ class AvScan(Task):
                        "двумя базами.",
                        "Своя сигнатура из report.txt: " + _NEW + " — потом проверка двумя "
                        "базами (-d дважды).",
-                       "clamscan -r -i -d ~/av/local.hsb -d ~/av/main.hsb inbox; " + _QUAR),
+                       "print -r -- СИГНАТУРА >> ~/av/local.hsb; clamscan -r -i -d "
+                       "~/av/local.hsb -d ~/av/main.hsb inbox; mkdir -p quarantine; "
+                       "mv НАЙДЕННЫЕ quarantine/; chmod -x quarantine/*"),
                 solution=(_NEW + "; clamscan -r -i -d ~/av/local.hsb -d ~/av/main.hsb inbox; "
                           + _QUAR),
                 wrong=("clamscan -r -i inbox; mkdir -p quarantine; mv {known} quarantine/; "
