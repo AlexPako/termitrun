@@ -33,6 +33,8 @@ TOPICS = {
     "line_edit": "edit-line",
     "history_recall": "history",
     "screen_scroll": "scroll-back",
+    "screen_find": "screen-find",
+    "quick_fix": "quick-fix",
     "fzf_pick": "three-scraps",
     "z_jump": "jump-back",
     # Инструменты
@@ -42,6 +44,7 @@ TOPICS = {
     "vim_trap": "vim-trap",
     "vim_escape": "vim-exit",
     "vim_purge": "weed-lines",
+    "job_control": "bg-jobs",
     "brew_lesson": "supply-store",
     "tldr_tar": "archive",
     "json_check": "bad-config",
@@ -117,6 +120,10 @@ TOPICS = {
     # Окружение и скрипты
     "env_vars": "env-vars",
     "export_child": "inherit",
+    "perm_basics": "who-am-i",
+    "perm_rwx": "no-access",
+    "read_long_list": "long-list",
+    "perm_digits": "permissions",
     "dotenv": "dotenv",
     "path_which": "path",
     "shebang_run": "launch",

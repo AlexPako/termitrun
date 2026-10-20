@@ -212,6 +212,30 @@ class _Sheet(AnswerTask):
 
     fallback = ("Не то. Кавычки с запятой внутри — одна ячейка, а cut и awk режут по каждой "
                 "запятой. Проверь, не съехали ли колонки, и набери hint.")
+    # FB7: частые промахи, не связанные с кавычками, — свой отклик, а не общий про кавычки
+    trap_messages = {
+        "street": "{city} попался и в других ячейках — например, в названии улицы. Ищи ячейку "
+                  "целиком, с запятыми по краям.",
+        "cut": "Часть строк выпала: у адреса в кавычках своя запятая, и для cut колонки "
+               "съехали. Ищи ячейку целиком grep-ом — с запятыми по краям.",
+        "total": "Это число всех колонок, а нужен номер колонки amount — grep -n покажет, "
+                 "где она стоит.",
+        "rowshift": "Ты считал по строке данных, а в ней адрес в кавычках со своей запятой — "
+                    "колонки съехали. Номер бери из первой строки, заголовка.",
+        "total_or_row": "Столько всего колонок; столько же выходит и по строке данных, где "
+                        "адрес в кавычках сдвинул колонки. Номер amount бери из заголовка — "
+                        "grep -n покажет, где она стоит.",
+        "similar": "Посчитаны и похожие статусы вроде cancelled_by_bank. Ищи ячейку целиком, с "
+                   "запятыми по краям.",
+        "head_empty": "Две лишние строки в счёте: заголовок customer и пустая ячейка гостевого "
+                      "заказа. Заголовок срежет tail -n +2, пустые не посчитает grep -c .",
+        "empty": "В счёте пустая ячейка гостевого заказа, а гость — не клиент. grep -c . "
+                 "считает только непустые строки.",
+        "all_months": "delivered — лидер за все полгода. Оставь только строки {month} "
+                      "(grep ',{month}-'), а статус считай справа, $(NF-1): cut на кавычках "
+                      "съезжает.",
+        "sum_only": "Это сумма всех его заказов, а нужен средний чек: ещё подели на их число.",
+    }
 
     def answer_kind(self, state):
         return self.kinds[variant_index(state.get("_variant"), len(self.variants))]
@@ -281,15 +305,19 @@ class CsvByHand(_Sheet):
             rng.choice([r for r in rows if r["status"] != "cancelled"])["status"] = \
                 "cancelled_by_bank"
             requote(rng.choice([r for r in rows if r["status"] == "cancelled"]), rng, True)
-            write(box, finish(rows))
-            return {"answer": sum(r["status"] == "cancelled" for r in rows)}
+            out = write(box, finish(rows))[1:]
+            return {"answer": sum(r["status"] == "cancelled" for r in rows),
+                    "traps": [["similar", sum("cancelled" in ln for ln in out)],
+                              ["cut", sum(naive(ln, 6) == "cancelled" for ln in out)]]}
         city = rng.choice(CITIES)
         mine = [r for r in rows if r["city"] == city]
         requote(rng.choice(mine), rng, True)            # cut -f5 его теряет
         other = rng.choice([r for r in rows if r["city"] != city])
         other["address"] = address(rng, rng.random() < 0.5, CITY_STREET[city])  # grep ловит
-        write(box, finish(rows))
-        return {"city": city, "answer": len(mine)}
+        out = write(box, finish(rows))[1:]
+        return {"city": city, "answer": len(mine),
+                "traps": [["street", sum(city in ln for ln in out)],
+                          ["cut", sum(city in naive(ln, 5) for ln in out)]]}
 
     @staticmethod
     def _columns(box, rng, rows):
@@ -307,8 +335,17 @@ class CsvByHand(_Sheet):
                 r[name] = rng.choice(EXTRA[name])
         finish(rows)
         requote(rows[0], rng, True)
-        write(box, rows, cols)
-        return {"answer": cols.index("amount") + 1, "amount2": rows[0]["amount"]}
+        out = write(box, rows, cols)
+        answer = cols.index("amount") + 1
+        traps = [["total", len(cols)]]
+        cells = out[1].split(",")
+        if str(rows[0]["amount"]) in cells:
+            shifted = cells.index(str(rows[0]["amount"])) + 1
+            if shifted == len(cols):        # оба промаха дают одно число
+                traps = [["total_or_row", shifted]]
+            elif shifted != answer:
+                traps.append(["rowshift", shifted])
+        return {"answer": answer, "amount2": rows[0]["amount"], "traps": traps}
 
 
 class CsvTop(_Sheet):
@@ -396,7 +433,9 @@ class CsvTop(_Sheet):
         if variant == 1:
             rng.choice(rows)["customer"] = ""
             write(box, finish(rows))
-            return {"answer": len({r["customer"] for r in rows} - {""})}
+            answer = len({r["customer"] for r in rows} - {""})
+            return {"answer": answer,
+                    "traps": [["head_empty", answer + 2], ["empty", answer + 1]]}
         if variant == 2:
             return self._month(box, rng, rows)
         city = rng.choice(CITIES)
@@ -428,7 +467,7 @@ class CsvTop(_Sheet):
         sink_naive(inside, [r for r in inside if r["status"] == status], status, rng,
                    lambda r: (naive_row(r, 6), 1))
         write(box, finish(rows))
-        return {"month": month, "answer": status}
+        return {"month": month, "answer": status, "traps": [["all_months", "delivered"]]}
 
 
 class CsvSum(_Sheet):
@@ -511,8 +550,10 @@ class CsvSum(_Sheet):
         requote(rng.choice([r for r in rows if r["city"] == city]), rng, True)    # $5 теряет
         other = rng.choice([r for r in rows if r["city"] != city])
         other["address"] = address(rng, rng.random() < 0.5, CITY_STREET[city])     # grep лишний
-        write(box, finish(rows))
-        return {"city": city, "answer": sum(r["amount"] for r in rows if r["city"] == city)}
+        out = write(box, finish(rows))[1:]
+        grepped = sum(int(ln.rsplit(",", 1)[1]) for ln in out if city in ln)
+        return {"city": city, "answer": sum(r["amount"] for r in rows if r["city"] == city),
+                "traps": [["street", grepped]]}
 
     @staticmethod
     def _month(box, rng, rows):
@@ -547,7 +588,8 @@ class CsvSum(_Sheet):
         total = sum(r["amount"] for r in mine)
         mine[0]["amount"] -= total % len(mine)
         write(box, finish(rows))
-        return {"cust": cust, "answer": sum(r["amount"] for r in mine) // len(mine)}
+        total = sum(r["amount"] for r in mine)
+        return {"cust": cust, "answer": total // len(mine), "traps": [["sum_only", total]]}
 
 
 TASKS = [CsvByHand(), CsvTop(), CsvSum()]

@@ -6,7 +6,8 @@ import sys
 import textwrap
 from typing import Optional
 
-from termit_app import commands, icons, origins, progress, textnorm, theme, tui, zsh_only
+from termit_app import (commands, diagrams, icons, lifehacks, origins, progress, textnorm, theme,
+                        tui, zsh_only)
 
 
 def _color() -> bool:
@@ -200,6 +201,7 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         else:
             say(c("36", mark + spell + ":"))
             say(_wrap(task.scroll_for(state) or task.scroll, width=wide))
+        show_diagram(task.id, cp)
         origin_notes(task.id, cp, tw)
     head = theme.intro(task, state)
     line = f"💬 {theme.speaker(task)}:" + (f" {head}" if head else "")
@@ -249,6 +251,26 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             say("\n".join(tui.style(r, "dim", c=cp) for r in tui.fill(note, tw, "   ", "   ")))
     if owl:             # мост Совы запущен (Ollama есть и Сова не выключена)
         say(c("2", f"   ask ВОПРОС — {theme.word('owl')}: наводка, не ответ"))
+
+
+# FB9c: рисунок в уроке (diagrams.py) — отступ 2: строка до 76 знаков влезает в 78 колонок
+DIAGRAM_INDENT = "  "
+
+
+def diagram_rows(task_id: str, cp: tui.Caps) -> list:
+    """Строки рисунка для экрана: как есть, без переноса; без псевдографики (plain, basic) —
+    ASCII-вариант. Первая строка (пример) — жирно, стрелки и подписи — тускло."""
+    lines = diagrams.rows(task_id, ascii_only=cp.level != "rich")
+    return [DIAGRAM_INDENT + tui.style(line, "bold" if i == 0 else "dim", c=cp)
+            for i, line in enumerate(lines)]
+
+
+def show_diagram(task_id: str, cp: tui.Caps) -> None:
+    """Рисунок под уроком или шпаргалкой — в карточке и в команде lesson; пустые строки
+    вокруг отделяют его от абзаца урока и от реплики под ним."""
+    lines = diagram_rows(task_id, cp)
+    if lines:
+        say("\n".join([""] + lines + [""]))
 
 
 def origin_notes(task_id: str, cp: tui.Caps, tw: int) -> None:
@@ -622,6 +644,8 @@ KEYS_SHEET = """\
   Option+B/F      то же по словам (вне игры — если Option работает как Esc+)
   Ctrl+D          Done, ввод окончен (EOT): выход из python3, sqlite3, psql
 
+""" + lifehacks.short_section() + """
+
 Меню
   В игре выбор делается словом или числом и Enter — стрелками ходить не нужно.
   В less и man стрелки ↑ ↓ листают текст по строке.
@@ -641,8 +665,12 @@ KEYS_SHEET = """\
   в каждой задаче: ./termit home board (набирать после рана, не в задаче)"""
 
 
-def keys_sheet() -> str:
-    """Шпаргалка клавиш: keys в задаче и ./termit keys."""
+def keys_sheet(args=()) -> str:
+    """Шпаргалка клавиш: keys в задаче и ./termit keys. FB10: keys hacks [РАЗДЕЛ] — весь
+    каталог лайфхаков (termit_app/lifehacks.py) или один его раздел."""
+    words = " ".join(args).split()
+    if words and words[0] == "hacks":
+        return lifehacks.sheet(lifehacks.sections_of(words[1:]))
     return KEYS_SHEET
 
 
@@ -659,25 +687,12 @@ BOARD_CARDS = {
     "keys-screen": "⌨ Cmd+↑↓ прокрутка · Cmd+K или clear (Ctrl+L — «новый лист») очистить",
     "game": "task задание · hint подсказка · book выученное · keys клавиши · skip · bug",
 }
-ROTATE_SHEET = "💡 "            # совет дня из шпаргалки
-ROTATE_BOOK = "📖 "             # совет дня из книги выученного
 
 
-def sheet_tips() -> list:
-    """Советы дня из KEYS_SHEET: строки «клавиша  пояснение» (с продолжениями) — как
-    «клавиша — пояснение»; не шире BOARD_WIDTH вместе со значком."""
-    entries = []
-    for line in KEYS_SHEET.splitlines():
-        m = re.match(r"^  (\S.*?\S)\s{2,}(\S.*)$", line)
-        if m:
-            entries.append([m.group(1), m.group(2)])
-        elif entries and entries[-1] and line.startswith(" " * 10) and line.strip():
-            entries[-1][1] += " " + line.strip()
-        else:
-            entries.append(None)            # другой абзац: продолжения не цепляются
-    tips = [f"{ROTATE_SHEET}{key} — {' '.join(text.split())}"
-            for key, text in filter(None, entries)]
-    return [t for t in tips if tui.vlen(t) <= BOARD_WIDTH]
+def hack_tip(line: str) -> None:
+    """FB10: приём из каталога лайфхаков под итогом рана — тускло, переносом по ширине."""
+    if line:
+        say(c("2", story_fill(line, "  ", "     ")))
 
 
 def extension_notes(lines) -> None:

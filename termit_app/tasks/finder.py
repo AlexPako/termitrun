@@ -75,7 +75,7 @@ class OpenGui(Task):
         Variant("Покажи в Finder папку reports, а картинку plan.png открой именно в программе "
                 "Preview. Всё — из терминала.",
                 hints=("Окна открывает open: папку — по её имени, как точку.",
-                       "Программу выбирает ключ -a: open -a Preview файл",
+                       "Программу выбирает флаг -a: open -a Preview файл",
                        "open reports && open -a Preview plan.png"),
                 solution="open reports && open -a Preview plan.png",
                 wrong=("open reports && open plan.png",),
@@ -83,8 +83,8 @@ class OpenGui(Task):
         Variant("Опись лежит глубоко: docs/{year}/{month}/inventory.txt. Покажи её в Finder — "
                 "чтобы открылось окно её папки и опись в нём была выделена. Сам файл "
                 "открывать не нужно.",
-                hints=("Показать файл в Finder, а не открыть его, — отдельный ключ open.",
-                       "Ключ -R: open -R путь/к/файлу",
+                hints=("Показать файл в Finder, а не открыть его, — отдельный флаг open.",
+                       "Флаг -R: open -R путь/к/файлу",
                        "open -R docs/{year}/{month}/inventory.txt"),
                 solution="open -R docs/{year}/{month}/inventory.txt",
                 wrong=("open docs/{year}/{month}/inventory.txt", "open docs/{year}/{month}"),
@@ -93,7 +93,7 @@ class OpenGui(Task):
     )
     par = 25
     hints = ("Окна открывает команда open.",
-             "Точка . — это текущая папка; ключ -a выбирает программу.",
+             "Точка . — это текущая папка; флаг -a выбирает программу.",
              "open . && open -a TextEdit inventory.txt")
     solution = "open . && open -a TextEdit inventory.txt"
     explain = "open — мост из терминала в обычные программы: папки, файлы, ссылки."
@@ -130,18 +130,24 @@ class OpenGui(Task):
         v = ctx.state.get("_variant", 0)
         if v == 2:
             target = _resolve(ctx.box, ctx.state["path"])
-            shown = opened = False
+            shown = opened = folder = False
             for pwd, toks in entries:
                 if any(_resolve(pwd, t) == target for t in toks if not t.startswith("-")):
                     if "-R" in toks:
                         shown = True
                     else:
                         opened = True
+                elif any(_resolve(pwd, t) == target.parent for t in toks
+                         if not t.startswith("-")):
+                    folder = True
             if shown:
                 return Verdict(True)
             if opened:
                 return Verdict(False, "Опись открылась сама, а нужно показать её в Finder — "
-                                      "это ключ -R: open -R путь")
+                                      "это флаг -R: open -R путь")
+            if folder:
+                return Verdict(False, "Папка открылась, но опись в ней не выделена. Открыть "
+                                      "папку и сразу выделить файл — open -R путь/к/файлу.")
             return Verdict(False)
         if v == 1:
             folder, name, app = _resolve(ctx.box, "reports"), "plan.png", "preview"
@@ -197,7 +203,7 @@ class FindName(AnswerTask):
                        "find storage -name config.yaml покажет все пути. Нужен тот, где папка "
                        "называется ровно prod, а не preprod.",
                        "find storage -name config.yaml — путь с /prod/ сдай: ans ПУТЬ"),
-                solution="find storage -name config.yaml → путь с /prod/",
+                solution="find storage -name config.yaml, путь с /prod/",
                 solution_script="find storage -name config.yaml | grep /prod/",
                 wrong=("find storage -name config.yaml | grep prod",
                        "find storage -name config.yaml"),
@@ -296,7 +302,7 @@ class GrepR(AnswerTask):
     )
     par = 40
     hints = ("Искать внутри файлов умеет grep.",
-             "Во всех подпапках сразу — ключ -r, только имена файлов — -l.",
+             "Во всех подпапках сразу — флаг -r, только имена файлов — -l.",
              "grep -rl 'пароль от сейфа' archive")
     solution = "grep -rl 'пароль от сейфа' archive"
     explain = "grep -r ищет по содержимому всех файлов — Spotlight в одну строку."
@@ -494,7 +500,7 @@ class LsNewest(AnswerTask):
                 wrong=("ls | head -1",),
                 alternatives=("ls -lt | head -3 — с датами, чтобы видеть разницу",)),
         Variant("Какой файл здесь самый старый — дольше всех не менялся? Назови его: ans ИМЯ. "
-                "Ключ -r у ls переворачивает порядок",
+                "Флаг -r у ls переворачивает порядок",
                 hints=("ls -t сортирует по времени: свежие сверху, старые — внизу.",
                        "-r переворачивает порядок: ls -tr — старые сверху. Или возьми последнюю "
                        "строку: ls -t | tail -1",
@@ -645,6 +651,13 @@ class RecentMove(Task):
         if lost:
             return Verdict(False, f"Стёрто то, что нужно было разложить: {kit.names_line(lost)}. "
                            + kit.RESET_TAIL)
+        extra = sorted(inside & set(stay))
+        if extra:
+            names = kit.names_line(extra)
+            end = "" if names.endswith("…") else "."
+            return Verdict(False, f"В {dest}/ попало то, что надо было оставить: {names}{end} "
+                                  "Сначала проверь отбор: ls -l с той же маской — потом mv. "
+                                  + kit.RESET_TAIL)
         return Verdict(False)
 
 
@@ -672,7 +685,7 @@ class BatchRename(Task):
                 wrong=("mv *.JPEG *.jpg",),
                 alternatives=("autoload zmv; zmv '(*).JPEG' '$1.jpg' — то же одной строкой",)),
         Variant("Ко всем .txt здесь допиши спереди 2025_: «report march.txt» → «2025_report "
-                "mart.txt». Другие файлы не трогай. Новое имя склеивается прямо в кавычках: "
+                "march.txt». Другие файлы не трогай. Новое имя склеивается прямо в кавычках: "
                 "\"2025_$f\".",
                 hints=("Много файлов — цикл for по *.txt, как в карточке.",
                        "Внутри цикла: mv \"$f\" \"2025_$f\" — приставка просто пишется перед $f.",
@@ -750,7 +763,19 @@ class BatchRename(Task):
             files = {**s["want"], **s["keep"]}
         if all((b / n).is_file() and kit.sha(b / n) == h for n, h in files.items()):
             return Verdict(True)
-        return _lost_files(b, files.values())
+        lost = _lost_files(b, files.values())
+        if lost.message:
+            return lost
+        keep = {**s.get("keep", {}), **s.get("png", {})}
+        renamed = sorted(n for n, h in keep.items()
+                         if not ((b / n).is_file() and kit.sha(b / n) == h))
+        if renamed:
+            return Verdict(False, f"Переименовано лишнее: {renamed[0]} должен был остаться как "
+                                  "есть. Цикл бери только по нужной маске. " + kit.RESET_TAIL)
+        missing = sorted(n for n, h in s["want"].items()
+                         if not ((b / n).is_file() and kit.sha(b / n) == h))
+        return Verdict(False, f"Имена пока не те: нет, например, «{missing[0]}». Сравни с ls — "
+                              "что лишнее или чего не хватает в новом имени. " + kit.RESET_TAIL)
 
 
 class ZipPack(Task):
@@ -787,8 +812,8 @@ class ZipPack(Task):
                               "(-i — «включить»)",)),
     )
     par = 45
-    hints = ("Упаковывает zip, папку целиком — с ключом -r.",
-             "Исключить файлы — ключ -x и маска в кавычках.",
+    hints = ("Упаковывает zip, папку целиком — с флагом -r.",
+             "Исключить файлы — флаг -x и маска в кавычках.",
              "zip -r report.zip report -x '*.DS_Store'")
     solution = "zip -r report.zip report -x '*.DS_Store'"
     explain = "-r — вместе с подпапками, -x — без мусора. Проверить посылку — unzip -l."
@@ -857,6 +882,9 @@ class ZipPack(Task):
         if any("/cache/" in "/" + n for n in names):
             return Verdict(False, f"В архив попало содержимое cache/ — {redo}: маска для папки — "
                                   "'project/cache/*'.")
+        if not names:
+            return Verdict(False, f"В {name} одна пустая папка: без -r zip не заходит внутрь. "
+                                  f"Так что {redo} с -r.")
         return Verdict(sorted(names) == s["files"])
 
 
@@ -940,7 +968,12 @@ class PbcopyList(Task):
                                       "печатает pwd.")
             return Verdict(False, "В буфере путь другой папки — нужна та, где началась задача.")
         got = sorted(l.strip() for l in clip.splitlines() if l.strip())
-        return Verdict(got == s["pdfs"])
+        if got == s["pdfs"]:
+            return Verdict(True)
+        if set(s["pdfs"]) < set(got):
+            return Verdict(False, "В буфере не только PDF: отбери их маской *.pdf, а потом "
+                                  "| pbcopy.")
+        return Verdict(False)
 
 
 class KillFrozen(Task):
@@ -965,8 +998,8 @@ class KillFrozen(Task):
                 hints=("Сначала посмотри, что совпадает: pgrep -fl {base}",
                        "pkill -f {base} заденет обоих — у копии в имени то же начало. Бей по "
                        "номеру: kill PID нужной строки.",
-                       "pgrep -fl {base} → kill PID строки с {name} (не с _backup)"),
-                solution="pgrep -fl {base} → kill PID строки с {name}",
+                       "pgrep -fl {base}, kill PID строки с {name} (не с _backup)"),
+                solution="pgrep -fl {base}, kill PID строки с {name}",
                 solution_script=("kill $(ps aux | grep \"$TERMIT_BOX/{name}\" | grep -v grep | "
                                  "awk '{{print $2}}')"),
                 wrong=("pkill -f \"$TERMIT_BOX/{base}\"",),
@@ -977,8 +1010,8 @@ class KillFrozen(Task):
                 hints=("pgrep -fl stuck_ покажет обоих вместе с номерами.",
                        "Упрямого вежливый kill не возьмёт — нужен -9: kill -9 PID или "
                        "pkill -9 -f имя.",
-                       "pgrep -fl stuck_ → pkill -9 -f stuck_ (или kill -9 PID1 PID2)"),
-                solution="pgrep -fl stuck_ → pkill -9 -f stuck_",
+                       "pgrep -fl stuck_, pkill -9 -f stuck_ (или kill -9 PID1 PID2)"),
+                solution="pgrep -fl stuck_, pkill -9 -f stuck_",
                 solution_script=("kill -9 $(ps aux | grep \"$TERMIT_BOX/stuck_\" | grep -v grep "
                                  "| awk '{{print $2}}')"),
                 wrong=("pkill -f \"$TERMIT_BOX/stuck_\"", "pkill -9 -f \"$TERMIT_BOX/{name}\""),
@@ -987,9 +1020,9 @@ class KillFrozen(Task):
     par = 40
     hints = ("Список процессов — ps aux; отфильтровать по имени — | grep stuck",
              "PID — число во втором столбце. Останавливает kill PID.",
-             "ps aux | grep stuck → kill PID (не помогло — kill -9 PID). Короче — по точному "
-             "началу имени: pgrep -fl stuck_ → pkill -f stuck_ (упрямого — pkill -9 -f stuck_)")
-    solution = "ps aux | grep stuck → kill PID   (упрямого — kill -9 PID)"
+             "ps aux | grep stuck, kill PID (не помогло — kill -9 PID). Короче — по точному "
+             "началу имени: pgrep -fl stuck_, pkill -f stuck_ (упрямого — pkill -9 -f stuck_)")
+    solution = "ps aux | grep stuck, kill PID   (упрямого — kill -9 PID)"
     solution_script = ("kill -9 $(ps aux | grep \"$TERMIT_BOX/{name}\" | grep -v grep | "
                        "awk '{{print $2}}')")
     explain = ("ps и grep выследят процесс, kill его остановит; -9 — для тех, кто по-хорошему "
@@ -1062,6 +1095,10 @@ class KillFrozen(Task):
         if s["stubborn"] and killed:
             return Verdict(False, "Процесс не послушался вежливого kill. Есть приказ посильнее: "
                                   "kill -9 PID (или pkill -9 -f stuck_)")
+        last = ctx.cmds[-1].line if ctx.cmds else ""
+        if re.search(r"\bp(grep|kill)\b", last) and not re.search(r"\s-\w*f", last):
+            return Verdict(False, "pgrep и pkill без -f сверяют только имя программы — у "
+                                  "скрипта это sh, а не его файл. С -f они смотрят всю команду.")
         return Verdict(False)
 
 
@@ -1088,9 +1125,9 @@ class TopHog(Task):
                        "в первом столбце. Выход — q.",
                        "Сверь кандидата: ps aux -m | head — у нужного в команде путь "
                        ".termit/procs. PID — во втором столбце.",
-                       "ps aux -m | head → строка с .termit/procs наверху → kill PID"),
-                solution=("top -o mem → PID в первой строке; сверка: ps aux -m | head (в команде "
-                          ".termit/procs) → kill PID"),
+                       "ps aux -m | head, строка с .termit/procs наверху, kill PID"),
+                solution=("top -o mem, PID в первой строке; сверка: ps aux -m | head (в команде "
+                          ".termit/procs), kill PID"),
                 solution_script=("sleep 1; kill $(ps aux -m | grep \"$TERMIT_BOX/.termit/procs\" "
                                  "| grep -v grep | head -1 | awk '{{print $2}}')"),
                 wrong=("sleep 1; kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | "
@@ -1102,9 +1139,9 @@ class TopHog(Task):
                        "верхние строки. Выход — q.",
                        "Сверь: ps aux -r | head — у обоих в команде путь .termit/procs. kill "
                        "принимает несколько PID сразу.",
-                       "ps aux -r | head → два PID с .termit/procs наверху → kill PID1 PID2"),
-                solution=("top -o cpu → два PID сверху; сверка: ps aux -r | head (в команде "
-                          ".termit/procs) → kill PID1 PID2"),
+                       "ps aux -r | head, два PID с .termit/procs наверху, kill PID1 PID2"),
+                solution=("top -o cpu, два PID сверху; сверка: ps aux -r | head (в команде "
+                          ".termit/procs), kill PID1 PID2"),
                 solution_script=("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | "
                                  "grep -v grep | head -2 | awk '{{print $2}}')"),
                 wrong=("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
@@ -1117,9 +1154,9 @@ class TopHog(Task):
              "первом столбце. Выход — q.",
              "Сверь кандидата: ps aux -r | head — у нужного процесса в команде путь "
              ".termit/procs. PID — во втором столбце.",
-             "ps aux -r | head → строка с .termit/procs наверху → kill PID")
-    solution = ("top -o cpu → PID в первой строке; сверка: ps aux -r | head (в команде "
-                ".termit/procs) → kill PID")
+             "ps aux -r | head, строка с .termit/procs наверху, kill PID")
+    solution = ("top -o cpu, PID в первой строке; сверка: ps aux -r | head (в команде "
+                ".termit/procs), kill PID")
     solution_script = ("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
                        "head -1 | awk '{{print $2}}')")
     explain = "top — «Мониторинг системы» в терминале: виден виновник тормозов и его PID."
@@ -1259,7 +1296,7 @@ class DiskSweep(Task):
                               "ls -lS junk | head -3 — с размерами, чтобы сверить глазами")),
         Variant("В папке docs свалены файлы. Запиши имя самого тяжёлого из них в файл "
                 "heavy.txt — рядом с docs, одной строкой.",
-                hints=("Размер покажет ls с ключом: -S ставит тяжёлые сверху.",
+                hints=("Размер покажет ls с флагом: -S ставит тяжёлые сверху.",
                        "Первая строка — | head -1, а > файл запишет вывод в файл.",
                        "ls -S docs | head -1 > heavy.txt"),
                 solution="ls -S docs | head -1 > heavy.txt",
@@ -1348,7 +1385,12 @@ class DiskSweep(Task):
         b, s = ctx.box, ctx.state
         v = variant_index(s.get("_variant"), len(self.variants))
         if v == 1:
-            return Verdict(self._heavy_ok(b, s["heavy"]))
+            if self._heavy_ok(b, s["heavy"]):
+                return Verdict(True)
+            if (b / "heavy.txt").is_file():
+                return Verdict(False, "В heavy.txt не то имя: нужен самый тяжёлый файл из docs. "
+                                      "ls -S ставит тяжёлые сверху, первую строку берёт head -1.")
+            return Verdict(False)
         if v == 2:
             inside = {p.name for p in (b / "photos").iterdir()} if (b / "photos").is_dir() else set()
             if inside == set(s["move"]) and all((b / "mixed" / n).exists() for n in s["keep"]):
@@ -1362,6 +1404,8 @@ class DiskSweep(Task):
             if extra:
                 return Verdict(False, f"В photos попало не то: {kit.names_line(extra)} — верни "
                                       f"обратно: mv photos/{extra[0]} mixed/")
+            if inside:
+                return Verdict(False, self.RULES["move"])
             return Verdict(False)
         return self._sweep(b, s)
 
@@ -1543,7 +1587,13 @@ class DupSort(Task):
             if extra:
                 return Verdict(False, f"В documents попало не то: {kit.names_line(extra)} — "
                                       f"верни: mv 'downloads/documents/{extra[0]}' downloads/")
-            return Verdict(inside == set(s["move"]))
+            if inside == set(s["move"]):
+                return Verdict(True)
+            left = sorted(n for n in s["move"] if n not in inside)
+            if inside and left:
+                return Verdict(False, f"Перенесено не всё: {kit.names_line(left)} ещё в downloads. "
+                                      "Обе маски сразу — (pdf|docx).")
+            return Verdict(False)
         photos = z / "photos"
         where = {}
         for n in s["keep"]:
@@ -1588,7 +1638,7 @@ class RgHunt(AnswerTask):
               "отрежь: grep -rn 'текст' . --exclude-dir=.git --exclude-dir=vendor\n"
               "| xargs grep -l 'ещё' — из найденных файлов оставит те, где есть и второе.\n"
               "Утилита rg -n 'текст' . делает то же сама — мимо .git, скрытого и всего из "
-              ".gitignore. Скобку в шаблоне rg пиши как \\( или ищи ключом -F (Fixed — как "
+              ".gitignore. Скобку в шаблоне rg пиши как \\( или ищи флагом -F (Fixed — как "
               "есть).")
     variants = (
         Variant("Ты в проекте proj/. Где определена функция {fn} (кусок кода с именем) — в каком "
@@ -1631,7 +1681,7 @@ class RgHunt(AnswerTask):
                 alternatives=("rg -l '{k1}' . | xargs rg -l '{k2}' | xargs rg -l '{k3}'",)),
     )
     par = 60
-    hints = ("Номер строки к находке grep -r добавит ключом -n. Ищи само определение: "
+    hints = ("Номер строки к находке grep -r добавит флагом -n. Ищи само определение: "
              "'def {fn}('.",
              "grep -r лезет и в .git, и в vendor/ — отрежь их: --exclude-dir=.git "
              "--exclude-dir=vendor.",
@@ -1712,9 +1762,11 @@ class RgHunt(AnswerTask):
             self._save(proj, files)
             n = len(callers) + 1
             similar = len(rest) - len(callers)
-            return {"fn": fn, "answer": n,
-                    "traps": [["foreign", n + 2], ["similar", n + similar],
-                              ["foreign", n + similar + 2]]}
+            traps = [["foreign", n + 2], ["similar", n + similar],
+                     ["foreign", n + similar + 2]]
+            if similar == 2:        # чужих копий тоже две: по числу их не различить
+                traps = [["either", n + 2], ["foreign", n + similar + 2]]
+            return {"fn": fn, "answer": n, "traps": traps}
         self._save(proj, files)
         return {"fn": fn, "answer": f"{home}:{pos + 1}"}
 
@@ -1733,6 +1785,8 @@ class RgHunt(AnswerTask):
     trap_messages = {
         "foreign": "В счёт попали .git и vendor/ — это чужие копии. Отрежь их --exclude-dir.",
         "similar": "Посчитаны и похожие имена: ищи вместе со скобкой — '{fn}('.",
+        "either": "Лишние файлы в счёте: или чужие копии из .git и vendor/ (отрежь их "
+                  "--exclude-dir), или похожие имена (ищи вместе со скобкой — '{fn}(').",
     }
 
     def answer_kind(self, state):
@@ -1776,7 +1830,7 @@ class FdHunt(AnswerTask):
                        "fd без -H такие файлы не видит.",
                        "find . -name .env.example -not -path '*/node_modules/*' — и выбрать "
                        "самый длинный путь; утилитой: fd -H -g .env.example"),
-                solution="find . -name .env.example -not -path '*/node_modules/*' → самый "
+                solution="find . -name .env.example -not -path '*/node_modules/*', самый "
                          "глубокий путь",
                 solution_script="find . -name .env.example -not -path '*/node_modules/*' | "
                                 "awk -F/ '{{print NF, $0}}' | sort -n | tail -1 | cut -d' ' -f2",

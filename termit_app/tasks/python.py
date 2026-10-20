@@ -242,8 +242,8 @@ class PyVars(NumberOut):
                        "monday и tuesday — текст из файла. Сложить их как числа: сначала "
                        "int(…) каждое."),
                 wrong=("python3 price.py > total.txt",),
-                alternatives=("total = int(monday) + int(tuesday) прямо в print — тоже "
-                              "можно",),
+                alternatives=("print(f\"total: {{int(monday) + int(tuesday)}}\") — сложение "
+                              "прямо в f-строке, тоже можно",),
                 key="int"),
     )
     hints = variants[0].hints
@@ -589,6 +589,9 @@ class PyFunc(pykit.PyEditTask):
                      "столько параметров и пиши в def.",
         "IndentationError": "Скрипт упал с IndentationError: тело функции — с отступом в 4 "
                             "пробела под строкой def.",
+        "AttributeError": "Скрипт упал с AttributeError: report.py зовёт из mylib функцию, "
+                          "которой там нет. Имя после def — ровно как в вызове (смотри "
+                          "последнюю строку traceback).",
     }
     MSG_NONE = ("В fees.txt — None: функция печатает, но не возвращает. Вместо print — "
                 "return.")
@@ -844,7 +847,7 @@ class PyJson(pykit.PyEditTask):
     crash_tips = {
         "KeyError": "Скрипт упал с KeyError: такого ключа нет. Сверь имена ключей с "
                     "orders.json: cat orders.json.",
-        "IndentationError": "Скрипт упал с IndentationError: строка под if и под with — с "
+        "IndentationError": "Скрипт упал с IndentationError: строка под for, if и with — с "
                             "отступом в 4 пробела.",
     }
 
@@ -1597,7 +1600,9 @@ class PyUrllib(pykit.PyEditTask):
 
 _BOSS_RUN = "source .venv/bin/activate && python3 report.py"
 _BOSS_FIXES = ("swap", "pages", "json", "header")
-_BOSS_LATER = ("for page in [1, 2]:; json.dump(paid, f, indent=2, ensure_ascii=False); "
+# «for …:» и разделитель «;» подряд читались как «:;» — цикл назван словами (FB7)
+_BOSS_LATER = ("цикл for page in [1, 2]: по обеим страницам; json.dump(paid, f, indent=2, "
+               "ensure_ascii=False); "
                "w.writeheader() перед циклом строк")
 _BOSS_SWAP = ("убери строку import requests", "rm csv.py", "order[\"town\"] → order[\"city\"]")
 

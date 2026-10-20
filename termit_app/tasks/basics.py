@@ -1676,6 +1676,193 @@ class ScreenScroll(AnswerTask):
                 "sources": sources(box, "journal.txt")}
 
 
+class ScreenFind(AnswerTask):
+    """FB10 (лайфхаки): поиск по экрану iTerm2 — Cmd+F, метки Cmd+Shift+↑ ↓ (прыжок от
+    команды к команде), Cmd+Shift+A (вывод последней команды); панели Cmd+D — в уроке.
+    Ответ виден только в выводе: проверка — по сданному слову, как у screen_scroll."""
+    id = "screen_find"
+    track = "basics"
+    title = "Поиск по экрану"
+    scroll = ("Cmd+F — поиск по выводу, и по уехавшему вверх: Enter или Cmd+G — следующее "
+              "совпадение, Esc — закрыть.\n"
+              "Cmd+Shift+↑ ↓ — от команды к команде (метки iTerm2; меню iTerm2, Install Shell "
+              "Integration). В Terminal.app — Cmd+↑ ↓.\n"
+              "Cmd+Shift+A — выделить вывод последней команды. Cmd+D — вторая панель рядом, "
+              "Cmd+W — закрыть.")
+    variants = (
+        Variant("Склад выдал опись stock.txt на сотни строк. Где-то в середине одна строка "
+                "помечена словом ПРОПУСК. Выведи опись командой cat, найди метку поиском "
+                "Cmd+F и сдай слово, что стоит после неё: ans СЛОВО",
+                wrong=("echo {old}",),
+                alternatives=("cat stock.txt, затем Cmd+F и ПРОПУСК — Enter прыгает к "
+                              "совпадению",)),
+        Variant("Выведи три журнала по очереди: cat day1.txt, cat day2.txt, cat day3.txt. "
+                "Слово дня — в первой строке второго журнала. После третьей команды оно уедет "
+                "далеко вверх: прыгай к началу вывода day2.txt метками Cmd+Shift+↑ и сдай "
+                "его: ans СЛОВО",
+                hints=("Слово — сразу под командой cat day2.txt.",
+                       "Cmd+Shift+↑ прыгает к прошлой команде (с интеграцией iTerm2); без неё — "
+                       "Cmd+F и day2.txt.",
+                       "cat day1.txt, cat day2.txt, cat day3.txt, Cmd+Shift+↑ дважды — ans "
+                       "СЛОВО"),
+                solution="cat day1.txt && cat day2.txt && cat day3.txt",
+                solution_script="head -n 1 day2.txt | cut -d' ' -f3",
+                wrong=("echo {old}",),
+                alternatives=("cat day2.txt одной командой — слово в первой строке, Cmd+Shift+↑ "
+                              "сразу к ней",)),
+        Variant("В файле ticket.txt — код доступа: длинный, из цифр и латиницы. Перепечатывать "
+                "долго, а ошибка в одном знаке — и код не тот. Выведи его командой cat, выдели "
+                "вывод Cmd+Shift+A (или двойным щелчком по коду), Cmd+C и сдай: ans КОД — вместо "
+                "КОД вставь Cmd+V",
+                hints=("Код печатает cat ticket.txt. Набирать его руками не нужно.",
+                       "Cmd+Shift+A выделяет вывод последней команды (с интеграцией iTerm2); "
+                       "двойной щелчок по коду — тоже выделит его целиком.",
+                       "cat ticket.txt, Cmd+Shift+A, Cmd+C, ans и Cmd+V"),
+                solution="cat ticket.txt",
+                solution_script="cat ticket.txt",
+                wrong=("echo {old}",),
+                alternatives=("ans $(cat ticket.txt) — подстановка тоже сдаст код без "
+                              "перепечатки",)),
+    )
+    par = 40
+    hints = ("Вывод длинный, читать глазами долго — пусть ищет терминал.",
+             "Cmd+F открывает поиск: набери ПРОПУСК, Enter — к совпадению.",
+             "cat stock.txt, затем Cmd+F и ПРОПУСК — ans СЛОВО после метки")
+    solution = "cat stock.txt"
+    solution_script = "grep 'ПРОПУСК' stock.txt | cut -d' ' -f4"
+    explain = ("Искать глазами — долго: Cmd+F находит слово в выводе, Cmd+Shift+↑ ↓ прыгает от "
+               "команды к команде, Cmd+Shift+A берёт вывод последней целиком.")
+    spell = "Cmd+F — поиск по выводу; Cmd+Shift+↑ ↓ — от команды к команде; Cmd+Shift+A — вывод"
+    trap_messages = {"old": "Это слово из другой строки — нужное там, где сказано в задании. "
+                            "Найди его поиском Cmd+F."}
+
+    def setup_variant(self, box, rng, variant):
+        word, old = rng.sample(kit.WORDS, 2)
+        if variant == 1:
+            for day, n in (("day1", 120), ("day2", 140), ("day3", 160)):
+                head = [f"Слово дня: {word}"] if day == "day2" else [f"Слово дня: {old}"]
+                body = [f"{day} запись {i}: в порядке" for i in range(1, n + rng.randint(0, 40))]
+                kit.write(box / f"{day}.txt", "\n".join(head + body) + "\n")
+            return {"answer": word, "old": old, "traps": [["old", old]],
+                    "sources": sources(box, "day2.txt")}
+        if variant == 2:
+            alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
+            code = "".join(rng.choice(alphabet) for _ in range(24))
+            kit.write(box / "ticket.txt", code + "\n")
+            return {"answer": code, "old": old, "traps": [["old", old]],
+                    "sources": sources(box, "ticket.txt")}
+        body = [f"позиция {i}: на месте" for i in range(1, rng.randint(500, 600))]
+        body.insert(rng.randint(200, 350), f"позиция {rng.randint(600, 900)}: ПРОПУСК {word}")
+        body.append(f"Итог: {old}")
+        kit.write(box / "stock.txt", "\n".join(body) + "\n")
+        return {"answer": word, "old": old, "traps": [["old", old]],
+                "sources": sources(box, "stock.txt")}
+
+
+class QuickFix(Task):
+    """FB10 (лайфхаки): быстрая правка — Esc . и !$ (последний аргумент прошлой команды),
+    ^старое^новое (повтор с заменой), Ctrl+Y (вставить стёртое), Ctrl+_ (отмена). Прошлая
+    команда заготовлена в истории песочницы; проверка — по результату."""
+    id = "quick_fix"
+    track = "basics"
+    title = "Быстрая правка"
+    scroll = ("Esc, потом точка — последнее слово прошлой команды; ещё раз — слово команды "
+              "постарше (Option+. — если Option работает как Esc+).\n"
+              "!$ — то же слово набором: cd !$. ^старое^новое — прошлая команда с заменой: "
+              "^q1^q2.\n"
+              "Ctrl+Y — вставить стёртое Ctrl+W, Ctrl+U, Ctrl+K. Ctrl+_ — отменить правку.")
+    variants = (
+        Variant("Последняя команда в истории создала папку с длинным путём. Перейди в неё, не "
+                "набирая путь: cd, пробел, Esc, потом точка — путь встанет сам — и Enter.",
+                wrong=("cd projects/{client}",),
+                alternatives=("cd !$ — то же слово набором; zsh подставит путь сам",)),
+        Variant("Последняя команда в истории скопировала в архив отчёт первого квартала, "
+                "summary_q1.txt. Сделай то же для второго квартала, не перепечатывая: "
+                "^q1^q2 и Enter.",
+                hints=("Команда почти та же — поменять надо одно: q1 на q2.",
+                       "^старое^новое повторит прошлую команду с заменой. ↑ жать не нужно: "
+                       "прошлая — та, что надо.",
+                       "^q1^q2"),
+                solution="^q1^q2",
+                solution_script="cp reports/{year}/summary_q2.txt archive/{year}/",
+                wrong=("cp reports/{year}/summary_q1.txt archive/{year}/",),
+                alternatives=("↑, Option+← к q1, поправь на q2 и Enter — тоже верно, но "
+                              "дольше",)),
+        Variant("Последней командой ты посмотрел лог с длинным путём. Скопируй именно его в "
+                "outbox/: cp, пробел, Esc, потом точка — путь встанет сам, — пробел, outbox/ "
+                "и Enter.",
+                hints=("Путь — последнее слово прошлой команды: Esc . вставит его.",
+                       "cp, пробел, Esc . (или !$), пробел, outbox/",
+                       "cp !$ outbox/"),
+                solution="cp, пробел, Esc ., пробел, outbox/, Enter",
+                solution_script="cp logs/{year}/october/server_{name}.log outbox/",
+                wrong=("cp logs/{year}/october/*.log outbox/",),
+                alternatives=("cp !$ outbox/ — то же слово набором",)),
+    )
+    par = 40
+    hints = ("Путь — последнее слово прошлой команды. Набирать его не нужно.",
+             "Esc, отпусти, потом точка — вставит последнее слово прошлой команды. Или !$ — то "
+             "же набором.",
+             "cd !$ (или cd, пробел, Esc . и Enter)")
+    solution = "cd, пробел, Esc ., Enter"
+    solution_script = "cd projects/{client}/drafts/{year}/final"
+    explain = ("Что уже набрано, не набирают снова: Esc . и !$ берут последнее слово прошлой "
+               "команды, ^старое^новое повторяет её с заменой.")
+    spell = "Esc . и !$ — последний аргумент; ^старое^новое — повтор с заменой; Ctrl+Y, Ctrl+_"
+
+    CLIENTS = ("atlas", "orbit", "nova", "delta", "vertex")
+    SERVERS = ("alpha", "bravo", "cobalt", "delta")
+
+    def setup_variant(self, box, rng, variant):
+        year = str(rng.randint(2024, 2026))
+        fill = list(rng.sample(FILLER, 8))
+        if variant == 1:
+            want = {}
+            for q in ("q1", "q2", "q3"):
+                f = kit.write(box / "reports" / year / f"summary_{q}.txt",
+                              f"Отчёт {q} {year}: {kit.word(rng)}\n")
+                want[f"reports/{year}/summary_{q}.txt"] = kit.sha(f)
+                if q in ("q1", "q2"):
+                    want[f"archive/{year}/summary_{q}.txt"] = kit.sha(f)
+            (box / "archive" / year).mkdir(parents=True)
+            kit.write(box / "archive" / year / "summary_q1.txt",
+                      (box / "reports" / year / "summary_q1.txt").read_text("utf-8"))
+            _history(box, fill + [f"cp reports/{year}/summary_q1.txt archive/{year}/"])
+            return {"year": year, "want": want}
+        if variant == 2:
+            name, *others = rng.sample(self.SERVERS, 3)
+            want = {}
+            for srv in [name] + others:
+                f = kit.write(box / "logs" / year / "october" / f"server_{srv}.log",
+                              f"server {srv}: {kit.word(rng)}\n")
+                want[f"logs/{year}/october/server_{srv}.log"] = kit.sha(f)
+                if srv == name:
+                    want[f"outbox/server_{srv}.log"] = kit.sha(f)
+            (box / "outbox").mkdir()
+            _history(box, fill + [f"ls -l logs/{year}/october/server_{name}.log"])
+            return {"year": year, "name": name, "want": want, "only": f"server_{name}.log"}
+        client = rng.choice(self.CLIENTS)
+        target = f"projects/{client}/drafts/{year}/final"
+        (box / target).mkdir(parents=True)
+        (box / "projects" / client / "notes").mkdir()
+        _history(box, fill + [f"mkdir -p {target}"])
+        return {"year": year, "client": client, "target": target}
+
+    def check(self, ctx):
+        s = ctx.state
+        if "target" in s:
+            return Verdict(ctx.pwd is not None and
+                           ctx.pwd.resolve() == (ctx.box / s["target"]).resolve())
+        if "only" in s:
+            extra = sorted(p.name for p in (ctx.box / "outbox").glob("*")
+                           if p.name != s["only"]) if (ctx.box / "outbox").is_dir() else []
+            if extra:
+                return Verdict(False, "В outbox/ лишнее: " + ", ".join(extra) + ". Нужен один "
+                                      "файл — тот, что ты смотрел последним. Убери лишнее: "
+                                      "rm outbox/" + extra[0])
+        return _files_check(ctx)
+
+
 # --- Пары «до/после» (часть 5): fzf_pick и z_jump ------------------------------------------
 
 class CopyDir(Task):
@@ -2244,8 +2431,10 @@ class BossBasics(Task):
 
 # FB5: MeetTerminal — первым: что такое терминал, оболочка и команда.
 # FB4: уроки навигации (LineEdit, HistoryRecall, ScreenScroll) — временно сразу после двух
-# задач на глубину: владелец проходит их следующими, потом их переставят на постоянное место
+# задач на глубину: владелец проходит их следующими, потом их переставят на постоянное место.
+# FB10: за ними — лайфхаки: поиск по экрану (к прокрутке) и быстрая правка (строка + история)
 TASKS = [MeetTerminal(), WhereAmI(), ClimbDown(), BackUp(), HomeTilde(), HiddenCache(),
-         MkdirP(), CopyMove(), FileExt(), StarMask(), QuestionMask(), RunScript(), DeepDig(), DeepRm(),
-         LineEdit(), HistoryRecall(), ScreenScroll(), CopyDir(), FzfPick(), ZJump(),
-         BossBasics()]
+         MkdirP(), CopyMove(), FileExt(), StarMask(), QuestionMask(),
+         RunScript(), DeepDig(), DeepRm(),
+         LineEdit(), HistoryRecall(), ScreenScroll(), ScreenFind(), QuickFix(), CopyDir(),
+         FzfPick(), ZJump(), BossBasics()]

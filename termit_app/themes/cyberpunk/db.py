@@ -188,7 +188,7 @@ LESSONS = {
     "sql_pipe": (
         "Запрос — такая же команда, как ls: вывод можно в файл и в трубу. `sqlite3 -csv -header "
         "staff.db \"SELECT …\"` и `> report.csv` — отчёт через запятую с шапкой; -header ставь "
-        "после -csv, иначе -csv его сбросит. Без ключей режим list — графы через |. Трубой — "
+        "после -csv, иначе -csv его сбросит. Без флагов режим list — графы через |. Трубой — "
         "как всегда: `| sort | uniq -c`, `| sort -t, -k2 -rn | head -3` — по второй графе CSV "
         "(t — separator, k — key), числами, от большего. `cat` покажет, что легло."),
     "import_csv": (
@@ -201,9 +201,9 @@ LESSONS = {
     "create_insert": (
         "Своя форма — та же CREATE TABLE, что ты читал в .schema, только пишешь её сам. Первая "
         "графа — `id INTEGER PRIMARY KEY`, дальше `name TEXT NOT NULL`, всё внутри `CREATE "
-        "TABLE staff (…)`. PRIMARY KEY — номер строки, NOT NULL — графа обязательная. Строки: "
+        "TABLE staff (…)`. PRIMARY KEY, первичный ключ, — номер строки, NOT NULL — графа обязательная. Строки: "
         "`INSERT INTO staff (name, note)` и `VALUES ('a', 'x'), ('b', NULL)`, id база поставит "
-        "сама; команды — через `;`. NOT NULL constraint failed — база бережёт бланк."),
+        "сама; команды — через `;`. NOT NULL constraint failed — это база бережёт свой бланк."),
     "backup_update": (
         "Правка без копии — ставка. Сначала копия: `mkdir -p` и папка "
         "backup, затем `sqlite3 staff.db \".backup backup/staff.db\"` (или `cp`). Потом `SELECT` с тем же WHERE — кого "
@@ -220,7 +220,7 @@ LESSONS = {
         "— до .quit, иначе черновик пропадёт."),
     "csv_sql": (
         "Не каждой справке нужен ящик. `sqlite3 :memory:` — база в памяти, пока идёт команда. "
-        "Ключ `-cmd` — command — выполнит команду до запроса: `sqlite3 :memory: -cmd \".import "
+        "Флаг `-cmd` — command — выполнит команду до запроса: `sqlite3 :memory: -cmd \".import "
         "--csv v.csv v\" \"…\"` — загрузит файл, а вместо «…» — запрос: `\"SELECT COUNT(*) FROM "
         "v\"`. Кряква — `duckdb` — спросит CSV по имени: `duckdb -c \"SELECT SUM(price) FROM "
         "'visits.csv'\"`, а базы SQLite без сети она не читает."),
@@ -246,7 +246,7 @@ VOICES = {
                      "сам."],
     "join_inner": ["Склеивай по id. Имя — для писем, id — для печатей."],
     "join_left": ["Простой JOIN молча выбрасывает тех, кого нет. Ищешь пропавших — бери LEFT."],
-    "sql_pipe": ["-header до -csv не держится. Порядок ключей — тоже порядок."],
+    "sql_pipe": ["-header до -csv не держится. Порядок флагов — тоже порядок."],
     "import_csv": ["Шапка в чужой таблице — не шапка, а лишняя строка с враньём."],
     "create_insert": ["constraint failed — не ошибка базы. Это база отказывается врать."],
     "backup_update": ["UPDATE без WHERE не спрашивает. Он просто делает."],

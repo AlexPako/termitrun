@@ -6,7 +6,7 @@ from datetime import date
 import re
 
 from termit_app import (citymap, contracts, cosmetics, diary, hideout, implants, loot, music,
-                        paths, progress, repute, sandbox, session, story, warehouse, weekly)
+                        paths, progress, repute, sandbox, session, story, updates, warehouse, weekly)
 from termit_app import book as book_mod
 from termit_app import commands, edition, extensions, icons, theme, tui, ui
 from termit_app import owl as owl_mod
@@ -61,6 +61,7 @@ def usage(p: dict = None) -> str:
     on = _opened(p)
     has_story = story.has_story()
     cmd = commands.line
+    home = commands.home_line
 
     def line(key, text, enabled=True):
         return text if enabled and on[key] else ""
@@ -74,14 +75,14 @@ def usage(p: dict = None) -> str:
     implants_line = line("implants", cmd("implants", "", "\n" + " " * 27 + "shell — подключить fzf и zoxide к своему zsh"))
     wheels_line = line("wheels", cmd("wheels", "[get]"))
     style_line = line("style", cmd("style", "[ВИД ID]"))
-    callsign_line = line("callsign", "  ./termit home callsign   позывной в шапке рана и приглашении; "
-                                     "off — снять\n")
+    callsign_line = line("callsign", home("callsign"))
     music_line = line("music", cmd("music", "[play ID]"))
     diary_line = line("diary", cmd("diary", "[N]"))
     owl_line = line("owl", cmd("owl", "[on|off]"))
     exists = {"fence": loot.enabled(), "case": has_story, "memory": has_story,
               "dossier": has_story}          # в теме без сюжета эти команды не появятся
     report_line = cmd("report") if edition.ISSUES_URL else ""
+    report_line += cmd("update") if edition.ISSUES_URL else ""
     places = "basics" if edition.closed() else "basics, tools, finder"
     themes = f": {', '.join(theme.available())} (сейчас: {theme.current()})"
     later = LATER if any(not v and exists.get(k, True) for k, v in on.items()) else ""
@@ -94,8 +95,7 @@ def usage(p: dict = None) -> str:
 {cmd("ext")}{cmd("shop", "[all]")}\
   ./termit shop ID         купить (например, ./termit shop freeze)
 {style_line}{rehearse_line}{cmd("list")}{cmd("map")}{cmd("home", "[look ID]")}\
-  ./termit home prompt     своё приглашение zsh в задачах: детали, on|off, show
-  ./termit home board      доска: подсказки над приглашением в задаче; pin|unpin|off|on
+{home("prompt")}{home("board")}{home("shop")}{home("help")}\
 {callsign_line}{deck_line}{story_lines}{fence_line}{cmd("book", "[слово]")}\
 {diary_line}{cmd("theme", "[ИМЯ]", themes)}{cmd("sound", "[on|off]", ";")}\
                            test, pack ID|off, vol 1..10
@@ -410,6 +410,7 @@ def shop_buy(item_id: str) -> int:
             home_line = _buy_text("home", **kw)
             if home_line:
                 ui.say("   " + home_line)
+            _say_use(item_id)
         stocked = p["stock"][stock_before:] if isinstance(p.get("stock"), list) else []
         if stocked:
             ui.say(ui.story_fill(cosmetics.stock_line(stocked), "   ", "   "))
@@ -434,7 +435,30 @@ def shop_buy(item_id: str) -> int:
         home = _buy_text("home", **kw)
         if home:
             ui.say("   " + home)
+        _say_use(item_id)
+    if _where_needed(item, story.bought_lines(item_id)):
+        ui.say(ui.story_fill("⚙ " + hideout.where_text(item_id), "   ", "     "))
     return 0
+
+
+# FB5 п. 17: виды, о которых покупка сама не говорила, где вещь и как ей пользоваться
+# (вещи комнаты, приглашение, доска и дека говорят своими строками выше)
+WHERE_AFTER_BUY = ("freeze", "tip", "dossier", "fragment", "sound", "soundpack", "tape") + \
+    tuple(hideout.STYLE_ARG)
+
+
+def _where_needed(item, bought: list) -> bool:
+    if item.kind not in WHERE_AFTER_BUY or not hideout.where_text(item.id):
+        return False
+    if item.kind == "dossier" and item.id.endswith("1") and bought:
+        return False            # «Читать: ./termit dossier ИМЯ» уже сказано
+    return True
+
+
+def _say_use(item_id: str) -> None:
+    """FB8: купленная вещь сразу говорит, как ей пользоваться."""
+    for line in hideout.use_news([item_id]):
+        ui.say(ui.story_fill(line, "   ", "     "))
 
 
 def shop(args) -> int:
@@ -456,6 +480,10 @@ def _print_lines(lines) -> None:
         ui.say(line if not line or line.startswith("  ") else ui.story_fill(line, "", ""))
 
 
+# подкоманды ./termit home СЛОВО: по ним охрана сверяет тексты «как пользоваться» (FB8)
+HOME_SUBCOMMANDS = tuple(commands.HOME_ABOUT)
+
+
 def home(args) -> int:
     p = progress.load(paths.PROGRESS_FILE)
     if not args:
@@ -467,7 +495,14 @@ def home(args) -> int:
         rest = hideout.listing(p)
         if rest:
             ui.say()
-            _print_lines(rest)
+            with ui.glossary_off():     # у каждой вещи своя строка ⚙ — ⓘ не нужны
+                _print_lines(rest)
+        ui.say()                # витрина видна из дома всегда (FB5 п. 16)
+        ui.say(ui.story_fill(hideout.shop_line(), "  ", "  "))
+        ui.say()                # дом — хаб: куда отсюда (FB5 п. 18)
+        with ui.glossary_off():     # у каждой строки панели своё «что там» — ⓘ не нужны
+            for line in home_hub(p):
+                ui.say(line)
         ui.say()                # репутация (М6) и контракт недели (М5) — в убежище на виду
         if repute.grant(p):     # порог взят раньше, чем появилась награда, — рамка на месте
             progress.save(paths.PROGRESS_FILE, p)
@@ -490,11 +525,73 @@ def home(args) -> int:
         return home_callsign(p, args[1:])
     if args[0] == "board":
         return home_board(p, args[1:])
+    if args[0] == "shop":           # витрина прямо из дома — то же, что ./termit shop
+        return shop(args[1:])
+    if args[0] == "help":
+        with ui.glossary_off():
+            _print_lines(home_help(p))
+        return 0
     ui.say("Убежище: ./termit home · осмотр: ./termit home look ID · "
            "приглашение: ./termit home prompt · палитра: ./termit home palette ID · "
            "дневник: ./termit home diary · позывной: ./termit home callsign ИМЯ · "
-           "доска: ./termit home board")
+           "доска: ./termit home board · витрина: ./termit home shop · "
+           "всё о доме: ./termit home help")
     return 2
+
+
+# FB5 п. 18 (владелец: «нужны напоминалки дома — что как смотреть, где досье, где что»):
+# панель «Куда отсюда» под комнатой — только то, что игроку уже открыто (как в cli.usage);
+# слова — первая часть описания из commands.ABOUT / HOME_ABOUT, один источник
+HUB = ("dossier", "case", "memory", "diary", "book", "keys", "map", "stats", "deck", "style",
+       "music", "fence", "home board", "home prompt")
+
+
+def _hub_open(p: dict) -> dict:
+    on = _opened(p)
+    has_story = story.has_story()
+    parts = bool(hideout.prompt_parts(p)) or any(
+        i in (p.get("owned") or ()) for i in hideout.WAVE2_PARTS)
+    return {"dossier": on["dossier"] and has_story, "case": on["case"] and has_story,
+            "memory": on["memory"] and has_story, "diary": on["diary"],
+            "book": True, "keys": True, "map": True, "stats": True,
+            "deck": on["deck"], "style": on["style"], "music": on["music"],
+            "fence": on["fence"] and loot.enabled(),
+            "home board": hideout.has_board(p), "home prompt": parts}
+
+
+def _hub_about(name: str) -> str:
+    if name.startswith("home "):
+        text = commands.HOME_ABOUT[name[5:]][1]
+    else:
+        text = commands.about(name)
+    return text.split(";")[0]
+
+
+def home_hub(p: dict) -> list:
+    """Панель «Куда отсюда»: команды, открытые игроку сейчас, по строке на каждую."""
+    is_open = _hub_open(p)
+    out = ["  Куда отсюда (набирай после рана, не в задаче):"]
+    for name in HUB:
+        if is_open[name]:
+            cmd = f"./termit {name}"
+            out += ui.story_fill(f"{cmd:<21} {_hub_about(name)}", "    ",
+                                 " " * 26).splitlines()
+    out.append("  Подробно о доме — ./termit home help")
+    return out
+
+
+def home_help(p: dict) -> list:
+    """./termit home help: что такое дом, что на экране и все его команды."""
+    return ["Дом — твоя комната с вещами и пульт игры. Вещи приходят подарками и с витрины; "
+            "у каждой под именем строка ⚙ — как ею пользоваться. Что не стоит в комнате "
+            "(досье, детали приглашения, модули деки, стиль…), лежит в разделе «Ещё твоё».",
+            "",
+            *[ui.story_fill(row.strip(), "  ", " " * 27)
+              for row in [commands.line("home")] + [commands.home_line(sub)
+                                                    for sub in commands.HOME_ABOUT]],
+            "",
+            "Внизу экрана дома — «Куда отсюда»: досье, дело, дневник, карта и прочее, что "
+            "уже открыто. Все команды игры — ./termit help."]
 
 
 def diary_cmd(args) -> int:
@@ -1179,7 +1276,7 @@ def main(argv) -> int:
     shown_before = len(seen)
     try:
         with ui.glossary(seen):
-            return dispatch(args, opts)
+            return with_update_notice(args, opts)
     except KeyboardInterrupt:          # Ctrl+C у любого вопроса — спокойный выход без трассировки
         ui.say("\n" + theme.msg("quit"))
         return 130
@@ -1188,6 +1285,30 @@ def main(argv) -> int:
         # без сохранения (игра ещё не начата) файл не заводим: просмотр ничего не пишет
         if len(seen) > shown_before and paths.PROGRESS_FILE.exists():
             remember_seen(seen)
+
+
+def with_update_notice(args, opts) -> int:
+    """Проверка обновления идёт в фоне; «вышло обновление» — на старте и в конце рана, раз в день."""
+    game = (args[0] if args else "dozor") in GAME_CMDS
+    if game:
+        updates.start()
+        note = updates.notice()
+        if note:
+            ui.say(note)
+    try:
+        return dispatch(args, opts)
+    finally:
+        if game:
+            note = updates.notice()
+            if note:
+                ui.say(note)
+
+
+def update_cmd() -> int:
+    """./termit update (в хабе — слово update): подтянуть свежую версию игры."""
+    ok, text = updates.update_text()
+    ui.say(text)
+    return 0 if ok else 1
 
 
 def remember_seen(seen) -> None:
@@ -1243,7 +1364,7 @@ def _dispatch(cmd, args, opts) -> int:
     elif cmd == "theme":
         return choose_theme(args[1] if len(args) > 1 else None)
     elif cmd == "keys":
-        ui.say(ui.keys_sheet())
+        ui.say(ui.keys_sheet(args[1:]))
     elif cmd == "ext":
         ui.say(extensions.sheet(progress.load(paths.PROGRESS_FILE)["extensions"]))
     elif cmd == "intro":
@@ -1279,6 +1400,8 @@ def _dispatch(cmd, args, opts) -> int:
         show_feedback()
     elif cmd == "report":
         ui.say("\n".join(edition.report_lines()))
+    elif cmd == "update":
+        return update_cmd()
     elif cmd == "implants":
         return implants_cmd(args[1:])
     elif cmd == "wheels":

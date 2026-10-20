@@ -210,7 +210,7 @@ bug() {
 loot()   { _tr loot "$*" }
 memory() { _tr memory "$*" }
 ask()    { _tr ask "$*" }
-keys()   { _tr keys }
+keys()   { _tr keys "$*" }
 ext()    { _tr ext }
 book()   { _tr book "$*" }
 lesson() { _tr lesson }

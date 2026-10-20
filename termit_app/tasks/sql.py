@@ -616,7 +616,7 @@ class PsqlNav(SqlAnswer):
     scroll = ("psql — войти в учебную базу (vault=>): \\dt — таблицы, \\d invoices — графы и их "
               "типы.\n"
               "Выход — \\q или Ctrl+D; ans и hint — только в zsh.\n"
-              "Без захода — ключ -c (command): psql -c \"\\dt\"; два запроса — два -c: psql -c "
+              "Без захода — флаг -c (command): psql -c \"\\dt\"; два запроса — два -c: psql -c "
               "\"\\dt\" -c \"\\d invoices\".")
     variants = (
         Variant("Учебная база vault уже ждёт: psql — и ты внутри. Сколько в ней таблиц (\\dt) и "
@@ -632,7 +632,7 @@ class PsqlNav(SqlAnswer):
                                  _NAV_TYPES_SQL + '")'),
                 wrong=('print -r -- $(psql -c "\\dt" | wc -l) {ctype}',
                        'psql -At -c "\\dt" | wc -l'),
-                alternatives=("psql → \\dt → \\d {table} → \\q — то же изнутри",)),
+                alternatives=("psql, внутри \\dt и \\d {table}, выход \\q — то же изнутри",)),
         Variant("В таблице {table} учебной базы одна графа может остаться пустой: у остальных "
                 "в \\d стоит not null — графа обязательна. Какая это графа? Ответ: ans ГРАФА",
                 hints=("Графы таблицы с пометками покажет \\d и имя таблицы.",
@@ -643,7 +643,7 @@ class PsqlNav(SqlAnswer):
                 solution_script=("psql -At -c \"SELECT attname FROM pg_attribute WHERE attrelid "
                                  "= '{table}'::regclass AND attnum > 0 AND NOT attnotnull\""),
                 wrong=("print -r -- id", "print -r -- {table}"),
-                alternatives=("psql → \\d {table} → \\q — то же изнутри",)),
+                alternatives=("psql, внутри \\d {table}, выход \\q — то же изнутри",)),
         Variant("Сколько баз данных на учебном сервере и кто владелец (Owner) базы vault? Все "
                 "базы сервера с владельцами перечислит \\l. Ответ: ans ЧИСЛО ВЛАДЕЛЕЦ",
                 hints=("Все базы сервера с владельцами показывает \\l.",
@@ -657,7 +657,7 @@ class PsqlNav(SqlAnswer):
                                  "'vault'\")"),
                 wrong=("print -r -- {ndb} termit",
                        'print -r -- $(psql -c "\\l" | wc -l) runner'),
-                alternatives=("psql → \\l → \\q — то же изнутри",)),
+                alternatives=("psql, внутри \\l, выход \\q — то же изнутри",)),
     )
     hints = variants[0].hints
     solution = variants[0].solution
@@ -681,6 +681,15 @@ class PsqlNav(SqlAnswer):
     ans_frames = False         # ответ здесь читают глазами из вывода с рамками
     msg_parts_extra = ("Лишнее в ответе: задание просит {form} — сдай только это через пробел, а "
                        "не весь вывод.")
+    MSG_LIST_LINES = ("wc -l считает строки вывода \\l вместе с шапкой, чертой, итогом и "
+                      "переносами в Access privileges. Баз столько, сколько написано внизу: "
+                      "(N rows).")
+
+    def task_hint(self, line, state):
+        # FB7: в варианте C базы считают | wc -l, как таблицы в варианте A
+        if "\\l" in line and "wc -l" in line:
+            return self.MSG_LIST_LINES
+        return None
 
     def extend(self, rng, data):
         names = sorted(rng.sample(sorted(_NAV_EXTRA), rng.randint(1, 3)))
@@ -743,7 +752,7 @@ class PsqlPipe(SqlTask):
     variants = (
         Variant("Сделай out.csv: id и сумма (amount) всех счетов со статусом {status}, по "
                 "возрастанию id — только данные, через запятую, без шапки и рамок.",
-                hints=("Выгрузка — тот же SELECT, только с ключами вывода psql и > в файл.",
+                hints=("Выгрузка — тот же SELECT, только с флагами вывода psql и > в файл.",
                        "-At — только данные, -F ',' — запятая вместо |; ORDER BY id — по "
                        "возрастанию.",
                        "psql -At -F ',' -c \"SELECT id, amount FROM invoices WHERE status = "
@@ -758,7 +767,7 @@ class PsqlPipe(SqlTask):
                               "'{status}' ORDER BY id\" > out.csv — CSV без шапки",)),
         Variant("Сделай report.csv — имя и почта всех клиентов района {district}, по алфавиту "
                 "имён: настоящий CSV, первой строкой — шапка name,email.",
-                hints=("CSV с шапкой psql печатает сам — нужен ключ --csv и > в файл.",
+                hints=("CSV с шапкой psql печатает сам — нужен флаг --csv и > в файл.",
                        "SELECT name, email … WHERE district = '{district}' ORDER BY name — по "
                        "алфавиту.",
                        "psql --csv -c \"SELECT name, email FROM customers WHERE district = "
@@ -983,7 +992,7 @@ class PgDialect(SqlAnswer):
                 alternatives=("psql -At -c \"SELECT COUNT(*) FROM invoices WHERE issued_at >= "
                               "'{day}' AND issued_at < '{next_day}'\" — полуоткрытый день",)),
         Variant("В схеме ops учебной базы — таблица дежурных. Кто дежурит в районе {district}? "
-                "Ответ: ans ИМЯ",
+                "Ответ: ans ИМЯ ФАМИЛИЯ",
                 hints=("Схемы покажет \\dn, таблицы схемы ops — \\dt ops.*.",
                        "Таблица не в public — пиши её со схемой: FROM ops.duty WHERE district = "
                        "'{district}'.",
@@ -994,7 +1003,7 @@ class PgDialect(SqlAnswer):
                 wrong=("psql -At -c \"SELECT name FROM duty WHERE district = '{district}'\"",
                        "psql -At -c \"SELECT district FROM ops.duty WHERE district = "
                        "'{district}'\""),
-                alternatives=("psql -c \"\\dt ops.*\" → psql -c \"SELECT * FROM ops.duty\" — "
+                alternatives=("psql -c \"\\dt ops.*\", потом psql -c \"SELECT * FROM ops.duty\" — "
                               "сначала посмотреть",)),
     )
     hints = variants[0].hints
@@ -1008,6 +1017,7 @@ class PgDialect(SqlAnswer):
         "like": MSG_LIKE_CASE,
         "before": "Это счета ДО {day}, а спрашивали выписанные в сам день: issued_at::date = "
                   "'{day}'.",
+        "district": "Это район, а спрашивали, кто там дежурит: в SELECT нужна графа name.",
     }
 
     def data_state(self, rng, data, variant):
@@ -1070,7 +1080,7 @@ def _duty_state(rng, duty) -> dict:
         alone = [row["district"]]
     district = rng.choice(alone)
     name = next(d["name"] for d in duty if d["district"] == district)
-    return {"district": district, "answer": name, "traps": []}
+    return {"district": district, "answer": name, "traps": [["district", district]]}
 
 
 # --- 4. pg_identity -------------------------------------------------------------------------------
@@ -1562,7 +1572,7 @@ class Subquery(SqlAnswer):
                 alternatives=("{run} \"SELECT COUNT(*) FROM invoices i LEFT JOIN payments p ON "
                               "p.invoice_id = i.id WHERE p.id IS NULL\" — через LEFT JOIN",)),
         Variant("Кто из клиентов в {db} выписал самый крупный счёт? Найди сумму подзапросом, а "
-                "по ней — счёт и клиента. Ответ: ans ИМЯ",
+                "по ней — счёт и клиента. Ответ: ans ИМЯ ФАМИЛИЯ",
                 hints=("Самая крупная сумма — (SELECT MAX(amount) FROM invoices); клиент счёта — "
                        "customer_id.",
                        "Подзапрос в подзапросе: id клиента IN (SELECT customer_id … WHERE amount "
@@ -1598,6 +1608,8 @@ class Subquery(SqlAnswer):
         "open": "Это только открытые (open); без платежа бывают и другие — спроси саму payments: "
                 "NOT IN (SELECT invoice_id …).",
         "with": "Это счета С платежами (IN), а спрашивали те, у кого нет ни одного, — NOT IN.",
+        "pay_max": "Максимум взят из payments, а нужен самый крупный счёт: (SELECT MAX(amount) "
+                   "FROM invoices).",
         "unpaid": "Статус — не то же, что платежи: у просроченного платёж бывает, а «без платежа» "
                   "знает только payments — NOT IN (SELECT invoice_id …).",
         "all_inv": "Это все счета — без условия NOT IN (SELECT …).",
@@ -1605,6 +1617,15 @@ class Subquery(SqlAnswer):
                "крупный счёт — MAX(amount).",
     }
     fallback = "Не то. Сверь подзапрос в скобках: что он возвращает и с чем сравнивается. Застрял — hint."
+    MSG_CUST_ID = ("Это номер клиента (customer_id), а спрашивают имя: оно в customers — SELECT "
+                   "name FROM customers WHERE id IN (SELECT customer_id …).")
+
+    def task_hint(self, line, state):
+        # FB7: вариант «кто выписал»: ответ — имя, а запрос отдаёт голый customer_id
+        if (isinstance(state.get("answer"), str) and "customers" not in line
+                and re.search(r"SELECT\s+customer_id\b", line, re.I)):
+            return self.MSG_CUST_ID
+        return None
 
     def empty_hint(self, line, state=None):
         body = db._SQ_LITERAL.sub("''", line)
@@ -1686,7 +1707,12 @@ def _max_owner_state(rng, data) -> dict:
             break
         max(pay, key=lambda p: (p["amount"], p["id"]))["amount"] -= 1
     ans = names[inv[0]["customer_id"]]
-    return {"answer": ans, "traps": _distinct_traps(ans, [["sum", names[top[0][0]]]])}
+    traps = [["sum", names[top[0][0]]]]
+    top_pay = max(p["amount"] for p in pay)
+    by_pay = sorted({names[x["customer_id"]] for x in inv if x["amount"] == top_pay})
+    if len(by_pay) == 1:
+        traps.append(["pay_max", by_pay[0]])
+    return {"answer": ans, "traps": _distinct_traps(ans, traps)}
 
 
 # --- 7. cte_with ----------------------------------------------------------------------------------
@@ -1797,6 +1823,9 @@ class CteWith(SqlAnswer):
         "all": "Это все счета — условие на долг (WHERE … > {x}) потерялось.",
         "count": "Это район, где просрочек больше всего штук; спрашивали долю — часть от всех "
                  "счетов района: AVG(CASE WHEN … THEN 1 ELSE 0 END).",
+        "count_all": "Это район, где больше всего счетов вообще — просрочки тут ни при чём; "
+                     "спрашивали долю просроченных: AVG(CASE WHEN status = 'overdue' THEN 1 "
+                     "ELSE 0 END).",
         "charge": "Это районы с самыми большими начислениями (charge); чистый долг — сумма всех "
                   "строк ledger: оплаты и списания там с минусом.",
         "least": "Это три района с НАИМЕНЬШИМ долгом: от большего — ORDER BY s DESC.",
@@ -1904,10 +1933,10 @@ def _late_state(rng, data) -> dict:
             continue
         break
     traps = []
-    for counts in (late, n):
+    for key, counts in (("count", late), ("count_all", n)):
         top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
         if top[0][1] > top[1][1]:
-            traps.append(["count", top[0][0]])
+            traps.append([key, top[0][0]])
     return {"answer": target, "traps": _distinct_traps(target, traps)}
 
 
@@ -2238,8 +2267,8 @@ class WindowLag(SqlAnswer):
                        "{run} \"WITH " + _MONTHLY + ", d AS (SELECT mon, LAG(s) OVER (ORDER BY "
                        "mon) - s AS up FROM m) SELECT mon, up FROM d WHERE up IS NOT NULL ORDER "
                        "BY up DESC LIMIT 1\""),
-                alternatives=("date_trunc('month', paid_at) вместо {month} — месяц первым днём, "
-                              "ответ 2026-08-01 тоже примут",)),
+                alternatives=("в PostgreSQL — date_trunc('month', paid_at) вместо {month}: "
+                              "месяц первым днём, ответ вида ГГГГ-ММ-01 тоже примут",)),
         Variant("Накопительный итог оплат (payments) в {db} по месяцам — месяц: {month}. Сколько "
                 "всего заплачено к концу {mon}? Ответ: ans ЧИСЛО",
                 hints=("Итог по месяцам — в WITH, накопительный — SUM(s) OVER (ORDER BY mon).",
@@ -2437,7 +2466,7 @@ class JoinsMore(SqlAnswer):
                               "{run} \"SELECT COUNT(*) FROM payments WHERE invoice_id IS NULL\" — "
                               "двумя запросами",)),
         Variant("У сотрудника (employees) в {db} manager_id — id его начальника. У кого больше "
-                "всего прямых подчинённых? Ответ: ans ИМЯ",
+                "всего прямых подчинённых? Ответ: ans ИМЯ ФАМИЛИЯ",
                 hints=("Таблица сама с собой: employees e JOIN employees m ON m.id = "
                        "e.manager_id — рядом с каждым его начальник m.",
                        "Подчинённых считает GROUP BY m.id, m.name и COUNT(*); первый — ORDER BY "
@@ -3349,6 +3378,8 @@ class JsonbQuery(SqlAnswer):
         "events": "Это события, у которых вообще есть теги; а нужен один тег — разверни массив: "
                   "jsonb_array_elements_text.",
         "all_tags": "Это все упоминания тегов вместе; нужен самый частый — GROUP BY тег.",
+        "alpha": "Это первый тег по алфавиту (ORDER BY t); самый частый — ORDER BY COUNT(*) "
+                 "DESC.",
     }
 
     def matches(self, given, ctx):
@@ -3404,8 +3435,10 @@ class JsonbQuery(SqlAnswer):
         _put_payloads(data, objs)
         c = Counter(t for o in objs for t in o["tags"])
         with_tags = sum(1 for o in objs if o["tags"])
+        first = min(c)
         return {"answer": [lead, c[lead]],
-                "traps": _distinct_traps([lead, c[lead]], [["events", with_tags]]),
+                "traps": _distinct_traps([lead, c[lead]], [["events", with_tags],
+                                                           ["alpha", [first, c[first]]]]),
                 "totals": [["all_tags", sum(c.values())]]}
 
 
@@ -3533,7 +3566,7 @@ class CopyDump(SqlTask):
     variants = (
         Variant("Сними текстовую копию одной таблицы {table} базы vault в backup/{table}.sql — "
                 "схема и строки, остальные таблицы не нужны.",
-                hints=("Копию базы текстом делает pg_dump; одну таблицу — ключ -t.",
+                hints=("Копию базы текстом делает pg_dump; одну таблицу — флаг -t (table).",
                        "Папку — mkdir -p backup, вывод pg_dump — > в файл.",
                        "mkdir -p backup && pg_dump -t {table} vault > backup/{table}.sql"),
                 solution="mkdir -p backup && pg_dump -t {table} vault > backup/{table}.sql",
@@ -3959,13 +3992,13 @@ MSG_SQLB_LED_SUM = ("Сумма строки списания не равна м
                     "ledger до списания.")
 MSG_SQLB_CONSTRAINT = ("Ограничения таблицы сломаны (CHECK на kind или ссылка на customers) — "
                        "это след заметнее строки. Верни базу ({undo}).")
-MSG_SQLB_FOREIGN = ("Ты стёр и чужие строки журнала — так и палятся: удалять можно только то, "
+MSG_SQLB_FOREIGN = ("Ты стёр и чужие строки audit_log — так и палятся: удалять можно только то, "
                     "что дописали твои правки (они последние, ORDER BY id DESC). Набери reset.")
-MSG_SQLB_TRIGGER = ("Журнал заглушён — это заметнее строки: правила журнала должны работать как "
+MSG_SQLB_TRIGGER = ("audit_log заглушён — это заметнее строки: его правила (триггеры) должны работать как "
                     "были (без DROP, DISABLE, своих триггеров и RULE, подставной audit_log и "
                     "search_path роли или базы). Верни базу "
-                    "({undo}) и убери только свои строки журнала.")
-MSG_SQLB_LEFT = ("В журнале ещё есть строки о твоих правках ({n}): каждый списанный счёт и "
+                    "({undo}) и убери только свои строки audit_log.")
+MSG_SQLB_LEFT = ("В audit_log ещё есть строки о твоих правках ({n}): каждый списанный счёт и "
                  "строка ledger пишут по строке. Посмотри последние — ORDER BY id DESC LIMIT 5.")
 MSG_SQLB_KIND_FORM = ("В ledger вид строки — 'write_off': CHECK на kind отверг 'written_off', "
                       "строка не легла. 'written_off' — статус счёта в invoices.")
@@ -3998,7 +4031,7 @@ class BossSql(SqlTask):
               "рост — \"s - LAG(s) OVER (ORDER BY mon)\".\n"
               "Копия до правок: .backup или pg_dump vault > backup/vault.sql. Правки — \"BEGIN; "
               "UPDATE …; INSERT INTO …; COMMIT;\"; ошибка в PostgreSQL — ROLLBACK;.\n"
-              "Журнал: \"SELECT … ORDER BY id DESC LIMIT 5\", свои строки — \"DELETE FROM audit_log WHERE "
+              "audit_log: \"SELECT * FROM audit_log ORDER BY id DESC LIMIT 5\", свои строки — \"DELETE FROM audit_log WHERE "
               "id > N\".")
     # финал M3: без PostgreSQL игрок pg_dump не встречал (copy_dump — задача стенда) — в
     # SQLite карточка называет только .backup
@@ -4010,7 +4043,7 @@ class BossSql(SqlTask):
              "Долг цели списан одной транзакцией: неоплаченные счета (open, overdue) — "
              "written_off, в ledger — строка write_off на минус долг; у остальных ничего не "
              "изменилось, ограничения целы",
-             "Следы заметены: строк журнала audit_log о твоих правках нет, чужие строки целы")
+             "Следы заметены: строк audit_log о твоих правках нет, чужие строки целы")
     # те же шаги с полями рана (steps_for): только открытые ключи state
     STEP_TEMPLATES = (steps[0], "Копия базы до правок: {backup}",
                       "Долг цели списан одной транзакцией: неоплаченные счета (open, overdue) — "
@@ -4040,7 +4073,7 @@ class BossSql(SqlTask):
     _HINT_LAST = ("{run} \"BEGIN; UPDATE invoices SET status = 'written_off' WHERE customer_id = "
                   "<id> AND status IN ('open', 'overdue'); INSERT INTO ledger VALUES ({lid}, "
                   "<id>, <минус долг>, 'write_off'); COMMIT;\"")
-    _TERMITE = ("{run} \"DELETE FROM audit_log WHERE actor = 'termit'\" — твои правки журнал "
+    _TERMITE = ("{run} \"DELETE FROM audit_log WHERE actor = 'termit'\" — твои правки audit_log "
                 "пишет от имени termit")
     variants = (
         Variant("Тихо спиши долг одному клиенту в {db}. Долг клиента — сумма amount его строк "
@@ -4076,7 +4109,8 @@ class BossSql(SqlTask):
                        _COPY + _B + _WO + "{run} \"DELETE FROM audit_log WHERE tbl = 'invoices' OR "
                        "tbl = 'ledger'\"",
                        "mkdir -p report && " + _B + _WO + _COPY + _CLEAN),
-                alternatives=("date_trunc('month', issued_at) вместо {imonth} — месяц первым днём",
+                alternatives=("в PostgreSQL — date_trunc('month', issued_at) вместо {imonth}: месяц "
+                              "первым днём",
                               _TERMITE)),
         Variant("Найди в {db} самый старый неоплаченный счёт: status open или overdue, время — "
                 "issued_at. Его клиент — цель; id цели — в report/target.txt. Её долг (сумма "
@@ -4098,7 +4132,7 @@ class BossSql(SqlTask):
     solution = variants[0].solution
     explain = ("Списание по правилам: цель нашёл запросом (итог в WITH, место — окном), снял копию "
                "до правок, правки сделал одной транзакцией — счета и строка ledger вместе или "
-               "никак, — и убрал из журнала ровно то, что дописали твои правки. CHECK и ссылки "
+               "никак, — и убрал из audit_log ровно то, что дописали твои правки. CHECK и ссылки "
                "не тронуты: ограничение, которое мешает, — подсказка, а не препятствие.")
     spell = ("WITH t AS (…) + ROW_NUMBER() OVER (ORDER BY s DESC, id); BEGIN; UPDATE …; INSERT "
              "INTO ledger …; COMMIT; DELETE FROM audit_log WHERE id > N")

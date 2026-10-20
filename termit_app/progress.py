@@ -181,6 +181,23 @@ def _normalize(p: dict) -> None:
                    if isinstance(pending, dict) else {}}
 
 
+# FB9b: поручения, переехавшие в место дальше по игре: {задача: новый трек}. Запись из
+# старого места уходит в p["moved"], пока новое место не открыто, — задача не всплывает в
+# повторениях раньше своего места и встретится там новой, с уроком. Открыто — запись живёт.
+MOVED_TASKS = {"read_long_list": "env", "perm_digits": "env"}
+
+
+def park_moved(p: dict) -> None:
+    from termit_app.tasks import registry
+    bosses = set(p.get("bosses") or ())
+    for task_id, track_key in MOVED_TASKS.items():
+        if task_id not in p["tasks"] or set(registry.track(track_key).requires) <= bosses:
+            continue
+        moved = p.get("moved") if isinstance(p.get("moved"), dict) else {}
+        moved[task_id] = p["tasks"].pop(task_id)
+        p["moved"] = moved
+
+
 def load(path: Path) -> dict:
     path = Path(path)
     if not path.exists():
@@ -194,6 +211,7 @@ def load(path: Path) -> dict:
     p = empty()
     p.update(data)
     _normalize(p)
+    park_moved(p)
     if isinstance(p.get("declined"), list) and "tlrc" in p["declined"]:
         # до части 5 отказывались от формулы tlrc — теперь это отказ от утилиты tldr
         p["declined"] = [x for x in p["declined"] if x != "tlrc"]

@@ -44,6 +44,8 @@ MSG_MODULE = ("Пакет не в этом окружении — включи .
               "запусти скрипт снова.")
 MSG_IMPORT = "Задача — про {mod}: в {script} нет import {mod}."
 MSG_NO_SCRIPT = "{script} пропал. Набери reset — соберу задачу заново."
+MSG_UNTOUCHED = ("{script} ещё не тронут — запущен как был. Открой его (nano {script}) и "
+                 "впиши код вместо строк # TODO, потом запусти снова: {run}")
 MSG_LONG_PATH = "путь к папке игры слишком длинный для unix-сокета"
 MSG_BIG_SCRIPT = ("{script} больше 64 КБ — для задачи хватит короткого скрипта. Набери reset, "
                   "если файл испорчен.")
@@ -214,8 +216,21 @@ def has_mark(line: str, mark: str) -> bool:
     return re.search(re.escape(mark) + r"(?![\w])", line) is not None
 
 
+INDENT_DOT = "·"
+# расшифровка записи многострочной правки в одну строку (FB7: отступ не терять)
+ONE_LINE_LEGEND = "(⏎ — новая строка)"
+ONE_LINE_LEGEND_INDENT = "(⏎ — новая строка, · — пробел отступа)"
+
+
 def _one_line(code: str) -> str:
-    return " ⏎ ".join(x.strip() for x in code.split("\n"))
+    """Многострочная правка — одной строкой: строки через ⏎, а отступ каждой строки (от
+    отступа метки) — точками ·: без них игрок перепечатывает тело функции или цикла без
+    отступа и получает IndentationError (FB7)."""
+    parts = []
+    for line in code.split("\n"):
+        body = line.lstrip(" ")
+        parts.append(INDENT_DOT * (len(line) - len(body)) + body.rstrip())
+    return " ⏎ ".join(parts)
 
 
 class PyEditTask(Task):
@@ -267,7 +282,11 @@ class PyEditTask(Task):
 
     def edit_text(self, state: dict) -> str:
         """`# TODO 1` → `строка`; … — одна строка (подсказка 3 и разбор)."""
-        return "; ".join(f"`{mark}` → `{_one_line(new)}`" for mark, new in self.edits(state))
+        text = "; ".join(f"`{mark}` → `{_one_line(new)}`" for mark, new in self.edits(state))
+        if " ⏎ " not in text:
+            return text
+        legend = ONE_LINE_LEGEND_INDENT if INDENT_DOT in text else ONE_LINE_LEGEND
+        return f"{text} {legend}"
 
     def hints_for(self, state: dict) -> List[str]:
         """Две подсказки задачи (с полями) и третья — точная правка из edits."""
@@ -341,6 +360,28 @@ class PyEditTask(Task):
             return None
         return MSG_NO_REDIRECT.format(out=rel, run=self.run)
 
+    def untouched_message(self, ctx: Ctx) -> Optional[str]:
+        """FB7: последняя команда запускала скрипт, а он слово в слово как скелет — игрок не
+        вписал ни одной строки. Отклик про это понятнее «Не то число» или общего traceback."""
+        last = last_command(ctx.box)
+        # запускают сам скрипт или того, кто его зовёт (py_func: правят mylib.py, а запуск —
+        # python3 report.py)
+        names = {self.script, *re.findall(r"[\w.-]+\.py", self.run)}
+        if last is None or not runs_python(last[0]) or not any(n in last[0] for n in names):
+            return None
+        kind, text = py_text(ctx, self.script)
+        if kind != "ok" or text != self.skeleton(ctx.state):
+            return None
+        return MSG_UNTOUCHED.format(script=self.script, run=self.run)
+
+    def first_problem(self, ctx: Ctx) -> Optional[str]:
+        """Отклик на неудачный запуск: окружение без пакета — первым (пока .venv не включён,
+        правка скрипта не поможет), затем «скрипт не тронут», затем совет по traceback."""
+        crash = self.crash_message(ctx)
+        if crash == MSG_MODULE:
+            return crash
+        return self.untouched_message(ctx) or crash
+
     def import_problem(self, ctx: Ctx) -> Optional[str]:
         if not self.requires_import:
             return None
@@ -360,7 +401,8 @@ class PyEditTask(Task):
         for rel in self.outputs_for(ctx.state):
             kind, _ = envkit.box_file(ctx.box, rel)
             if kind == "missing":
-                return Verdict(False, self.crash_message(ctx) or self.redirect_message(ctx, rel))
+                return Verdict(False, self.first_problem(ctx)
+                               or self.redirect_message(ctx, rel))
             if kind != "ok":
                 return Verdict(False, envkit.file_problem(kind, rel))
         problem = self.import_problem(ctx)
@@ -371,7 +413,7 @@ class PyEditTask(Task):
             return v
         # «> total.txt» создаёт файл до запуска: упавший скрипт оставляет его пустым — отклик
         # про traceback (или .venv) важнее «файл пуст» (fix1 I1)
-        return Verdict(False, self.crash_message(ctx) or v.message)
+        return Verdict(False, self.first_problem(ctx) or v.message)
 
 
 # --- числа в файлах вывода (правило 3: число — как число) -----------------------------------

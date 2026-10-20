@@ -116,6 +116,11 @@ COMMANDS: Dict[str, Origin] = {
                    "«убить», но на деле kill шлёт процессу сигнал: без флага — вежливый TERM, "
                    "«заверши работу», а -9 — KILL, от которого не отмахнёшься."),
     "pkill": Origin("process kill", "«process kill» — kill по имени процесса."),
+    # FB10: задачи в фоне
+    "fg": Origin("foreground", "«foreground» — «передний план»: задача снова на экране."),
+    "bg": Origin("background", "«background» — «задний план, фон»: работает, экран не занимает."),
+    "jobs": Origin("работы", "«jobs» — «работы, задачи»: что запущено из этой оболочки."),
+    "wait": Origin("жди", "«wait» — «жди»: пока не закончатся фоновые задачи."),
     "pgrep": Origin("process grep", "«process grep» — grep по запущенным процессам."),
     "ps": Origin("process status", "«process status» — «состояние процессов»."),
     "top": Origin("верхушка", "«top» — «верхушка»: самые прожорливые процессы — сверху."),
@@ -156,6 +161,13 @@ COMMANDS: Dict[str, Origin] = {
     "env": Origin("environment",
                   "«environment» — «окружение»: переменные, с которыми стартует каждая "
                   "программа."),
+    # FB9b: права — кто ты в системе
+    "whoami": Origin("who am I", "«who am I» — «кто я»: имя, под которым тебя знает система."),
+    "groups": Origin("groups", "«groups» — «группы»: в каких кругах пользователей ты состоишь."),
+    "sudo": Origin("superuser do",
+                   "«superuser do» — «сделай как суперпользователь»: команда от имени root. "
+                   "Придумана в 1980 году в университете Буффало, чтобы не входить под root "
+                   "целиком."),
     "printenv": Origin("print environment", "«print environment» — «напечатай окружение»."),
     "export": Origin("наружу",
                      "«экспорт»: переменная уходит наружу — детям, программам, что ты "
@@ -206,6 +218,9 @@ KEYS: Dict[str, Origin] = {
     "Ctrl+D": Origin("Done",
                      "в ASCII это «конец передачи» (EOT): ввод окончен, запоминай как Done. На "
                      "пустой строке закрывает python3, sqlite3 или psql."),
+    "Ctrl+Z": Origin("замри",
+                     "Z — последняя буква, в ASCII символ 26. zsh шлёт программе сигнал SIGTSTP, "
+                     "«terminal stop» — «замри». Управление задачами пришло из csh, рубеж 70–80-х."),
     "!!": Origin("bang",
                  "восклицательный знак программисты зовут bang: «bang bang». Приём из оболочки "
                  "csh Билла Джоя, конец 70-х."),
@@ -251,6 +266,7 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "brew_lesson": (STUB_NAME, "which", "rg"),
     "tldr_tar": ("tar",),
     "bat_lines": ("bat", "sed"),
+    "job_control": ("Ctrl+Z", "fg", "bg", "kill"),
     # «Свалка»
     "open_gui": ("open",),
     "find_name": ("find",),
@@ -274,6 +290,7 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Окружение», Python
     "env_vars": ("env", "printenv"),
     "export_child": ("export",),
+    "perm_basics": ("whoami", "groups", "sudo"),
     "dotenv": ("set", "source"),
     "shebang_run": ("python3",),
     "script_audit": ("shasum",),

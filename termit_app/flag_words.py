@@ -20,6 +20,7 @@ FLAG_WORDS: Dict[Tuple[str, str], Tuple[str, str]] = {
     ("ls", "-r"): ("reverse", "обратный порядок"),
     ("ls", "-t"): ("time", "по времени"),
     ("ls", "-S"): ("Size", "по размеру"),
+    ("ls", "-h"): ("human-readable", "по-человечески: K, M, G"),
     # файлы и папки
     ("mkdir", "-p"): ("parents", "с родителями — вся цепочка"),
     ("cp", "-r"): ("recursive", "рекурсивно, вглубь"),

@@ -234,6 +234,7 @@ def cmd_lesson(box) -> int:
     else:
         ui.say(ui.c("1;36", "📖 Урок"))
         ui.say(ui._wrap(scroll, width=min(78, cp.width - 1)))
+    ui.show_diagram(task.id, cp)
     ui.origin_notes(task.id, cp, min(tui.STORY, cp.width - 2))
     return 0
 
@@ -513,8 +514,8 @@ def main(argv) -> int:
     cmd, args = argv[0], argv[1:]
     theme.use()          # тема родителя приходит через TERMIT_THEME
     try:
-        if cmd == "keys":       # FB2: шпаргалка клавиш — задачу не трогает
-            ui.say(ui.keys_sheet())
+        if cmd == "keys":       # FB2: шпаргалка клавиш — задачу не трогает; keys hacks — FB10
+            ui.say(ui.keys_sheet(args))
             return 0
         if cmd == "ext":        # FB3: копилка расширений — задачу не трогает
             ui.say(extensions.sheet(extensions.read_box(box)))

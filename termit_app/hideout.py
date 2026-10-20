@@ -346,6 +346,137 @@ ITEMS["board"] = {"name": "доска", "row": "wall", "glyph": _board_glyph, "l
 ROWS = ("wall", "mid", "desk", "floor", "pet")     # desk и pet пустыми не рисуются
 
 
+# --- Как пользоваться (FB8) ------------------------------------------------------------------
+# Владелец: «надо явно добавить, как пользоваться предметами в доме, а не просто посмотреть».
+# На каждую вещь — пара (коротко, полно): коротко — строкой «⚙ …» под именем в ./termit home,
+# полно — строкой «Пользоваться: …» в осмотре и сразу при подарке или покупке. Если вещь
+# «просто есть», так и сказано: что она показывает и где. Тема может переопределить оба текста
+# (home → items → ID → use / use_short). Группы — то, что не стоит в комнате, а живёт в
+# приглашении: детали, палитры, знак, позывной.
+
+USE: Dict[str, tuple] = {
+    "clock": ("просто висит: время видно прямо в комнате",
+              "Делать ничего не надо — время видно прямо в комнате. А в осмотре — как "
+              "спросить время у самого терминала командой date."),
+    "calendar": ("звёздочки в осмотре — дни, когда ты занимался",
+                 "Глянь его осмотром: звёздочкой отмечены дни, когда ты занимался, — сразу "
+                 "видно, держишь ли серию. Заодно научишься команде cal."),
+    "neon": ("для красоты, ничего не делает",
+             "Ничего не делает, просто светит — для красоты. В осмотре подскажет, как "
+             "нарисовать такие же большие буквы самому."),
+    "monitor": ("нагрузка твоего Mac, в осмотре — uptime",
+                "Число на нём — нагрузка твоего Mac прямо сейчас. Осмотр расскажет, что "
+                "оно значит, научит uptime и посчитает, сколько раз ты уже садился играть."),
+    "shelf": ("⚙ ./termit book — выученные команды целиком",
+              "Книг на полке столько, сколько команд ты выучил. Перечитать их с пояснениями — "
+              "./termit book (или ./termit book слово — найти нужную)."),
+    "chiba_clock": ("просто висят: второе время — Токио",
+                    "Делать ничего не надо — вторые часы показывают Токио. В осмотре — как "
+                    "узнать время в любом поясе одной командой."),
+    "player": ("⚙ ./termit music — включить свои записи",
+               "Крутит купленные записи: ./termit music — что есть и что играет, "
+               "./termit music play ID — включить, ./termit music stop — тишина."),
+    "safe": ("отпечаток файла прогресса, в осмотре — shasum",
+             "Ничего в нём не хранится — он показывает отпечаток файла с твоим прогрессом. "
+             "Осмотр научит shasum: так проверяют, что файл никто не трогал."),
+    "neko": ("талисман: каждый день новое число на кубике",
+             "Талисман на удачу: каждый день выкидывает новое число. На игру не влияет — "
+             "зато осмотр покажет, как бросить кубик в самом терминале."),
+    "pet": ("живёт сам, растёт, пока ты играешь",
+            "Ухаживать не нужно — живёт сам и подрастает, пока ты играешь. Осмотр покажет, "
+            "сколько места на диске занимает файл, который он грызёт (du -h)."),
+    "diary": ("⚙ ./termit diary — уроки и разборы пройденного",
+              "Перечитать уроки и разборы того, что уже прошёл: ./termit diary — список, "
+              "./termit diary N — нужная запись. Бесплатно."),
+    "board": ("⚙ ./termit home board — что висит над приглашением",
+              "Что приколешь, то и висит над приглашением в каждой задаче: ./termit home board "
+              "— что можно, потом pin КАРТОЧКА — приколоть, unpin — снять."),
+    # не в комнате — в приглашении (строке перед курсором в задаче)
+    "prompt": ("⚙ ./termit home prompt — что стоит, вкл/выкл",
+               "Детали собираются в твоё приглашение — строку перед курсором в задаче: "
+               "./termit home prompt — что стоит, on/off — включить или выключить, show — "
+               "как устроено, чтобы перенести к себе."),
+    "palette": ("⚙ ./termit home palette ID — цвет пути",
+                "Палитра красит путь в приглашении: ./termit home palette — какие есть, "
+                "./termit home palette ID — выбрать, off — без цвета."),
+    "glyph_pack": ("⚙ ./termit home prompt glyph — знак у курсора",
+                   "Знак перед курсором: ./termit home prompt glyph — какие есть, "
+                   "./termit home prompt glyph ЗНАК — поставить, off — убрать."),
+    "callsign": ("⚙ ./termit home callsign ИМЯ — свой позывной",
+                 "Позывной встанет в шапку и в приглашение: ./termit home callsign ИМЯ — "
+                 "задать (буквы, цифры, _ и -), off — снять."),
+}
+USE_GROUPS = ("prompt", "palette", "glyph_pack", "callsign")
+for _track in shop.TROPHY_TRACKS:
+    USE[f"trophy_{_track}"] = (
+        f"⚙ ./termit play boss_{_track} — реванш без экзамена",
+        f"Висит в честь победы. Хочешь размяться ещё раз — ./termit play boss_{_track}: та "
+        "же схватка, но без экзамена и без риска.")
+for _iid in shop.SHNYR_ITEMS:
+    USE[_iid] = ("просто лежит: вещь из прошлого",
+                 "Пользоваться не нужно — это вещь из прошлого, её история в осмотре. "
+                 "Сколько таких уже собрано — ./termit case.")
+
+
+def use_key(item_id: str) -> Optional[str]:
+    """Чей текст «как пользоваться» у вещи: свой, группы приглашения или ничей (места доски)."""
+    if item_id in ITEMS or item_id in USE_GROUPS:
+        return item_id
+    if item_id in PROMPT_PARTS:
+        return "prompt"
+    if item_id in PALETTE_COLORS:
+        return "palette"
+    return None
+
+
+USE_PLAYER_SOON = ("пока молчит: записи скоро появятся",
+                   "Пока молчит — записи для него скоро появятся. Осмотр покажет, как "
+                   "проиграть звук в терминале самому.")
+
+
+def _use(key: str) -> tuple:
+    t = (_ui().get("items") or {}).get(key) or {}
+    short, full = USE_PLAYER_SOON if key == "player" and not _music_ready() else USE[key]
+    return t.get("use_short") or short, t.get("use") or full
+
+
+def use_short(key: str) -> str:
+    return _use(key)[0]
+
+
+def use_text(key: str) -> str:
+    return _use(key)[1]
+
+
+def use_news(item_ids, skip=()) -> List[str]:
+    """Строки «как пользоваться» для только что полученного: по одной на вещь или группу.
+    Доска и места на ней молчат — о них говорит board_enable."""
+    out, seen = [], set(skip) | {BOARD}
+    for iid in item_ids:
+        key = use_key(iid)
+        if key is None or key in seen:
+            continue
+        seen.add(key)
+        text = _with_look(key, use_text(key))
+        if len(text) > 1 and text[1].islower():     # после двоеточия — со строчной
+            text = text[0].lower() + text[1:]
+        out.append(f"⚙ {_use_name(key)}: {text}")
+    return out
+
+
+def _with_look(key: str, text: str) -> str:
+    """Вещь «просто есть» — где на неё посмотреть: осмотр по её ID."""
+    if key in ITEMS and "./termit " not in text:
+        return f"{text} Осмотреть — ./termit home look {key}."
+    return text
+
+
+def _use_name(key: str) -> str:
+    names = {"prompt": "детали приглашения", "palette": "палитра", "glyph_pack": "знак",
+             "callsign": "позывной"}
+    return names.get(key) or name(key)
+
+
 # --- Тексты темы ---------------------------------------------------------------------------
 
 def _ui() -> dict:
@@ -393,6 +524,141 @@ def _story_on() -> bool:
     return story.has_story()
 
 
+# --- Ещё твоё: купленное, что не стоит в комнате (FB5 п. 17) --------------------------------
+# Владелец купил место на доске и страницу досье — и в доме не нашёл ни того, ни другого.
+# Теперь всё купленное видно в ./termit home: вещи — в комнате, места доски — в строке доски,
+# остальное — разделом «Ещё твоё» с подсказкой, где оно и как им пользоваться. Тот же текст
+# «где и как» печатает покупка любого вида (where_text).
+
+STYLE_ARG = {"frame": "frame", "anim": "anim", "mapstyle": "map", "title": "title"}
+# (группа, заголовок, виды витрины) — порядок раздела «Ещё твоё»
+EXTRA_GROUPS = (("prompt", "детали", ("prompt",)), ("palette", "палитры", ("palette",)),
+                ("glyph_pack", "знак", ("glyph",)), ("callsign", "позывной", ("callsign",)),
+                ("dossier", "досье", ("dossier",)), ("fragment", "фрагменты", ("fragment",)),
+                ("deck", "дека", ("module", "slot")), ("sound", "звуки", ("sound", "soundpack")),
+                ("style", "стиль", tuple(STYLE_ARG)), ("tape", "записи", ("tape",)))
+EXTRA_SHORT = {
+    "dossier": "⚙ ./termit dossier {who} — читать страницы",
+    "fragment": "⚙ ./termit case — где лежат и как открыть",
+    "deck": "⚙ ./termit deck — что стоит в слотах, on/off ID",
+    "sound": "⚙ ./termit sound — on/off, pack ID, test",
+    "style": "⚙ ./termit style — надеть или снять: ВИД ID",
+    "tape": "⚙ ./termit music play ID — включить запись",
+}
+KIND_WHERE = {
+    "freeze": "Заморозка лежит в запасе и сама спасёт серию, если пропустишь день. Сколько "
+              "их — ./termit stats.",
+    "tip": "Наводка записана: в одном из ближайших дел осколок памяти точно найдётся. "
+           "Найденное — ./termit memory.",
+    "dossier": "Страница легла в досье: ./termit dossier {who} — все его страницы.",
+    "fragment": "Фрагмент — в деле: ./termit case покажет, где он лежит и как его открыть.",
+    "module": "Модуль работает сам со следующего дела. Что стоит в слотах, поставить или "
+              "снять — ./termit deck (on/off ID).",
+    "slot": "Слот появился в деке: ./termit deck — что стоит, ./termit deck on ID — "
+            "поставить модуль.",
+    "sound": "Звук играет сам — на взломе, рекорде, вехе. Выключить — ./termit sound off, "
+             "послушать — ./termit sound test.",
+    "soundpack": "Набор звуков: ./termit sound pack {id} — поставить, ./termit sound test — "
+                 "послушать.",
+    "style": "Это стиль: ./termit style — что надето, ./termit style {arg} {id} — надеть.",
+    "tape": "Запись для проигрывателя: ./termit music play {id} — включить, ./termit music "
+            "stop — тишина.",
+    "board": "Ещё одно место на доске: что приколото и что можно добавить — ./termit home "
+             "board.",
+}
+GROUP_OF_KIND = {k: key for key, _title, kinds in EXTRA_GROUPS for k in kinds}
+
+
+def where_text(item_id: str) -> Optional[str]:
+    """Где купленная вещь теперь и как ею пользоваться — для строки после покупки."""
+    item = shop.get(item_id)
+    if item is None:
+        return None
+    if item_id in ITEMS:
+        return _with_look(item_id, use_text(item_id))
+    group = GROUP_OF_KIND.get(item.kind)
+    if group in USE_GROUPS:
+        return use_text(group)
+    kind = "style" if item.kind in STYLE_ARG else item.kind
+    text = KIND_WHERE.get(kind)
+    if text is None:
+        return None
+    return text.format(who=item_id[:-1], id=item_id, arg=STYLE_ARG.get(item.kind, ""))
+
+
+def extra_groups(p: dict) -> List[tuple]:
+    """(группа, заголовок, id) купленного не для комнаты; места доски — в строке доски."""
+    have = [i for i in p.get("owned") or () if isinstance(i, str)]
+    out = []
+    for key, title, kinds in EXTRA_GROUPS:
+        ids = []
+        for iid in have:
+            item = shop.get(iid)
+            if item is None or item.kind not in kinds or iid in ITEMS or iid in ids:
+                continue
+            if item.story and not _story_on():
+                continue
+            ids.append(iid)
+        if ids:
+            out.append((key, title, ids))
+    return out
+
+
+def _extra_short(key: str, ids: List[str]) -> str:
+    if key in USE_GROUPS:
+        return use_short(key)
+    whos = sorted({i[:-1] for i in ids})
+    return EXTRA_SHORT[key].format(who=whos[0] if len(whos) == 1 else "ИМЯ")
+
+
+def _extra_lines(p: dict) -> List[str]:
+    from termit_app import ui
+    groups = extra_groups(p)
+    if not groups:
+        return []
+    out = ["", "  Ещё твоё (не для комнаты):"]
+    for key, title, ids in groups:
+        names = ", ".join(shop.name(i).replace(" ", ui.NBSP) for i in ids)   # имя не рвётся
+        out += ui.story_fill(f"{title:14} {names}", "  ", " " * 17).splitlines()
+        out.append(" " * 17 + _mark(_extra_short(key, ids)))
+    return out
+
+
+def _board_short(p: dict) -> str:
+    from termit_app import tui
+    cards = ", ".join(pinned(p)) or "пусто"
+    text = f"⚙ ./termit home board — мест {board_slots(p)} из {1 + len(BOARD_SLOTS)}: {cards}"
+    return tui.trunc(text, 57)
+
+
+# --- Витрина из дома (FB5 п. 16) -------------------------------------------------------------
+# Владелец: «стоит в игре упоминать, что есть магазин, доступный из дома». На экране дома —
+# всегда строка про витрину; один раз (первые деньги или первый подарок) — подсказка, где
+# тратить. Память — p["settings"]["shop_tip"], как board_seen: старое сохранение читается.
+
+SHOP_LINE = ("Витрина: вещи за {cash} — их платят за решённые задачи. Зайти — ./termit shop "
+             "или прямо отсюда: ./termit home shop")
+SHOP_TIP = ("{cash} Заработанное тратят на витрине: ./termit shop (или из дома: "
+            "./termit home shop) — вещи для дома, подсказки и не только.")
+
+
+def _shop_text(key: str, default: str) -> str:
+    return (_ui().get(key) or default).format(cash=theme.word("money"))
+
+
+def shop_line() -> str:
+    return _shop_text("shop_line", SHOP_LINE)
+
+
+def shop_tip(p: dict) -> Optional[str]:
+    """Подсказка про витрину — один раз за игру; потом None."""
+    s = _settings(p)
+    if s.get("shop_tip"):
+        return None
+    s["shop_tip"] = True
+    return _shop_text("shop_tip", SHOP_TIP)
+
+
 # --- Комната -------------------------------------------------------------------------------
 
 def _row(glyphs: List[str], side: str = "|") -> str:
@@ -414,8 +680,7 @@ def render(p: dict, frame: str = "ascii") -> List[str]:
     top, edge = f"  {tl}" + h * WIDTH + tr, f"  {bl}" + h * WIDTH + br
     out = [f"  {title()}", top]
     if not items:
-        empty = _ui().get("empty") or "Голые стены. Вещи появятся из подарков и витрины: " \
-                                      "./termit shop"
+        empty = _ui().get("empty") or "Голые стены. Вещи появятся из подарков и с витрины."
         out += [_row([], v), _row(["[____]"], v), edge]
         from termit_app import ui
         out.append(ui.story_fill(empty, "  ", "  "))
@@ -436,10 +701,18 @@ def render(p: dict, frame: str = "ascii") -> List[str]:
 def listing(p: dict) -> List[str]:
     """Под комнатой: что есть и как осмотреть."""
     items = owned_items(p)
-    if not items:
+    out = []
+    for iid in items:
+        short = _board_short(p) if iid == BOARD else use_short(iid)
+        out += [f"  {iid:14} {name(iid)}", f"{' ' * 17}{_mark(short)}"]
+    out += _extra_lines(p)
+    if not out:
         return []
-    out = [f"  {iid:14} {name(iid)}" for iid in items]
-    return out + ["", "  осмотреть: ./termit home look ID"]
+    return out + ["", "  осмотреть: ./termit home look ID · пользоваться — см. ⚙"]
+
+
+def _mark(short: str) -> str:
+    return short if short.startswith("⚙") else "⚙ " + short
 
 
 def look(p: dict, item_id: str) -> List[str]:
@@ -454,7 +727,7 @@ def look(p: dict, item_id: str) -> List[str]:
     fl = flavour(item_id)
     if fl:
         out.append(fl)
-    return out + ITEMS[item_id]["look"](p)
+    return out + ITEMS[item_id]["look"](p) + [f"Пользоваться: {use_text(item_id)}"]
 
 
 # --- Конструктор приглашения zsh (E8) ------------------------------------------------------
@@ -642,7 +915,7 @@ def prompt_lines(p: dict) -> List[str]:
 # --- Доска «перед глазами» (FB5, п. 8) -------------------------------------------------------
 # Предмет убежища board: что к нему приколото, игра показывает строками над приглашением в
 # каждой задаче (env TERMIT_TIPS → .zshrc игры). Одна карточка — одна строка из
-# ui.BOARD_CARDS (выжимки шпаргалки keys) или совет дня. Места: одно с доской, board2 —
+# ui.BOARD_CARDS (выжимки шпаргалки keys) или совет дня (каталог lifehacks). Места: одно с доской, board2 —
 # витрина, board3 — подарок за стража «Основ». Настройки — в p["settings"]: board (вкл/выкл),
 # board_cards (приколотые), board_seen (о каких карточках уже сказано), board_turn (счётчик
 # совета дня). Старое сохранение без этих полей читается значениями по умолчанию.
@@ -661,7 +934,7 @@ CARD_NAMES = {"keys-line": "клавиши правки строки",
               "keys-history": "история команд",
               "keys-screen": "экран: прокрутка и очистка",
               "game": "команды игры в задаче",
-              "rotate": "совет дня: каждую задачу новый"}
+              "rotate": "совет дня: приём терминала, каждую задачу новый"}
 
 
 def has_board(p: dict) -> bool:
@@ -713,16 +986,10 @@ def pinned(p: dict) -> List[str]:
 
 
 def _rotate_tips(p: dict) -> List[str]:
-    """Советы дня по очереди: шпаргалка клавиш и книга выученного вперемешку."""
-    from termit_app import ui
-    sheet = ui.sheet_tips()
-    book = [f"{ui.ROTATE_BOOK}{spell}" for spell in (p.get("grimoire") or {}).values()
-            if isinstance(spell, str) and spell]
-    book = [tip for tip in book if _width(tip) <= ui.BOARD_WIDTH]
-    mixed: List[str] = []
-    for k in range(max(len(sheet), len(book))):
-        mixed += sheet[k:k + 1] + book[k:k + 1]
-    return mixed
+    """FB10: советы дня — только из каталога лайфхаков (termit_app/lifehacks.py), от простых
+    к сложным и только то, что игрок уже может применить (решена задача after)."""
+    from termit_app import lifehacks, ui
+    return [tip for tip in lifehacks.tips(p) if _width(tip) <= ui.BOARD_WIDTH]
 
 
 def _width(text: str) -> int:

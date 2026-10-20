@@ -117,15 +117,16 @@ TASKS = {
 LESSONS = {
     "py_run": (
         "Скрипт — файл с кодом: `python3 shelf.py`. Слова после имени — его аргументы: `python3 "
-        "shelf.py visits.txt`, внутри это sys.argv[1]. Мелочь — строкой: `python3 -c 'print(7 + "
+        "shelf.py visits.txt`, внутри это sys.argv[1] (sys.argv — слова команды). Мелочь — строкой: `python3 -c 'print(7 + "
         "5)'`, c — command; print(x) печатает. Упал — вывалит Traceback. Читай снизу: последняя "
         "строка — тип ошибки, над ней File …, line N. Строк line бывает несколько — виновата "
         "нижняя."),
     "py_vars": (
         "Переменная — ярлык: `books = 12`. Целое — int, с точкой — float, в кавычках — str, текст. "
-        "Из файла всегда приходит текст: `int(\"40\")` — уже число, а \"4\" + \"0\" — склейка "
-        "\"40\", а не сорок. `round(3.14159, 2)` — 3.14. f-строка подставляет сама: "
-        "`print(f\"полок: {books}\")`. Вывод — в файл: `python3 shelf.py > out.txt`."),
+        "Из файла приходит текст: \"4\" + \"0\" — склейка \"40\", а `int(\"40\")` — число. "
+        "`round(3.14159, 2)` — 3.14. f-строка (f — format) подставит значение: "
+        "`print(f\"полок: {books}\")`, в файл — `python3 shelf.py > out.txt`. Строку # TODO (# — "
+        "комментарий, Python его не читает) замени кодом."),
     "py_loop": (
         "`visits = [3, 0, 7]` — список. `for v in visits:` берёт числа по одному; всё, что внутри, "
         "— с отступом в 4 пробела, иначе IndentationError. `if v > 5:` — условие: > больше, >= "
@@ -134,7 +135,7 @@ LESSONS = {
     "py_dict": (
         "Словарь — ящики с ярлыками: `shelf = {}`, `shelf[\"sci\"] = 4` — положить, "
         "`shelf[\"sci\"]` — достать. Ярлыка нет — KeyError, и скрипт лежит. `shelf.get(\"art\", "
-        "0)` — значение или 0, от нуля и копят: `d[k] = d.get(k, 0) + 1`. `sorted(shelf)` — ярлыки "
+        "0)` — значение или 0, от нуля и копят: `shelf[\"art\"] = shelf.get(\"art\", 0) + 1`. `sorted(shelf)` — ярлыки "
         "по алфавиту, а пары — `for k, v in shelf.items():`."),
     "py_func": (
         "Считаешь одно и то же дважды — дай расчёту имя: `def share(x, n):`, x и n — "
@@ -144,10 +145,10 @@ LESSONS = {
         "`shelf.share(9, 3)`. Переименовал файл — ModuleNotFoundError."),
     "py_repl": (
         "Щупай до покупки: `python3` без файла — живой Python: >>> ждёт строку, ... — продолжение, "
-        "Enter на пустой его закончит. `dir(json)` — имена в модуле, с _ — служебные; "
+        "Enter на пустой его закончит. `import json`, потом `dir(json)` — имена в модуле, с _ — служебные; "
         "`help(json.dumps)` — справка, выход — q. ans и hint внутри >>> не работают: сначала "
-        "`exit()` или Ctrl+D. В конвейере — `echo 7 | python3 -c 'код'`: Python прочтёт всё, что "
-        "ему пришло по |."),
+        "`exit()` или Ctrl+D. `echo 7 | python3 -c 'код'` — Python прочтёт то, что "
+        "пришло по |."),
     "py_json": (
         "JSON — словари и списки: `with open(\"shelf.json\") as f:` и `shelf = json.load(f)`, with "
         "as сам закроет файл. Вглубь — `shelf[\"books\"][0][\"title\"]`. Запись — `with "
@@ -161,10 +162,11 @@ LESSONS = {
         "csv.DictWriter(f, fieldnames=[\"title\"])`, `w.writeheader()`, потом `w.writerow(b)` на "
         "строку."),
     "py_files": (
-        "Путь в Python — объект, а не строка: `from pathlib import Path`, `Path(\"shelf\")` — "
+        "Путь в Python — объект: `from pathlib import Path`, `Path(\"shelf\")` — "
         "папка. `.glob(\"*.txt\")` — файлы в ней, `.rglob(\"*.txt\")` — ещё и во всех подпапках. "
         "`for p in Path(\"shelf\").glob(\"*.txt\"):` — по файлам; `p.stat().st_size` — размер в "
-        "байтах, p.name — имя. А шаблон внутри строк ищет уже модуль re."),
+        "байтах, p.name — имя. Шаблоны в строках ищет модуль "
+        "re — regular expressions, регулярки."),
     "py_stats": (
         "Подсчёт — `from collections import Counter`: `c = Counter(books)` — сколько раз каждая "
         "книга, `c.most_common(2)` — пары (книга, сколько), от самых частых. Середина — "
@@ -174,7 +176,8 @@ LESSONS = {
         "Запрос к API (входу сервиса для программ): `import urllib.request`, "
         "`r = urllib.request.urlopen(url)`, `json.load(r)` — ответ. Сервер игры — в api.sock: "
         "`import sockhttp`, `sockhttp.install()` — и дальше как в сети (sockhttp — в .venv: "
-        "`source .venv/bin/activate`). Параметры — в адресе: `http://api/books?page=2&city=Omsk`."),
+        "`source .venv/bin/activate`). Параметры — после ?, через &: "
+        "`http://api/books?page=2&city=Omsk`."),
     "boss_py": (
         "Подменыш врёт тихо. Не верь выводу — запусти и читай traceback снизу: ModuleNotFoundError "
         "— пакета нет в .venv или import лишний; файл shelf.py рядом со скриптом перекроет "

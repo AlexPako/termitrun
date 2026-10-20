@@ -82,7 +82,8 @@ EXTRA_OK: Dict[str, Set[str]] = {
 # задачу. Исключения — только здесь и с причиной. Ключ — id задачи или «id:вариант».
 # Режим: skip — не исполняется по природе; read — команда показывает ответ, игрок сдаёт его
 # сам: ответ обязан быть в выводе; look — показывает данные для подсчёта: команда обязана
-# отработать без ошибки. Часть: first/last — гонять только первый/последний шаг «→».
+# отработать без ошибки. Часть: first/last — гонять только первый/последний шаг (шаги — через
+# «→» или «, »).
 SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
     "meet_terminal:0": ("skip", None, "$SHELL приходит из окружения терминала, а прогон эталонов "
                                    "идёт без него (zsh -f); та же оболочка — эталон echo $0"),
@@ -93,6 +94,14 @@ SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
     "hidden_cache": ("read", None, "ls -la && cat печатает тайник, ответ игрок сдаёт сам"),
     "file_ext": ("read", None, "ls печатает имена, cat — записку, file — что внутри: ответ "
                            "игрок сдаёт сам"),
+    # FB9b: блок прав в «Окружении» — команда печатает ответ, игрок сдаёт его сам
+    "perm_basics": ("read", None, "whoami, groups и id печатают имя, группу и номер — ответ "
+                                  "игрок сдаёт сам"),
+    "perm_rwx": ("read", None, "после chmod cat печатает слово — ответ игрок сдаёт сам"),
+    "perm_rwx:2": ("look", None, "после chmod ls показывает файлы, сосчитать их — работа "
+                                 "игрока"),
+    "read_long_list": ("read", None, "ls -l печатает строки с правами и владельцем, имя "
+                                     "игрок сдаёт сам"),
     "hidden_cache:2": ("look", None, "ls -la показывает файлы, сосчитать их — работа игрока"),
     "man_flag": ("skip", None, "клавиши внутри man: /слово, n, q"),
     "flag_review:2": ("read", None, "grep -n -m 1 печатает строку с номером, номер игрок "
@@ -156,6 +165,14 @@ SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
                                      "zsh -c истории нет"),
     "screen_scroll": ("read", None, "cat печатает длинный вывод, слово из нужной строки игрок "
                                     "находит прокруткой и сдаёт сам"),
+    # FB10: лайфхаки — поиск по экрану (клавиши iTerm2), быстрая правка (Esc ., !$, ^a^b —
+    # в zsh -c истории нет), задачи в фоне (Ctrl+Z и fg — клавиши; скрипт с & — в reference)
+    "screen_find": ("read", None, "cat печатает длинный вывод, слово или код игрок находит "
+                                  "поиском Cmd+F или метками и сдаёт сам"),
+    "quick_fix": ("skip", None, "Esc ., !$ и ^старое^новое берут прошлую команду из истории — "
+                                "в zsh -c её нет"),
+    "job_control": ("skip", None, "Ctrl+Z и fg — клавиши; показан путь клавишами, скрипт с & — "
+                                  "в reference"),
     "fd_hunt:1": ("read", "first", "find печатает все .env.example, самый глубокий путь "
                                    "выбирает игрок"),
     "csv_by_hand:1": ("read", None, "grep -n печатает НОМЕР:amount, номер игрок сдаёт сам "
@@ -869,9 +886,23 @@ def py_built(task, variant: int) -> bool:
 
 
 def shown_part(text: str, part: Optional[str]) -> str:
+    """Первый или последний шаг показанного эталона. Шаги — через «→» или (FB6/FB7: стрелка
+    путалась с клавишей →) через «, » вне кавычек; запятая разделителя (cut -d, и awk -F,) шагов не делит."""
     if part is None:
         return text
-    steps = [x.strip() for x in text.split("→")]
+    if "→" in text:
+        steps = [x.strip() for x in text.split("→")]
+    else:
+        steps, quote, start = [], "", 0
+        for i, ch in enumerate(text):
+            if quote:
+                quote = "" if ch == quote else quote
+            elif ch in "'\"`":
+                quote = ch
+            elif text.startswith(", ", i) and not text[:i].endswith(("-d", "-F")):
+                steps.append(text[start:i].strip())
+                start = i + 2
+        steps.append(text[start:].strip())
     return steps[0] if part == "first" else steps[-1]
 
 

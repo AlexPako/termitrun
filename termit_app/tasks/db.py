@@ -616,8 +616,8 @@ class SqliteOpen(_DbAnswer):
                                  '") $(sqlite3 records.db "' + _TABLE_OF + '")'),
                 wrong=('print -r -- $(sqlite3 record.db ".tables" | wc -w) {goal}',
                        'print -r -- $(sqlite3 records.db ".tables" | wc -w)'),
-                alternatives=("sqlite3 records.db → .tables → .schema → .quit — то же "
-                              "изнутри",)),
+                alternatives=("sqlite3 records.db, а внутри по очереди .tables, .schema и .quit — "
+                              "то же изнутри",)),
         Variant("Сколько колонок в таблице {table} базы records.db? Ответ: ans ЧИСЛО",
                 hints=("Колонки таблицы показывает .schema с её именем.",
                        "В скобках после CREATE TABLE {table} — колонки через запятую.",
@@ -627,7 +627,7 @@ class SqliteOpen(_DbAnswer):
                                 "pragma_table_info('{table}')\"",
                 wrong=('sqlite3 records.db "SELECT COUNT(*) FROM {table}"',
                        'sqlite3 record.db ".tables" | wc -w'),
-                alternatives=("sqlite3 records.db → .headers on → SELECT * FROM {table} "
+                alternatives=("sqlite3 records.db, а внутри .headers on, затем SELECT * FROM {table} "
                               "LIMIT 1; — шапка и есть колонки",)),
         Variant("В учебной базе records.db где-то хранятся {what}. В какой таблице? Ответ: "
                 "ans ТАБЛИЦА",
@@ -731,8 +731,8 @@ class SelectWhere(_DbAnswer):
                 wrong=("sqlite3 records.db \"SELECT phone FROM people WHERE name = '{name}'\"",
                        "sqlite3 records.db \"SELECT phone FROM people WHERE name = '{name}' AND "
                        "city <> '{city}'\""),
-                alternatives=("sqlite3 records.db → .headers on → .mode column → SELECT name, "
-                              "city, phone FROM people WHERE name = '{name}'; — видно обоих",)),
+                alternatives=("sqlite3 records.db, а внутри .headers on, .mode column, затем SELECT "
+                              "name, city, phone FROM people WHERE name = '{name}'; — видно обоих",)),
         Variant("Почта {email} всплыла в чужом письме. В каком городе живёт её хозяин? Ответ: "
                 "ans ГОРОД",
                 hints=("Почта — колонка email, город — city, обе в таблице people.",
@@ -1973,7 +1973,7 @@ def _csv_line(row) -> str:
 
 MSG_PIPE_HEADER = ("Шапки нет. Нужен -header — и после -csv: «sqlite3 -csv -header …». Перед "
                    "-csv он не держится: -csv выставляет свой вид вывода и шапку сбрасывает.")
-MSG_PIPE_LIST = ("Разделитель | — это обычный режим вывода (list). Для CSV нужен ключ -csv: "
+MSG_PIPE_LIST = ("Разделитель | — это обычный режим вывода (list). Для CSV нужен флаг -csv: "
                  "«sqlite3 -csv …».")
 MSG_PIPE_NO_HEADER = "Шапка тут не нужна: без -header в файле будут одни строки."
 
@@ -1985,14 +1985,14 @@ class SqlPipe(_DbTask):
     par = 75
     scroll = ("sqlite3 -csv -header records.db \"SELECT …\" > report.csv — отчёт в файл: -csv — "
               "через запятую, -header — шапка; ставь его после -csv.\n"
-              "Без ключей вывод — режим list: графы через |. Он идёт в трубу, как любой: | sort "
+              "Без флагов вывод — режим list: графы через |. Он идёт в трубу, как любой: | sort "
               "| head -3 или | sort | uniq -c.\n"
               "sort -t, -k2 -rn — по второй графе CSV (t — separator, разделитель; k — key, "
               "поле), числами, от большего. cat файл — проверить.")
     variants = (
         Variant("Сделай report.csv — имя и телефон всех людей из города {city}, по алфавиту "
                 "имён: через запятую, первой строкой — шапка name,phone.",
-                hints=("Отчёт — тот же SELECT, только с ключами вывода и > в файл.",
+                hints=("Отчёт — тот же SELECT, только с флагами вывода и > в файл.",
                        "-csv — через запятую, -header — шапка, после -csv; ORDER BY name — по "
                        "алфавиту.",
                        "sqlite3 -csv -header records.db \"SELECT name, phone FROM people WHERE "
@@ -2023,7 +2023,7 @@ class SqlPipe(_DbTask):
                               "BY balance DESC LIMIT 3\" > top.csv — сортирует сама база",)),
         Variant("Выпиши в emails.txt почты людей из города {city}: одна почта — одна строка, по "
                 "алфавиту, без пустых строк (у кого почты нет — того пропусти).",
-                hints=("Одна графа — без ключей, обычный вывод; > пишет его в файл.",
+                hints=("Одна графа — без флагов, обычный вывод; > пишет его в файл.",
                        "Пустые строки — это '' и NULL: AND email <> '' отсеет обе. ORDER BY email "
                        "— по алфавиту.",
                        "sqlite3 records.db \"SELECT email FROM people WHERE city = '{city}' AND "
@@ -2040,9 +2040,9 @@ class SqlPipe(_DbTask):
     )
     hints = variants[0].hints
     solution = variants[0].solution
-    explain = ("sqlite3 печатает в stdout, как любая команда: > — в файл, | — в трубу. Ключи "
+    explain = ("sqlite3 печатает в stdout, как любая команда: > — в файл, | — в трубу. Флаги "
                "-csv и -header меняют только то, как вывод выглядит, — запрос они не трогают.")
-    spell = ("sqlite3 -csv -header ф.db \"SELECT …\" > отчёт.csv; без ключей — графы через |; "
+    spell = ("sqlite3 -csv -header ф.db \"SELECT …\" > отчёт.csv; без флагов — графы через |; "
              "| sort -t, -k2 -rn | head -3")
 
     def form_hint(self, ctx, line):
@@ -2179,8 +2179,8 @@ class ImportCsv(_DbTask):
                 solution="sqlite3 records.db \".import --csv --skip 1 new_badges.csv badges\"",
                 wrong=("sqlite3 records.db \".import --csv new_badges.csv badges\"",
                        "sqlite3 records.db \".import --csv new_badges.csv new_badges\""),
-                alternatives=("sqlite3 records.db → .import --csv --skip 1 new_badges.csv "
-                              "badges → SELECT COUNT(*) FROM badges; — то же изнутри",)),
+                alternatives=("sqlite3 records.db, а внутри .import --csv --skip 1 new_badges.csv "
+                              "badges, затем SELECT COUNT(*) FROM badges; — то же изнутри",)),
         Variant("Загрузи visits.csv (шапка person_id,place,ts) в новую таблицу visits базы "
                 "records.db — колонки пусть называются как в шапке.",
                 hints=("Таблицы visits ещё нет — sqlite3 создаст её сам.",
@@ -2367,7 +2367,7 @@ class CreateInsert(_DbTask):
                        "sqlite3 records.db \"CREATE TABLE watchlist (id INTEGER PRIMARY KEY, "
                        "person_id INTEGER NOT NULL, reason TEXT NOT NULL); INSERT INTO watchlist "
                        "(person_id, reason) VALUES ({p1}, '{r1}')\""),
-                alternatives=("sqlite3 records.db → CREATE TABLE …; → INSERT INTO …; → SELECT * "
+                alternatives=("sqlite3 records.db, а внутри CREATE TABLE …; INSERT INTO …; и SELECT * "
                               "FROM watchlist; — то же изнутри, с проверкой",)),
         Variant("Заведи в records.db таблицу tags: code — текст, обязательный и без повторов, "
                 "title — текст, обязательный, color — текст, можно пустым. «Без повторов» — "
@@ -2596,7 +2596,7 @@ class BackupUpdate(_DbTask):
                        "'{name}' AND city = '{city}'\" && mkdir -p backup && cp records.db "
                        "backup/"),
                 alternatives=("sqlite3 records.db \"UPDATE people SET phone = '{phone}' WHERE "
-                              "id = {pid}\" — по id ещё надёжнее (id найди SELECT'ом)",)),
+                              "id = {pid}\" — после копии; по id ещё надёжнее (id найди SELECT'ом)",)),
         Variant("Город {old} переименован в {new}: перепиши графу city у всех, кто записан в "
                 "{old}. Копию — до правки, в backup/records.db.",
                 hints=("Копия, SELECT — сколько их, потом UPDATE с тем же WHERE.",
@@ -2757,8 +2757,8 @@ class TxDelete(_DbTask):
                        "'%test%'; SELECT changes(); COMMIT;\"",
                        "sqlite3 records.db \"BEGIN; DELETE FROM transfers; SELECT changes(); "
                        "COMMIT;\""),
-                alternatives=("sqlite3 records.db → BEGIN; → DELETE …; → SELECT changes(); → "
-                              "COMMIT; — по шагам изнутри, с правом на ROLLBACK",)),
+                alternatives=("sqlite3 records.db, а внутри по строке: BEGIN; DELETE …; SELECT "
+                              "changes(); COMMIT; — по шагам, с правом на ROLLBACK",)),
         Variant("Удали из accounts закрытые счета (status = 'closed'), по которым не было ни "
                 "одного перевода — ни исходящего, ни входящего. Одной транзакцией.",
                 hints=("Счёт без переводов — его id нет ни в from_acc, ни в to_acc таблицы "
@@ -3275,7 +3275,7 @@ class CsvSql(_DbAnswer):
     implant = "duckdb"
     after = ("import_csv", "boss_db")
     par = 90
-    scroll = ("sqlite3 :memory: — база в памяти, без файла. Ключ -cmd (command) выполнит "
+    scroll = ("sqlite3 :memory: — база в памяти, без файла. Флаг -cmd (command) выполнит "
               "команду до запроса: -cmd \".import --csv sales.csv t\" — CSV в таблицу t, шапка "
               "— графы.\n"
               "Целиком: sqlite3 :memory: -cmd \".import --csv f.csv t\" \"SELECT …\".\n"
@@ -3313,7 +3313,7 @@ class CsvSql(_DbAnswer):
                        _IMPORT + '"SELECT city FROM t GROUP BY city ORDER BY COUNT(*) DESC LIMIT '
                        '1"'),
                 alternatives=("duckdb -c \"SELECT city, SUM(amount) FROM 'sales.csv' GROUP BY "
-                              "city ORDER BY 2 DESC\" — вся сводка сразу",)),
+                              "city ORDER BY 2 DESC\" — вся сводка сразу; ORDER BY 2 — по второй графе",)),
         Variant("Сколько в sales.csv продаж со статусом {status} на сумму больше {limit}? Сумма "
                 "— колонка amount, статус — status. Ответ: ans ЧИСЛО",
                 hints=("CSV — в базу в памяти: sqlite3 :memory: -cmd \".import --csv sales.csv "

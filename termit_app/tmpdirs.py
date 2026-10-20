@@ -17,7 +17,7 @@ from typing import Callable, Iterable, List, Optional, Sequence
 KINDS = ("termit-lint-stock-light", "termit-lint-stock-wheels", "termit-lint-stock-full",
          "termit-lint-stock-third",
          "termit-lint", "termit-test",
-         "termit-fuzz", "termit-test-cache", "termit-test-run")
+         "termit-fuzz", "termit-test-cache", "termit-test-run", "termit-test-tmp")
 _NAME = re.compile(r"^(?P<kind>" + "|".join(sorted(map(re.escape, KINDS), key=len, reverse=True))
                    + r")-(?P<pid>[1-9][0-9]{0,9})-[A-Za-z0-9_]{8}$")
 

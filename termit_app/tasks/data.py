@@ -38,6 +38,13 @@ class _DataAnswer(AnswerTask):
         exp = state["answer"]
         return " ".join(map(str, exp)) if isinstance(exp, list) else str(exp)
 
+    def answer_kind(self, state: dict) -> str:
+        """Одно число — «number»: карточка скажет «сдаёшь одно число», а не «одно слово»
+        (FB7: в «Данных» просили ans ЧИСЛО, а форма звала сдать слово)."""
+        exp = state["answer"]
+        return ("number" if isinstance(exp, (int, float)) and not isinstance(exp, bool)
+                else "text")
+
     def matches(self, given, ctx):
         exp = ctx.state["answer"]
         if isinstance(exp, list):
@@ -45,6 +52,8 @@ class _DataAnswer(AnswerTask):
         return textnorm.same_number(given, exp)
 
     def wrong_message(self, given, ctx):
+        """Ловушки задачи, потом типовые промахи формы (пусто, подписи вокруг числа, не все
+        части ответа — FB7: раньше их глушил общий fallback), и только потом fallback."""
         st = ctx.state
         got = textnorm.parts(given)
         exp = st["answer"]
@@ -53,7 +62,7 @@ class _DataAnswer(AnswerTask):
             v = str(value).casefold()
             if v in got and v not in want:
                 return self.trap_messages[key].format(**st)
-        return self.fallback.format(**st)
+        return self.common_mistake(given, ctx) or self.fallback.format(**st)
 
 
 def _orders(box: Path, rng, **kw):
@@ -181,7 +190,7 @@ class GrepCount(_DataAnswer):
     scroll = ("grep СЛОВО файл — строки, где есть слово; -c — count, не печатать, а сосчитать; "
               "-i — не различать большие и маленькие буквы; -v — invert, наоборот: строки БЕЗ "
               "слова.\n"
-              "Ключи склеиваются: grep -ic warn server.log, а ещё -vc и -vic. Без -i grep "
+              "Флаги склеиваются: grep -ic warn server.log, а ещё -vc и -vic. Без -i grep "
               "различает WARN и Warn: для него это разные слова.")
     variants = (
         Variant("В app.log ночь была тяжёлой. Сколько строк с ошибками — слово error любым "
@@ -194,7 +203,7 @@ class GrepCount(_DataAnswer):
         Variant("Сколько строк в app.log обошлись без ошибки — в них нет слова error ни в каком "
                 "регистре (ни ERROR, ни Error, ни error)? Ответ: ans ЧИСЛО",
                 hints=("Строки без слова даёт -v, регистр отключает -i, счёт — -c.",
-                       "Ключи склеиваются в один: grep -vic — без слова, любым регистром, "
+                       "Флаги склеиваются в один: grep -vic — без слова, любым регистром, "
                        "числом.",
                        "grep -vic error app.log → ans ЧИСЛО"),
                 solution="grep -vic error app.log",
@@ -204,7 +213,7 @@ class GrepCount(_DataAnswer):
                 "сколько строк упоминают error в любом регистре — ERROR, Error или error. "
                 "Ответ: ans WARN ОШИБКИ",
                 hints=("Строки считает grep -c, регистр отключает -i.",
-                       "WARN всегда большими — хватит grep -c. Для error нужен ещё -i: ключи "
+                       "WARN всегда большими — хватит grep -c. Для error нужен ещё -i: флаги "
                        "склеиваются, grep -ic.",
                        "grep -c WARN app.log → первое; grep -ic error app.log → второе. "
                        "ans ПЕРВОЕ ВТОРОЕ"),
@@ -215,17 +224,17 @@ class GrepCount(_DataAnswer):
                               "строк",)),
     )
     hints = ("Строки считает grep -c, регистр отключает -i, «без слова» — -v.",
-             "Ключи склеиваются: grep -ic … и grep -vc … — каждый даёт одно число.",
+             "Флаги склеиваются: grep -ic … и grep -vc … — каждый даёт одно число.",
              "grep -ic error app.log → первое число; grep -vc INFO app.log → второе. "
              "ans ПЕРВОЕ ВТОРОЕ")
     solution = "grep -ic error app.log; grep -vc INFO app.log"
     explain = ("grep -c отвечает на «сколько?» за секунду — хоть на миллионе строк. -i плюёт на "
-               "регистр, -v переворачивает отбор, а ключи склеиваются в один: -vic.")
+               "регистр, -v переворачивает отбор, а флаги склеиваются в один: -vic.")
     spell = "grep -c слово файл — сколько строк; -i — без регистра; -v — строки без слова"
     trap_messages = {
         "case": "ERROR и error для grep — разные слова: добавь -i, и он сочтёт все написания.",
         "info": "Это все строки лога: info маленькими нет ни в одной, уровень пишется INFO.",
-        "no_v": "Это строки С error, а нужны строки без него: переверни отбор ключом -v.",
+        "no_v": "Это строки С error, а нужны строки без него: переверни отбор флагом -v.",
     }
     fallback = ("Не то. Проверь регистр (-i) и что считаешь: строки со словом или без него "
                 "(-v).")
@@ -689,7 +698,8 @@ class TopValues(_DataAnswer):
         st = ctx.state
         got = textnorm.parts(given)
         name, n = (str(x).casefold() for x in st["answer"])
-        if name in got and n not in got:
+        numbers = [w for w in got if textnorm.as_number(w) is not None]
+        if name in got and n not in got and numbers:
             return self.trap_messages[st["count_key"]]
         return super().wrong_message(given, ctx)
 
@@ -785,6 +795,15 @@ class FlagReview(_DataAnswer):
                    "где art стоит отдельным словом.",
         "lines": "Это число совпадений, а нужен номер строки первой ошибки: -n и -m 1.",
     }
+    MSG_WHOLE_LINE = ("Это строка вывода целиком: grep -n ставит номер в начало, до первого "
+                      "двоеточия. Сдай только этот номер.")
+
+    def wrong_message(self, given, ctx):
+        # grep -n печатает «6:10:06 ERROR …» — игрок сдаёт всю строку или её начало
+        first = str(ctx.state.get("answer"))
+        if ctx.state.get("_variant") == 2 and textnorm.clean(given).startswith(first + ":"):
+            return self.MSG_WHOLE_LINE
+        return super().wrong_message(given, ctx)
 
     WORDS = ("art", "start", "party", "artist", "smart", "cart", "apart")
 
@@ -869,7 +888,7 @@ class AwkSum(_DataAnswer):
                 wrong=("awk -F, '$5>={limit} {{s+=$5}} END {{print s}}' orders.csv",
                        "awk -F, '{{s+=$5}} END {{print s}}' orders.csv"),
                 alternatives=("awk -F, 'NR>1 && $5>{limit} {{s+=$5}} END {{print s}}' orders.csv "
-                              "— то же, заголовок пропущен явно",)),
+                              "— то же, заголовок пропущен явно: NR — номер строки, NR>1 — со второй",)),
     )
     hints = ("Складывает awk: колонка amount — пятая, разделитель — запятая.",
              "Условие $6==\"{status}\" перед фигурными скобками отберёт строки; s+=$5 копит, END "
@@ -1157,7 +1176,7 @@ class JoinParts(Task):
     scroll = ("cat a.csv b.csv > all.csv — склеить файлы подряд в один. Маска parts/*.csv "
               "раскрывается по алфавиту: 10-й файл встанет раньше 2-го.\n"
               "tail -n +2 файл — всё, кроме первой строки. С несколькими файлами tail вставляет "
-              "строки ==> имя <==, их убирает ключ -q (quiet — тихо).")
+              "строки ==> имя <==, их убирает флаг -q (quiet — тихо).")
     variants = (
         Variant("За неделю пришли выгрузки parts/day_1.csv … day_7.csv, у каждой свой заголовок. "
                 "Склей их в all.csv: заголовок один раз сверху, дальше все строки по порядку "
@@ -1252,7 +1271,7 @@ class JoinParts(Task):
         if old and not set(base[1:]) <= set(got):
             return "Старый архив затёрт: > стирает файл." + again
         if any(x.startswith("==>") for x in got):
-            return "tail вставил строки ==> имя <== между файлами — нужен ключ -q." + again
+            return "tail вставил строки ==> имя <== между файлами — нужен флаг -q." + again
         k = got.count(header)
         if k > 1:
             return (f"Заголовок встречается {k} раз: каждый кусок принёс свой. Строки без "
@@ -1581,7 +1600,7 @@ class TeeLog(Task):
         Variant("В sync.log уже лежит журнал прошлого запуска. Запусти ./sync.sh снова: вывод — "
                 "на экран и в конец sync.log, сообщения вместе с ошибками. Старое не трогай, "
                 "скрипт не правь.",
-                hints=("Дописывать в конец, не стирая, умеет tee с ключом -a.",
+                hints=("Дописывать в конец, не стирая, умеет tee с флагом -a.",
                        "Ошибки присоедини к данным — 2>&1 до палки; tee -a sync.log покажет всё "
                        "и допишет в конец.",
                        "./sync.sh 2>&1 | tee -a sync.log"),
@@ -1779,7 +1798,7 @@ class SedFix(Task):
                               "через ; в одной строке",)),
         Variant("В excel.csv разделитель ; — замени его везде на запятую прямо в этом файле, на "
                 "месте. Даты не трогай, копий файла рядом не оставляй.",
-                hints=("Замену делает sed: s/что/на что/g. Править прямо в файле — ключ -i.",
+                hints=("Замену делает sed: s/что/на что/g. Править прямо в файле — флаг -i.",
                        "На Mac после -i нужен аргумент — суффикс копии; пустые кавычки '' — без "
                        "копии.",
                        "sed -i '' 's/;/,/g' excel.csv"),
@@ -2003,7 +2022,7 @@ class JqField(_DataAnswer):
         "all": "Это все лоты, а нужны только проданные: select(.status==\"sold\") оставит их, wc -l "
                "сосчитает.",
         "pretty": "Это строки, а не лоты: jq разворачивает каждый лот на 6 строк. Выведи по строке "
-                  "на лот — одно поле, | .id (или ключ -c), — тогда wc -l сосчитает лоты.",
+                  "на лот — одно поле, | .id (или флаг -c — compact, сжато: объект в одну строку), — тогда wc -l сосчитает лоты.",
         "pretty_len": "Это строки красивой печати, а не лоты: jq разворачивает каждый лот на 6 "
                       "строк. Число лотов скажет .lots | length.",
         "all_max": "Это самый дорогой лот вообще, а нужен самый дорогой из проданных: сначала "
@@ -2304,7 +2323,7 @@ class CurlApi(_DataAnswer):
                 alternatives=("curl -s --unix-socket api.sock http://localhost/lots | wc -c — wc -c "
                               "считает байты: те же, что Content-Length, — длина тела",)),
     )
-    hints = ("Запрос — curl; к сокету — ключ --unix-socket api.sock, адрес — http://localhost/путь.",
+    hints = ("Запрос — curl; к сокету — флаг --unix-socket api.sock, адрес — http://localhost/путь.",
              "-o lots.json сохранит ответ /lots; ответ /rates отправь в jq: | jq '.rates.{cur}'.",
              "curl -s --unix-socket api.sock http://localhost/lots -o lots.json; curl -s "
              "--unix-socket api.sock http://localhost/rates | jq '.rates.{cur}'")
@@ -2677,7 +2696,7 @@ class BossData(Task):
                   "grep '^ЧАС' access.log | grep -c 'POST /login 401'.",
         "same": "В public.log ничего не заменилось: шаблон не нашёл адрес. Последнее число "
                 "адреса — точка, цифры и пробел за ними: \\.[0-9]+ и пробел.",
-        "public_noE": "В public.log ничего не заменилось: + sed понимает только с ключом -E — "
+        "public_noE": "В public.log ничего не заменилось: + sed понимает только с флагом -E — "
                       "sed -E 's/…/…/'.",
         "public_dollar": "В public.log ничего не заменилось: $ — конец строки, а адрес стоит в "
                          "середине, за ним пробел. Убери $ и поставь в шаблон пробел.",

@@ -14,6 +14,7 @@ import random
 import re
 import shlex
 import shutil
+import stat
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -41,7 +42,7 @@ class EnvVars(AnswerTask):
                 "ans ЗНАЧЕНИЕ",
                 hints=("Все переменные печатает env, одну — echo $ИМЯ.",
                        "Перед именем — знак $: без него echo напечатает само имя.",
-                       "echo $APP_REGION → ans ЗНАЧЕНИЕ"),
+                       "echo $APP_REGION, затем ans ЗНАЧЕНИЕ"),
                 solution="echo $APP_REGION",
                 wrong=("echo APP_REGION", "echo $REGION"),
                 alternatives=("printenv APP_REGION — то же без знака $",
@@ -50,7 +51,7 @@ class EnvVars(AnswerTask):
                 hints=("Все переменные печатает env, по строке на каждую.",
                        "Отфильтруй env через grep: строки, которые НАЧИНАЮТСЯ с APP_, — знак ^ "
                        "в шаблоне; -c сосчитает.",
-                       "env | grep -c '^APP_' → ans ЧИСЛО"),
+                       "env | grep -c '^APP_', затем ans ЧИСЛО"),
                 solution="env | grep -c '^APP_'",
                 wrong=("env | grep -c APP_",),
                 alternatives=("env | cut -d= -f1 | grep -c '^APP_' — то же по одним именам",)),
@@ -58,7 +59,7 @@ class EnvVars(AnswerTask):
                 "ans ИМЯ",
                 hints=("env печатает строки ИМЯ=значение — найди нужную.",
                        "Отфильтруй env через grep по значению; имя — то, что до знака =.",
-                       "env | grep {needle} | cut -d= -f1 → ans ИМЯ"),
+                       "env | grep {needle} | cut -d= -f1, затем ans ИМЯ"),
                 solution="env | grep {needle} | cut -d= -f1",
                 wrong=("env | grep {needle}",),
                 alternatives=("env | grep {needle} — строка целиком, имя до знака =",)),
@@ -317,6 +318,425 @@ class ExportChild(Task):
             return Verdict(False, self.MSG_SEEN.format(fields=" ".join(fields),
                                                        why="; ".join(why)))
         return Verdict(False, self.MSG_OTHER.format(**st))
+
+
+# --- FB9b: права — понятия ------------------------------------------------------------------
+# Владелец (FB5 п. 24): «про права вообще надо рассказывать отдельно, а не только цифрами».
+# Два урока по одному кругу понятий: perm_basics — зачем права и кто ты в системе (whoami,
+# groups, id; владелец, группа, остальные; root и sudo — только рассказ), perm_rwx — что
+# значат r, w, x у файла и у папки и откуда Permission denied. Ответ — то, что видно только
+# своими глазами (имя, группа, номер) или после починки прав.
+
+
+def _me():
+    """Имя, основная группа и номер игрока — то, что напечатают whoami, groups и id -u."""
+    import grp
+    import pwd
+    uid, gid = os.getuid(), os.getgid()
+    try:
+        name = pwd.getpwuid(uid).pw_name
+    except KeyError:
+        name = str(uid)
+    try:
+        group = grp.getgrgid(gid).gr_name
+    except KeyError:
+        group = str(gid)
+    return name, group, uid, gid
+
+
+class PermBasics(AnswerTask):
+    id = "perm_basics"
+    track = "env"
+    title = "Кто ты в системе"
+    scroll = ("Права решают, кто что может с файлом: на Mac много пользователей, чужое "
+              "закрыто. У файла три круга: владелец, группа (круг пользователей с общими "
+              "правами) и остальные.\n"
+              "whoami — твоё имя; groups — твои группы (обычно staff, у хозяина Mac ещё "
+              "admin); id — «identity», всё с номерами. root — суперпользователь, ему можно всё; sudo — "
+              "«superuser do», команда от его имени.")
+    variants = (
+        Variant("Под каким именем тебя знает система? Сдай его: ans ИМЯ",
+                hints=("Имя в системе спрашивают командой «кто я».",
+                       "who am i — пишется слитно: whoami.",
+                       "whoami, потом ans ИМЯ"),
+                solution="whoami",
+                wrong=("groups | awk '{{print $1}}'",),
+                alternatives=("id -un — то же: -u — user, -n — name, имя вместо номера",)),
+        Variant("Как зовут твою основную группу — первую в списке groups? Сдай её: ans ГРУППА",
+                hints=("Группы печатает команда с тем же именем.",
+                       "В выводе groups основная — первая слева.",
+                       "groups, потом ans и первое слово"),
+                solution="groups",
+                solution_script="groups | awk '{{print $1}}'",
+                wrong=("whoami",),
+                alternatives=("id -gn — то же: -g — group, -n — name",),
+                explain=("На Mac основная группа — обычно staff, «сотрудники»: в неё входят "
+                         "все обычные пользователи. admin — те, кому можно sudo.")),
+        Variant("У каждого пользователя есть номер — uid, user id. Найди свой в выводе id и "
+                "сдай: ans ЧИСЛО",
+                hints=("id печатает строку вида uid=…(имя) gid=…(группа) groups=….",
+                       "Нужно число сразу после uid=, а не после gid=.",
+                       "id, потом ans и число после uid="),
+                solution="id",
+                solution_script="id -u",
+                wrong=("id -g",),
+                alternatives=("id -u — сразу только номер: -u — user",),
+                explain=("Система помнит тебя по номеру, имя — для людей. У root номер 0: "
+                         "отсюда и сила — проверки прав для нуля не действуют.")),
+    )
+    par = 30
+    hints = ("Имя в системе спрашивают командой «кто я».",
+             "who am i — пишется слитно: whoami.",
+             "whoami, потом ans ИМЯ")
+    solution = "whoami"
+    explain = ("Права есть у каждого файла: владелец, группа и остальные. Кто ты в этих кругах "
+               "— скажут whoami, groups и id.")
+    spell = "whoami — кто я; groups — мои группы; id — всё с номерами; sudo — от имени root"
+    trap_messages = {
+        "group": "Это группа, а нужно имя пользователя — его печатает whoami.",
+        "user": "Это твоё имя, а нужна группа — первое слово в выводе groups.",
+        "gid": "Это номер группы — gid. Нужен номер пользователя: число после uid=.",
+    }
+
+    def answer_kind(self, state):
+        return "number" if state.get("_variant") == 2 else "text"
+
+    def setup_variant(self, box, rng, variant):
+        name, group, uid, gid = _me()
+        kit.write(Path(box) / "readme.txt", "Тут ничего прятать не нужно: ответ — у тебя.\n")
+        if variant == 2:
+            return {"answer": str(uid), "traps": [["gid", str(gid)]] if gid != uid else []}
+        if variant == 1:
+            return {"answer": group, "traps": [["user", name]] if name != group else []}
+        return {"answer": name, "traps": [["group", group]] if group != name else []}
+
+
+# имена файлов и папок perm_rwx
+RWX_FILES = ("note.txt", "pass.txt", "plan.txt", "memo.txt")
+RWX_DIRS = ("vault", "stash", "locker", "inbox")
+
+
+class PermRwx(AnswerTask):
+    id = "perm_rwx"
+    track = "env"
+    title = "Что значат r, w, x"
+    scroll = ("У файла: r — читать, w — менять, x — запускать.\n"
+              "У папки иначе: r — смотреть список (ls), w — создавать и удалять внутри, x — "
+              "заходить (cd) и открывать файлы внутри. Без x на папке файл в ней не "
+              "открыть, даже свой.\n"
+              "Нет права — Permission denied, «доступ запрещён»: ищи, какой буквы не хватает. "
+              "chmod +r, chmod +w, chmod +x — дать право, как chmod +x у скрипта.")
+    variants = (
+        Variant("cat {file} отвечает Permission denied: читать файл нельзя даже тебе. Дай "
+                "себе право читать и сдай слово из файла: ans СЛОВО",
+                hints=("Читать — буква r.",
+                       "Право дают так же, как запуск скрипту: chmod +буква.",
+                       "chmod +r {file}; cat {file}, потом ans СЛОВО"),
+                solution="chmod +r {file}; cat {file}",
+                wrong=("cat {file}",),
+                alternatives=("chmod u+r {file} — только себе: u — user, владелец",)),
+        Variant("Файл {dir}/{file} есть, но cat {dir}/{file} отвечает Permission denied, и cd "
+                "{dir} тоже. Почини папку и сдай слово из файла: ans СЛОВО",
+                hints=("Не пускает папка, а не файл. Заходить в папку — какая буква?",
+                       "У папки x — заходить и открывать файлы внутри.",
+                       "chmod +x {dir}; cat {dir}/{file}, потом ans СЛОВО"),
+                solution="chmod +x {dir}; cat {dir}/{file}",
+                wrong=("chmod +r {dir}/{file}; cat {dir}/{file}",),
+                alternatives=("chmod u+x {dir} — только себе",),
+                explain=("У папки x — пропуск внутрь: без него не открыть ни один файл в ней, "
+                         "даже с правом r у самого файла.")),
+        Variant("ls {dir} отвечает Permission denied: список папки скрыт. Верни право "
+                "смотреть список и сдай, сколько в папке файлов: ans ЧИСЛО",
+                hints=("Смотреть список папки — буква r.",
+                       "chmod +r {dir}, потом ls {dir}.",
+                       "chmod +r {dir}; ls {dir}, сосчитай имена: ans ЧИСЛО"),
+                solution="chmod +r {dir}; ls {dir}",
+                solution_script="chmod +r {dir}; ls {dir} | wc -l",
+                wrong=("ls {dir} | wc -l",),
+                alternatives=("chmod u+r {dir}; ls -1 {dir} | wc -l — сразу числом",),
+                explain=("У папки r — только список имён. Файл по точному имени без r "
+                         "открывается, если есть x: потому и прячут так — «знаешь имя — "
+                         "входи».")),
+    )
+    par = 40
+    hints = ("Читать — буква r.",
+             "Право дают так же, как запуск скрипту: chmod +буква.",
+             "chmod +r ИМЯ; cat ИМЯ, потом ans СЛОВО")
+    solution = "chmod +r {file}; cat {file}"
+    explain = ("Permission denied — не поломка, а замок: глянь, какой буквы не хватает, и "
+               "дай её chmod.")
+    spell = "файл: r читать, w менять, x запускать; папка: r список, w внутри, x заходить"
+
+    def answer_kind(self, state):
+        return "number" if state.get("_variant") == 2 else "text"
+
+    def setup_variant(self, box, rng, variant):
+        box = Path(box)
+        w = kit.word(rng)
+        file = rng.choice(RWX_FILES)
+        folder = rng.choice(RWX_DIRS)
+        if (box / folder).is_dir():         # повторная сборка: замок с папки снимаем сами
+            os.chmod(box / folder, 0o700)
+        if variant == 2:
+            names = rng.sample(RWX_FILES, rng.randint(2, 4))
+            for name in names:
+                kit.write(box / folder / name, "Обычный текст.\n")
+            os.chmod(box / folder, 0o300)
+            return {"dir": folder, "answer": str(len(names))}
+        if variant == 1:
+            kit.write(box / folder / file, f"{w}\n")
+            os.chmod(box / folder, 0o200)
+            return {"dir": folder, "file": file, "answer": w}
+        os.chmod(kit.write(box / file, f"{w}\n"), 0o200)
+        return {"file": file, "answer": w}
+
+
+# --- FB9b: длинный список ls -l ---------------------------------------------------------------
+# FB9: урок разбора строки ls -l; владелец (FB5 п. 26): «это не основы», а описание — «крайне
+# непонятное». Переехал из «Основ» сюда, после perm_basics и perm_rwx (кто ты, что значат
+# r, w, x): урок — две фразы, колонки показывает схема строки (diagrams, id read_long_list).
+EXEC_NAMES = ("sync", "deploy", "cleanup", "backup", "update", "build")
+SCRIPT_DECOYS = ("start.sh", "setup.sh", "install.sh", "run.sh")
+PLAIN_FILES = ("plan.txt", "contacts.txt", "prices.txt", "keys.txt", "log.txt", "map.txt",
+               "list.txt", "notes.txt")
+# права файлов варианта B: ответ — «менять может только владелец, читать — все»
+MODE_ANSWER = 0o644
+MODE_TRAPS = {0o666: "all_write", 0o664: "group_write", 0o444: "read_only",
+              0o600: "owner_only"}
+
+
+def _owner_group(path: Path):
+    """Имена владельца и группы файла — те, что напечатает ls -l."""
+    import grp
+    import pwd
+    st = path.stat()
+    try:
+        owner = pwd.getpwuid(st.st_uid).pw_name
+    except KeyError:
+        owner = str(st.st_uid)
+    try:
+        group = grp.getgrgid(st.st_gid).gr_name
+    except KeyError:
+        group = str(st.st_gid)
+    return owner, group
+
+
+class ReadLongList(AnswerTask):
+    id = "read_long_list"
+    track = "env"
+    title = "Длинный список"
+    scroll = ("ls -l (l — long) — длинный список: строка на файл, что в какой колонке — на "
+              "схеме. Прочерк вместо буквы права — права нет.\n"
+              "ls -lh — то же, но с K и M вместо байтов (h — human-readable).")
+    variants = (
+        Variant("Один файл в этой папке можно запускать. Найди его по правам в ls -l и сдай "
+                "имя: ans ИМЯ",
+                wrong=("ls -l | grep '^d' | awk '{{print $NF}}'",),
+                alternatives=("ls -lh — то же, размеры в K и M: -h — human-readable, "
+                              "«для людей»",)),
+        Variant("Один файл здесь менять может только владелец, а читать — все остальные. "
+                "Найди его по правам и сдай имя: ans ИМЯ",
+                hints=("Права — девять букв после первого знака: три тройки — владелец, "
+                       "группа, остальные.",
+                       "Нужно w только в первой тройке, а r — во всех трёх: rw-r--r--.",
+                       "ls -l, найди строку -rw-r--r-- и сдай имя из её конца: ans ИМЯ"),
+                solution="ls -l",
+                solution_script="ls -l | grep '^-rw-r--r--' | awk '{{print $NF}}'",
+                wrong=("ls -l | grep '^-rw-------' | awk '{{print $NF}}'",
+                       "ls -l | grep '^-rw-rw-r--' | awk '{{print $NF}}'"),
+                alternatives=("ls -l *.txt — то же, только файлы с хвостом .txt",)),
+        Variant("Кто владелец файла {file}? Сдай имя владельца: ans ИМЯ",
+                hints=("Владелец стоит в строке ls -l сразу после прав и числа ссылок.",
+                       "Колонки: права, число ссылок, владелец, группа, размер, дата, имя.",
+                       "ls -l {file} — третья колонка и есть владелец: ans ИМЯ"),
+                solution="ls -l {file}",
+                solution_script="ls -l {file} | awk '{{print $3}}'",
+                wrong=("ls -l {file} | awk '{{print $4}}'",),
+                alternatives=("ls -l — то же сразу для всех файлов папки",),
+                explain=("Владелец — ты сам: файл принадлежит тому, кто его создал, а игра "
+                         "создаёт файлы от твоего имени. Группа — колонка правее.")),
+    )
+    par = 30
+    hints = ("Право на запуск — буква x в правах, это девять букв после первого знака.",
+             "Строка папки начинается с d, файла — с прочерка. Нужен файл с x.",
+             "ls -l, найди строку вроде -rwxr-xr-x и сдай имя из её конца: ans ИМЯ")
+    solution = "ls -l"
+    solution_script = "ls -l | grep '^-..x' | awk '{{print $NF}}'"
+    explain = ("Строка ls -l читается слева направо: тип, права трёх троек, ссылки, владелец, "
+               "группа, размер, дата и имя.")
+    spell = "ls -l — тип, права rwx (владелец, группа, остальные), владелец, размер, дата"
+    trap_messages = {
+        "dir": "Это папка — её строка начинается с d. У папки x значит «можно зайти», а "
+               "нужен файл: его строка начинается с прочерка.",
+        "noexec": "Хвост .sh обещает запускаемый файл, но глянь на права: буквы x нет ни в одной тройке. "
+                  "Запускать его нельзя — имя не решает.",
+        "all_write": "У этого файла w во всех трёх тройках: менять его может кто угодно.",
+        "group_write": "Тут w и во второй тройке: менять может ещё и группа, не только "
+                       "владелец.",
+        "read_only": "У этого файла w нет нигде: менять его не может никто, даже владелец.",
+        "owner_only": "Менять может только владелец — верно, но читать остальным тоже "
+                      "нельзя: во второй и третьей тройке одни прочерки.",
+        "group": "Это группа — колонка правее владельца. Владелец стоит сразу после числа "
+                 "ссылок.",
+    }
+
+    def answer_kind(self, state):
+        return "text" if state.get("_variant") == 2 else "path"
+
+    accepts_name = True        # имя файла засчитывается и без ./
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 0:
+            names = rng.sample(PLAIN_FILES, 3)
+            for name in names:
+                os.chmod(kit.write(box / name, "Обычный текст.\n"), 0o644)
+            decoy = rng.choice(SCRIPT_DECOYS)
+            os.chmod(kit.write(box / decoy, "#!/bin/sh\necho пусто\n"), 0o644)
+            answer = rng.choice(EXEC_NAMES)
+            os.chmod(kit.write(box / answer, "#!/bin/sh\necho готово\n"), 0o755)
+            folder = box / "tools"
+            folder.mkdir(exist_ok=True)
+            os.chmod(folder, 0o755)
+            return {"answer": answer, "traps": [["dir", "tools"], ["noexec", decoy]]}
+        if variant == 1:
+            names = rng.sample(PLAIN_FILES, 1 + len(MODE_TRAPS))
+            answer, rest = names[0], names[1:]
+            os.chmod(kit.write(box / answer, "Обычный текст.\n"), MODE_ANSWER)
+            traps = []
+            for name, (mode, key) in zip(rest, MODE_TRAPS.items()):
+                os.chmod(kit.write(box / name, "Обычный текст.\n"), mode)
+                traps.append([key, name])
+            return {"answer": answer, "traps": traps}
+        names = rng.sample(PLAIN_FILES, 4)
+        for name in names:
+            kit.write(box / name, "Обычный текст.\n")
+        file = rng.choice(names)
+        owner, group = _owner_group(box / file)
+        traps = [["group", group]] if group != owner else []
+        return {"file": file, "answer": owner, "traps": traps}
+
+
+# --- FB9b: права цифрами --------------------------------------------------------------------
+# Владелец (FB5 п. 23): «ничего не понятно… это точно не основы» — урок переехал из «Основ»
+# сюда, перед dotenv (там chmod 600 .env). По одному понятию за раз: тройка, три тройки,
+# 755 и 600, почему не 777; буквы (u/g/o/a, +/-) — вторым шагом, в варианте про share.
+# Проверка — по итоговым правам файла, а не по команде.
+PERM_FILES = ("report.txt", "keys.txt", "plan.txt", "notes.txt", "prices.txt", "contacts.txt")
+PERM_SCRIPTS = ("deploy.sh", "backup.sh", "sync.sh", "cleanup.sh")
+
+
+def _mode_of(box: Path, rel: str):
+    """Права файла в песочнице (без перехода по симлинку); None — файла нет или не файл."""
+    try:
+        st = os.lstat(Path(box) / rel)
+    except OSError:
+        return None
+    if not stat.S_ISREG(st.st_mode):
+        return None
+    return stat.S_IMODE(st.st_mode)
+
+
+def _rwx(mode: int) -> str:
+    return stat.filemode(stat.S_IFREG | mode)[1:]
+
+
+class PermDigits(Task):
+    id = "perm_digits"
+    track = "env"
+    title = "Права цифрами"
+    scroll = ("Права цифрами. В одной тройке r — 4, w — 2, x — 1, их складывают: 4 + 2 = 6, "
+              "значит rw-.\n"
+              "Три цифры — три тройки: владелец, группа, остальные. chmod 644 файл даст "
+              "rw-r--r--: тебе 6, прочим по 4.\n"
+              "Скрипту — 755, значит rwxr-xr-x; ключам — 600, значит rw-------, только тебе. "
+              "777 не ставят: переписать файл сможет любой.")
+    variants = (
+        Variant("Файл {file} сейчас читают все. Сделай так, чтобы читать и менять его мог "
+                "только ты, а группе и остальным — ничего.",
+                hints=("Тебе нужны r и w: 4 + 2. Группе и остальным — ноль.",
+                       "Три цифры — владелец, группа, остальные: 6, 0, 0.",
+                       "chmod 600 {file}"),
+                solution="chmod 600 {file}",
+                wrong=("chmod 640 {file}", "chmod 700 {file}"),
+                alternatives=("chmod go-r {file} — то же буквами: g — группа, o — остальные, "
+                              "минус r — убрать чтение",),
+                explain=("600 значит rw-------: так держат ключи и пароли. Цифры прав — "
+                         "восьмеричная запись: в каждой цифре от 0 до 7 ровно три "
+                         "переключателя — r, w и x. Так права записывали ещё в первом Unix, "
+                         "в 1970-х.")),
+        Variant("Скрипту {file} нужны обычные права скрипта: тебе — всё, группе и остальным — "
+                "читать и запускать, но не менять.",
+                hints=("Тебе — rwx: 4 + 2 + 1. Остальным — r и x: 4 + 1.",
+                       "Три цифры: 7 владельцу, 5 группе, 5 остальным.",
+                       "chmod 755 {file}"),
+                solution="chmod 755 {file}",
+                wrong=("chmod 777 {file}", "chmod u+x {file}"),
+                alternatives=("chmod a+x {file} — то же буквами: a — все, плюс x — дать "
+                              "запуск; из rw-r--r-- выйдет rwxr-xr-x",),
+                explain=("755 значит rwxr-xr-x, обычные права скрипта. 777 тоже запустится, "
+                         "но даёт всем ещё и запись: любой подменит скрипт, а запустишь его "
+                         "ты. Владельца файла меняет chown — change owner, «сменить "
+                         "владельца»; чужой файл так не заберёшь, нужен sudo — запуск от "
+                         "имени администратора. В игре он не нужен.")),
+        Variant("В папке share один файл открыт всем на всё — 777, в ls -l это rwxrwxrwx. "
+                "Убери у него запись для группы и остальных, другие файлы не трогай. Права "
+                "можно писать и буквами: u — владелец, g — группа, o — остальные, a — все; "
+                "плюс — дать, минус — убрать.",
+                hints=("ls -l share: нужный файл — тот, где rwxrwxrwx.",
+                       "Цифрами нужно 755. Буквами: go-w — группе и остальным убрать w.",
+                       "chmod go-w share/{file}"),
+                solution="chmod go-w share/{file}",
+                wrong=("chmod 644 share/{file}", "chmod 755 share/*"),
+                alternatives=("chmod 755 share/{file} — то же цифрами",),
+                explain=("go-w убирает только w у группы и остальных, прочее не трогает: из "
+                         "rwxrwxrwx выйдет rwxr-xr-x, как 755. Цифры задают права целиком, "
+                         "буквы — правят. 777 — плохая привычка: кто угодно перепишет файл.")),
+    )
+    par = 30
+    hints = ("В тройке r — 4, w — 2, x — 1, их складывают.",
+             "Тебе — 4 + 2, группе и остальным — ноль: 600.",
+             "chmod 600 ИМЯ")
+    solution = "chmod 600 {file}"
+    explain = "Права цифрами: r — 4, w — 2, x — 1, сумма на каждую тройку."
+    spell = "chmod 755 — rwxr-xr-x, 644 — rw-r--r--, 600 — только себе; go-w — убрать запись"
+
+    def setup_variant(self, box, rng, variant):
+        box = Path(box)
+        if variant == 2:
+            names = rng.sample(PERM_FILES, 4)
+            target, rest = names[0], names[1:]
+            keep = {}
+            os.chmod(kit.write(box / "share" / target, "Общий файл.\n"), 0o777)
+            for name, mode in zip(rest, (0o644, 0o664, 0o600)):
+                os.chmod(kit.write(box / "share" / name, "Обычный текст.\n"), mode)
+                keep[f"share/{name}"] = mode
+            return {"file": target, "target": f"share/{target}", "want": 0o755, "start": 0o777,
+                    "keep": keep}
+        if variant == 1:
+            name = rng.choice(PERM_SCRIPTS)
+            os.chmod(kit.write(box / name, "#!/bin/sh\necho готово\n"), 0o644)
+            return {"file": name, "target": name, "want": 0o755, "start": 0o644, "keep": {}}
+        name = rng.choice(PERM_FILES)
+        os.chmod(kit.write(box / name, "Обычный текст.\n"), 0o644)
+        return {"file": name, "target": name, "want": 0o600, "start": 0o644, "keep": {}}
+
+    def check(self, ctx):
+        st = ctx.state
+        mode = _mode_of(ctx.box, st["target"])
+        if mode is None:
+            return Verdict(False, f"Файла {st['target']} нет на месте. " + kit.RESET_TAIL)
+        changed = [rel for rel, m in st["keep"].items() if _mode_of(ctx.box, rel) != m]
+        if changed:
+            return Verdict(False, "Задеты права и у других файлов: " + kit.names_line(changed)
+                           + ". Верни им прежние или набери reset.")
+        if mode == st["want"]:
+            return Verdict(True)
+        if mode == st["start"]:
+            return Verdict(False)       # ещё не трогали
+        if mode & 0o022:
+            return Verdict(False, f"Сейчас {_rwx(mode)}: менять файл может не только "
+                                  f"владелец. Нужно {_rwx(st['want'])}.")
+        return Verdict(False, f"Сейчас права {_rwx(mode)}, а нужно {_rwx(st['want'])}.")
 
 
 # --- E7 -------------------------------------------------------------------------------------
@@ -914,7 +1334,7 @@ class ExitCodes(AnswerTask):
         Variant("С каким кодом завершается ./check.sh? ans ЧИСЛО",
                 hints=("Код последней команды лежит в $?.",
                        "Запусти ./check.sh и сразу за ним — echo $?.",
-                       "./check.sh; echo $? → ans ЧИСЛО"),
+                       "./check.sh; echo $?, затем ans ЧИСЛО"),
                 solution="./check.sh; echo $?",
                 wrong=("./check.sh; echo hi > /dev/null; echo $?",
                        "./check.sh 2>&1 | cut -d: -f4"),
@@ -1156,8 +1576,8 @@ class JsonConfig(Task):
                        "Почини в nano, потом jq с присваиванием — в новый файл, и через && — mv обратно.",
                        "nano app.json — поправь строку из ошибки; потом jq '.db.port = {port}' "
                        "app.json > app.new.json && mv app.new.json app.json"),
-                solution="python3 -m json.tool app.json → nano app.json: поправь строку из "
-                         "ошибки → jq '.db.port = {port}' app.json > app.new.json && mv "
+                solution="python3 -m json.tool app.json; nano app.json — поправь строку из "
+                         "ошибки; jq '.db.port = {port}' app.json > app.new.json && mv "
                          "app.new.json app.json",
                 solution_script="print -r -- '{fixed}' > app.json; jq '.db.port = {port}' "
                                 "app.json > app.new.json && mv app.new.json app.json",
@@ -1170,8 +1590,8 @@ class JsonConfig(Task):
                        "Почини в nano, потом jq с присваиванием — в новый файл, и через && — mv обратно.",
                        "nano app.json — поправь строку из ошибки; потом jq '.features.beta = "
                        "false' app.json > app.new.json && mv app.new.json app.json"),
-                solution="python3 -m json.tool app.json → nano app.json: поправь строку из "
-                         "ошибки → jq '.features.beta = false' app.json > app.new.json && mv "
+                solution="python3 -m json.tool app.json; nano app.json — поправь строку из "
+                         "ошибки; jq '.features.beta = false' app.json > app.new.json && mv "
                          "app.new.json app.json",
                 solution_script="print -r -- '{fixed}' > app.json; jq '.features.beta = "
                                 "false' app.json > app.new.json && mv app.new.json app.json",
@@ -1185,8 +1605,8 @@ class JsonConfig(Task):
                        "Первый элемент списка — [0], текст — в двойных кавычках.",
                        "nano app.json — поправь строку из ошибки; потом jq '.server.hosts[0] = "
                        "\"{host}\"' app.json > app.new.json && mv app.new.json app.json"),
-                solution="python3 -m json.tool app.json → nano app.json: поправь строку из "
-                         "ошибки → jq '.server.hosts[0] = \"{host}\"' app.json > app.new.json "
+                solution="python3 -m json.tool app.json; nano app.json — поправь строку из "
+                         "ошибки; jq '.server.hosts[0] = \"{host}\"' app.json > app.new.json "
                          "&& mv app.new.json app.json",
                 solution_script="print -r -- '{fixed}' > app.json; jq '.server.hosts[0] = "
                                 "\"{host}\"' app.json > app.new.json && mv app.new.json app.json",
@@ -1340,7 +1760,7 @@ class ScriptAudit(AnswerTask):
                 "оболочки. Как он называется? ans ИМЯ",
                 hints=("Не запускай — читай: grep по всем файлам сразу.",
                        "grep -n -E 'curl|\\.zshrc' downloads/* — кто из них пишет в ~/.zshrc?",
-                       "grep -n -E 'curl|wget|eval|\\.zshrc' downloads/* → ans ИМЯ"),
+                       "grep -n -E 'curl|wget|eval|\\.zshrc' downloads/*, затем ans ИМЯ"),
                 solution="grep -n -E 'curl|wget|eval|\\.zshrc' downloads/*",
                 solution_script="cd downloads; grep -l '\\.zshrc' *",
                 wrong=("cd downloads; shasum -a 256 -c SHA256SUMS 2>/dev/null | grep FAILED | "
@@ -1348,20 +1768,20 @@ class ScriptAudit(AnswerTask):
                 alternatives=("less downloads/ИМЯ и /zshrc — поиск внутри less",)),
         Variant("В downloads/ рядом со скриптами лежит SHA256SUMS — отпечатки от автора. Какой "
                 "файл не совпадает с опубликованным отпечатком? ans ИМЯ",
-                hints=("Отпечаток печатает shasum -a 256, а весь список разом сверит ключ -c.",
+                hints=("Отпечаток печатает shasum -a 256, а весь список разом сверит флаг -c (check).",
                        "Сверяй из папки downloads: имена в SHA256SUMS — без пути. FAILED покажет "
                        "чужака.",
-                       "cd downloads; shasum -a 256 -c SHA256SUMS → ans ИМЯ"),
+                       "cd downloads; shasum -a 256 -c SHA256SUMS, затем ans ИМЯ"),
                 solution="cd downloads; shasum -a 256 -c SHA256SUMS",
                 solution_script="cd downloads; shasum -a 256 -c SHA256SUMS 2>/dev/null | grep "
                                 "FAILED | cut -d: -f1",
                 wrong=("cd downloads; grep -l '\\.zshrc' *",),
                 alternatives=("shasum -a 256 downloads/* — отпечатки всех и сверка глазами",)),
-        Variant("На какой строке опасного скрипта из downloads/ стоит запись в ~/.zshrc? ans "
-                "ИМЯ НОМЕР",
+        Variant("Какой скрипт из downloads/ пишет в ~/.zshrc и на какой строке? Назови оба: "
+                "ans ИМЯ НОМЕР",
                 hints=("grep -n печатает номер строки перед её текстом.",
                        "Ищи по всем файлам разом: grep -n по шаблону .zshrc (точку — через \\.).",
-                       "grep -n '\\.zshrc' downloads/* → ans ИМЯ НОМЕР"),
+                       "grep -n '\\.zshrc' downloads/*, затем ans ИМЯ НОМЕР"),
                 solution="grep -n '\\.zshrc' downloads/*",
                 solution_script="cd downloads; grep -n '\\.zshrc' * | cut -d: -f1,2 | tr : ' '",
                 wrong=("cd downloads; grep -n curl * | cut -d: -f1,2 | tr : ' '",),
@@ -1552,7 +1972,7 @@ class AvScan(Task):
     solution = variants[0].solution
     explain = ("Антивирус узнаёт только то, что уже видел. Новое ловят люди — и пишут "
                "сигнатуру для всех.")
-    spell = "clamscan -r -i папка; sha256:размер:Имя → свой.hsb; mv в quarantine/ + chmod -x"
+    spell = "clamscan -r -i папка; sha256:размер:Имя в свой.hsb; mv в quarantine/ + chmod -x"
     secret_keys = ("dirty", "clean", "sample", "moves", "known")
     LOCAL = ".termit/home/av/local.hsb"
     MSG_CLEAN = ("{name} — чистый файл: антивирус его не назвал. Верни на место: mv {got} "
@@ -2063,7 +2483,7 @@ class PipOffline(AnswerTask):
                        "pip show datapeek — строка Requires называет зависимость; версию "
                        "покажет pip list.",
                        "source .venv/bin/activate; pip install --no-index --find-links ~/wheels "
-                       "datapeek; pip list → ans ИМЯ ВЕРСИЯ"),
+                       "datapeek; pip list, затем ans ИМЯ ВЕРСИЯ"),
                 solution="source .venv/bin/activate; pip install --no-index --find-links "
                          "~/wheels datapeek; pip list",
                 solution_script="source .venv/bin/activate; pip install --no-index "
@@ -2510,9 +2930,9 @@ _B_QUAR = "mv {src} quarantine/; chmod -x quarantine/{name}; "
 _B_ENV = "chmod 600 app/.env; print -r -- .env >> app/.gitignore; "
 _B_PIP = ("source app/.venv/bin/activate; pip uninstall -y {extra}; pip freeze > "
           "app/requirements.txt")
-_B_SHOWN = ("which -a {cmd} → python3 -m json.tool app/config.json → nano app/config.json: поправь строку из "
-            "ошибки → mkdir -p report quarantine; jq -r '.sources[0].path' app/config.json > "
-            "report/source.txt → nano ~/.zshrc: убери строки # sync-agent и ~/.cache/bin → "
+_B_SHOWN = ("which -a {cmd}; python3 -m json.tool app/config.json; nano app/config.json — поправь строку из "
+            "ошибки; mkdir -p report quarantine; jq -r '.sources[0].path' app/config.json > "
+            "report/source.txt; nano ~/.zshrc — убери строки # sync-agent и ~/.cache/bin; "
             "rm ~/.cache/bin/{cmd}; mv {src} quarantine/; chmod -x quarantine/{name}; chmod 600 "
             "app/.env; print -r -- .env >> app/.gitignore; source app/.venv/bin/activate; pip "
             "uninstall -y {extra}; pip freeze > app/requirements.txt")
@@ -2604,8 +3024,8 @@ class BossEnv(Task):
     explain = ("Чужой скрипт оставляет следы в четырёх местах: в конфиге, в PATH через "
                "~/.zshrc, в правах файлов и в окружении Python. Лечат по порядку и ничего не "
                "запуская: читают, находят источник, убирают его в карантин, закрывают дыры.")
-    spell = ("json.tool → jq -r → which -a → nano ~/.zshrc → mv в quarantine/ + chmod -x → "
-             "chmod 600 → pip uninstall -y → pip freeze")
+    spell = ("json.tool, jq -r, which -a, nano ~/.zshrc, mv в quarantine/ + chmod -x, "
+             "chmod 600, pip uninstall -y, pip freeze — по порядку")
 
     MSG_CONF_GONE = "app/config.json нет на месте. Набери reset — он вернётся, сломанный, как был."
     MSG_CONF_CLOBBER = ("app/config.json пуст: > стёр его раньше, чем его прочли. Набери reset — "
@@ -2934,6 +3354,6 @@ class BossEnv(Task):
         return Verdict(False)
 
 
-TASKS = [EnvVars(), ExportChild(), Dotenv(), PathWhich(), ShebangRun(), ExitCodes(),
-         JsonConfig(), ScriptAudit(), AvScan(), VenvBasics(), PipOffline(), PipFreeze(),
-         BossEnv()]
+TASKS = [EnvVars(), ExportChild(), PermBasics(), PermRwx(), ReadLongList(), PermDigits(),
+         Dotenv(), PathWhich(), ShebangRun(), ExitCodes(), JsonConfig(), ScriptAudit(),
+         AvScan(), VenvBasics(), PipOffline(), PipFreeze(), BossEnv()]

@@ -12,7 +12,7 @@ from typing import Callable, List, Optional
 
 from termit_app import book as book_mod
 from termit_app import (contracts, cosmetics, edition, extensions, field, freezes, hideout, hook,
-                        implants, judge,
+                        implants, judge, lifehacks,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
                         repute, sound, story, theme, ui, warehouse, weekly)
 from termit_app.tasks import dbkit, registry
@@ -871,10 +871,23 @@ def give_gifts(p: dict, event: str) -> list:
     if got:
         fmt = (theme.story("shop") or {}).get("gift_got") or "🎁 {names}"
         ui.gift(shop.gift_line(event), fmt.format(names=", ".join(shop.name(i) for i in got)))
+        prompt_was = "prompt" in (p.get("settings") or {})
         line = hideout.auto_enable(p, got)
         if line:
             ui.say(ui.story_fill(line, "   ", "   "))
+        # FB8: как пользоваться новым; о только что включённом приглашении уже сказано выше
+        skip = () if prompt_was else ("prompt",)
+        for use in hideout.use_news(got, skip=skip):
+            ui.say(ui.story_fill(use, "   ", "     "))
+        _say_shop_tip(p)
     return got
+
+
+def _say_shop_tip(p: dict) -> None:
+    """FB5 п. 16: первый подарок или первые деньги — один раз сказать, где витрина."""
+    tip = hideout.shop_tip(p)
+    if tip:
+        ui.say(ui.story_fill(tip, "   ", "   "))
 
 
 def gifts_for_old_bosses(p: dict) -> list:
@@ -942,6 +955,8 @@ def _summary(p: dict, today: date, tally: dict, streak_before: int, book_before:
                      milestone=theme.milestone(after) if moved else None,
                      milestone_pay=tally.get("milestone_pay", 0), extra=extra,
                      reward_at=progress.next_reward(after), week=progress.activity(p, today))
+    # FB10: приём из каталога лайфхаков — по силам игроку, каждый ран следующий
+    ui.hack_tip(lifehacks.summary_line(p, p["dozors"]))
 
 
 def _yes(answer: str) -> bool:
@@ -1021,6 +1036,8 @@ def run_queue(queue: List[str], p: dict, opts: Options, today: date,
                                                  cash=theme.word("money")))
         progress.save(opts.progress_path, p)    # день засчитан, даже если дальше прервут
         _summary(p, today, tally, streak_before, book_before)
+        if tally["earned"] > 0:
+            _say_shop_tip(p)
         after = progress.current_streak(p, today)
         if after != streak_before and (bonus or theme.milestone(after)):
             sound.play(p, "milestone", tally.setdefault("sounds", set()))
