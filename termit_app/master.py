@@ -141,8 +141,8 @@ def summary_lines(p: dict) -> List[str]:
     best = []
     for tid, r in tasks.items():
         task = registry.all_tasks().get(tid)
-        b = r.get("best") if isinstance(r, dict) else None
-        if task is None or not isinstance(b, (int, float)) or isinstance(b, bool) or b <= 0:
+        b = progress.shown_best(r.get("best")) if isinstance(r, dict) else None
+        if task is None or b is None:
             continue
         best.append((b / max(1, task.par), theme.title(task), b))
     if best:
@@ -234,6 +234,7 @@ def release_variant(p: dict, task_id: str) -> None:
 def pay(p: dict, task, elapsed: float, prev_best, hints: int, today: date) -> int:
     """Побитый рекорд круга: без подсказок, был прежний рекорд, сегодня за задачу не платили.
     Начислить и вернуть сумму (0 — без выплаты)."""
+    prev_best = progress.shown_best(prev_best)     # FB12 B2: 0:00 и «забытое окно» — не рекорд
     if hints or prev_best is None or elapsed >= prev_best:
         return 0
     paid = _paid(p)

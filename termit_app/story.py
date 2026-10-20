@@ -13,6 +13,7 @@ import stat
 import tarfile
 import textwrap
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -1026,14 +1027,12 @@ VOICE_CHANCE = 0.4          # на задачу; не больше одного 
 VOICE_OUTCOMES = ("solved", "giveup")
 
 
-def recap_lines(p: dict) -> List[str]:
-    """«Ранее…» при входе в игру (FB3): заголовок и строки вехи. Веха — последний взломанный
-    страж, у которого есть запись; до стражей — дальний решённый шаг первого трека; иначе
-    start. Нет раздела в теме (фэнтези) — пусто: сюжетных вех там нет."""
-    recap = theme.story("recap")
-    beats = recap.get("beats") or {}
+def recap_key(p: dict) -> Optional[str]:
+    """Веха «Ранее…»: последний взломанный страж, у которого есть запись; до стражей — дальний
+    решённый шаг первого трека; иначе start. Нет раздела в теме (фэнтези) — None."""
+    beats = theme.story("recap").get("beats") or {}
     if not beats:
-        return []
+        return None
     key = next((b for b in reversed(p.get("bosses") or []) if b in beats), None)
     if key is None:
         from termit_app.tasks import registry   # здесь: реестр грузит модули задач
@@ -1041,8 +1040,45 @@ def recap_lines(p: dict) -> List[str]:
         steps = [t.id for t in registry.tasks_of("basics")
                  if t.id in beats and (tasks.get(t.id) or {}).get("solved")]
         key = steps[-1] if steps else "start"
-    lines = beats.get(key) or []
+    return key
+
+
+def recap_lines(p: dict) -> List[str]:
+    """«Ранее…» при входе в игру (FB3): заголовок и строки вехи (recap_key). Нет раздела в
+    теме (фэнтези) — пусто: сюжетных вех там нет."""
+    recap = theme.story("recap")
+    key = recap_key(p)
+    lines = ((recap.get("beats") or {}).get(key) or []) if key else []
     return [recap.get("title", "")] + list(lines) if lines else []
+
+
+# FB12 (S10): «Ранее…» слово в слово каждый день глаз учится пропускать — полное «Ранее…»
+# только при новой вехе или после перерыва в столько дней без игры
+RECAP_BREAK_DAYS = 3
+
+
+def recap_due(p: dict, today: date) -> bool:
+    """Показывать ли «Ранее…» сегодня: веха сменилась с прошлого показа или игрок не играл
+    RECAP_BREAK_DAYS дней и больше. За день — не больше одного раза."""
+    key = recap_key(p)
+    if key is None or p.get("recap_day") == today.isoformat():
+        return False
+    if p.get("recap_seen") != key:
+        return True
+    played = [d for d in p.get("days") or () if isinstance(d, str) and d < today.isoformat()]
+    if not played:
+        return False
+    try:
+        gap = (today - date.fromisoformat(max(played))).days
+    except ValueError:
+        return False
+    return gap >= RECAP_BREAK_DAYS
+
+
+def recap_mark(p: dict, today: date) -> None:
+    """«Ранее…» показано: запомнить веху и день."""
+    p["recap_seen"] = recap_key(p)
+    p["recap_day"] = today.isoformat()
 
 
 def voice_name(track: str) -> Optional[str]:

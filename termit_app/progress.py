@@ -198,6 +198,39 @@ def park_moved(p: dict) -> None:
         p["moved"] = moved
 
 
+# FB12 (B2): рекорд меньше секунды — наследие старого таймера (стартовал с первой команды,
+# ans первой же командой давал «0:00»); его не побить никогда — такого рекорда не бывает.
+# Дольше 10 минут — не рекорд, а открытое и забытое окно: в дневнике и круге мастера не видно.
+BEST_MIN = 1.0
+BEST_SHOWN_MAX = 600
+
+
+def _note_best(rec: dict, elapsed: float) -> None:
+    if elapsed >= BEST_MIN and (rec.get("best") is None or elapsed < rec["best"]):
+        rec["best"] = round(elapsed, 1)
+
+
+def shown_best(best) -> Optional[float]:
+    """Рекорд для экрана и для круга мастера: число от BEST_MIN до BEST_SHOWN_MAX, иначе None."""
+    if not isinstance(best, (int, float)) or isinstance(best, bool):
+        return None
+    return best if BEST_MIN <= best <= BEST_SHOWN_MAX else None
+
+
+def drop_old_bests(p: dict) -> None:
+    """Миграция: рекорды меньше секунды из старого сохранения — None («поставишь сейчас»).
+    Испорченный раздел tasks (не словарь) — мимо: загрузку он ронять не должен."""
+    tasks = p.get("tasks")
+    if not isinstance(tasks, dict):
+        return
+    for rec in tasks.values():
+        if not isinstance(rec, dict):
+            continue
+        best = rec.get("best")
+        if isinstance(best, (int, float)) and not isinstance(best, bool) and best < BEST_MIN:
+            rec["best"] = None
+
+
 def load(path: Path) -> dict:
     path = Path(path)
     if not path.exists():
@@ -212,6 +245,7 @@ def load(path: Path) -> dict:
     p.update(data)
     _normalize(p)
     park_moved(p)
+    drop_old_bests(p)
     if isinstance(p.get("declined"), list) and "tlrc" in p["declined"]:
         # до части 5 отказывались от формулы tlrc — теперь это отказ от утилиты tldr
         p["declined"] = [x for x in p["declined"] if x != "tlrc"]
@@ -366,8 +400,7 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         retrain = rec.get("retrain", False)
         if outcome == "solved":
             rec["solved"] += 1
-            if rec["best"] is None or elapsed < rec["best"]:
-                rec["best"] = round(elapsed, 1)
+            _note_best(rec, elapsed)
             p["xp"] += TRAIN_XP
             if spell:
                 p["grimoire"][task_id] = spell
@@ -381,8 +414,7 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
     rec["jobs"] = rec.get("jobs", 0) + 1
     if outcome == "solved":
         rec["solved"] += 1
-        if rec["best"] is None or elapsed < rec["best"]:
-            rec["best"] = round(elapsed, 1)
+        _note_best(rec, elapsed)
         p["xp"] += stars * 10 + (50 if boss else 0)
         p["money"] += stars * pay_per_star
         if spell:

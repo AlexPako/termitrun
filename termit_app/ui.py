@@ -203,7 +203,7 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             say(_wrap(task.scroll_for(state) or task.scroll, width=wide))
         show_diagram(task.id, cp)
         origin_notes(task.id, cp, tw)
-    head = theme.intro(task, state)
+    head = theme.intro(task, state, lore=first_time)   # FB12 (D1): лор — только впервые
     line = f"💬 {theme.speaker(task)}:" + (f" {head}" if head else "")
     if cp.level == "plain":
         say(textwrap.fill(line, 78, subsequent_indent="   ",
@@ -763,7 +763,24 @@ def gift(line, names_line: str) -> None:
     ok(story_fill(names_line, "", "   "))
 
 
-def boss_down(task, opened) -> None:
-    ok(theme.msg("boss_down", title=theme.title(task)))
-    for tr in opened:
-        say("   " + theme.msg("opened", place=theme.place(tr.key)))
+def boss_down(task, opened, first: bool = False) -> None:
+    """Страж взломан. first — первая победа (FB12, B6: пик игры не должен проскочить):
+    двойная рамка с пустыми строками вокруг; пауза «Enter — дальше» — у вызывающего."""
+    if not first:
+        ok(theme.msg("boss_down", title=theme.title(task)))
+        for tr in opened:
+            say("   " + theme.msg("opened", place=theme.place(tr.key)))
+        return
+    cp = _framed()
+    rows = [theme.msg("boss_down", title=theme.title(task))]
+    rows += [theme.msg("opened", place=theme.place(tr.key)) for tr in opened]
+    say()
+    if cp.level == "plain":
+        say(c("1;32", "  " + "=" * 60))
+        for row in rows:
+            say(c("1;32", story_fill(row, "  ", "    ")))
+        say(c("1;32", "  " + "=" * 60))
+        return
+    for row in tui.box(["", *rows, ""], title=theme.word("fight"), kind="double", c=cp,
+                       color="boss"):
+        say(row)

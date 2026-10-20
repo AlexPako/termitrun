@@ -252,12 +252,13 @@ def lesson(task, state: Optional[dict] = None) -> Optional[str]:
     return (entry.get("lessons") or {}).get(engine) or entry.get("lesson") or None
 
 
-def intro(task, state: dict) -> Optional[str]:
+def intro(task, state: dict, lore: bool = True) -> Optional[str]:
     """Строка атмосферы карточки. lore — порция сюжета перед ней (FB3: ответы порциями),
-    текст без подстановок."""
+    текст без подстановок. FB12 (D1): порция разовая — карточка просит её только при первой
+    встрече (lore=False на повторах и в команде task)."""
     entry = _entry(task)
     lines = entry.get("intro") or ()
-    lore = entry.get("lore")
+    lore = entry.get("lore") if lore else None
     if not lines:
         return lore or None
     head = lines[state.get("_seed", 0) % len(lines)].format(**state)
@@ -266,6 +267,6 @@ def intro(task, state: dict) -> Optional[str]:
 
 def task_text(task, state: dict) -> str:
     """Строка атмосферы (если есть) + суть задачи обычным языком."""
-    head = intro(task, state)
+    head = intro(task, state, lore=False)
     body = task.text(state)
     return f"{head}\n{body}" if head else body

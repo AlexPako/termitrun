@@ -8,6 +8,7 @@ import re
 from termit_app import (citymap, contracts, cosmetics, diary, hideout, implants, loot, music,
                         paths, progress, repute, sandbox, session, story, updates, warehouse, weekly)
 from termit_app import book as book_mod
+from termit_app import goal
 from termit_app import commands, edition, extensions, icons, theme, tui, ui
 from termit_app import owl as owl_mod
 from termit_app import shop as shop_mod
@@ -147,6 +148,9 @@ def show_stats() -> None:
     beaten = [theme.title(tasks[b]) for b in p["bosses"] if b in tasks]
     rows.append(f"{theme.word('beaten')}: " + (", ".join(beaten) if beaten else "пока никто"))
     rows.append(repute.line(p, with_next=True))      # репутация (C2 М6) — отдельной строкой
+    aim = goal.line(p)                               # FB12 (A2): ближняя цель
+    if aim:
+        rows.append(aim)
     guards = [t for t in tasks.values() if t.boss]
     places = []
     for tr in registry.shown_tracks():

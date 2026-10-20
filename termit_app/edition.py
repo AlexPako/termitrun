@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 
 OPEN_TRACKS = ('basics',)
 ISSUES_URL = 'https://github.com/AlexPako/termitrun/issues/new'
-RELEASE = 'модуль 1 · 2026-10-20 · efeb4ae'
+RELEASE = 'модуль 1 · 2026-10-20 · 5393421'
 
 SOON = "скоро — следующий модуль"
 LOCKED = ("{place} откроется в следующем модуле игры — уже скоро. Следи за репозиторием, "

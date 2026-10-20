@@ -148,9 +148,10 @@ def list_lines(p: dict, cp: tui.Caps) -> List[str]:
 
 
 def _best(p: dict, task_id: str) -> Optional[str]:
-    """Личный рекорд времени задачи (rec["best"]) для дневника; нет — None (М3)."""
-    best = (p["tasks"].get(task_id) or {}).get("best")
-    if not isinstance(best, (int, float)) or isinstance(best, bool) or best < 0:
+    """Личный рекорд времени задачи (rec["best"]) для дневника; нет — None (М3). Меньше
+    секунды и дольше 10 минут — не рекорд (FB12 B2, progress.shown_best)."""
+    best = progress.shown_best((p["tasks"].get(task_id) or {}).get("best"))
+    if best is None:
         return None
     return ui.fmt_time(best)
 

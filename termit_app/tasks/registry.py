@@ -99,12 +99,27 @@ def missing_after(p: dict, task) -> List[str]:
     return out
 
 
+def place_open(p: dict, task) -> bool:
+    """FB12 (C5): место задачи открыто для игрока — его стражи взяты. Запись из старого
+    сохранения (задача переехала в место дальше по игре) не выдаётся, пока место закрыто."""
+    key = getattr(task, "track", None)
+    if not key:
+        return True             # не задача реестра (заглушка теста) — замка нет
+    try:
+        need = set(track(key).requires)
+    except KeyError:
+        return False
+    return need <= set(p.get("bosses") or ())
+
+
 def after_done(p: dict, task) -> bool:
     """Задачи-пары открываются после близнеца и стража трека. Этим фильтром пользуются все
     пути выдачи: next_new, track, разминка, срочные заказы, возвращение, play ID. Задачи мест
-    вне издания (edition.OPEN_TRACKS) не выдаются ни одним путём — и из старого сохранения."""
+    вне издания (edition.OPEN_TRACKS) и закрытых мест (place_open, FB12 C5) не выдаются ни
+    одним путём — и из старого сохранения."""
     from termit_app import edition
-    return edition.track_open(getattr(task, "track", "")) and not missing_after(p, task)
+    return (edition.track_open(getattr(task, "track", "")) and place_open(p, task)
+            and not missing_after(p, task))
 
 
 def rank_level(bosses) -> int:
