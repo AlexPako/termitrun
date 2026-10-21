@@ -376,6 +376,10 @@ GIFTS: Dict[str, List[Tuple[str, Tuple[str, ...]]]] = {
     "boss_env": [("trophy_env", ())],
 }
 GIFT_STREAK = 3
+# кто дарит (роль из раздела characters темы): от него и сообщение на деке
+GIFT_FROM = {"first_solve": "raven", "streak3": "raven", "boss_basics": "gaika",
+             "boss_tools": "gaika", "boss_finder": "shnyr", "boss_data": "marina",
+             "boss_db": "plomba", "boss_sql": "dubrov", "boss_env": "frosya"}
 
 
 def give(p: dict, event: str) -> List[str]:
@@ -429,3 +433,8 @@ def section_title(section: str) -> str:
 
 def gift_line(event: str) -> Optional[str]:
     return (_ui().get("gifts") or {}).get(event)
+
+
+def gift_from(event: str) -> str:
+    """Ключ отправителя подарка на деке: персонаж, а не безликий «Подарок»."""
+    return GIFT_FROM.get(event, "gift")

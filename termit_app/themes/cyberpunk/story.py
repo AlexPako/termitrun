@@ -568,7 +568,25 @@ VAULT_TABLES = {
     ],
 }
 
+# Имена отправителей сообщений на деке (inbox.sender_name). Ключи — роли, общие для всех
+# тем (raven — наставник первого трека, gaika — мастерская и т. д.): выбрал другую тему —
+# старые сообщения подписаны новыми именами тех же людей.
+CHARACTERS = {
+    "raven": "Ворон",
+    "gaika": "Гайка",
+    "shnyr": "Шнырь",
+    "marina": "Марина",
+    "agata": "Агата",
+    "plomba": "Пломба",
+    "dubrov": "Дубров",
+    "frosya": "Фрося",
+    "sonya": "Соня-Модуль",
+    "haron": "Харон",
+    "blits": "Блиц",
+}
+
 SECTIONS = {
+    "characters": CHARACTERS,
     "vault_tables": VAULT_TABLES,
     "found_ui": FOUND_UI,
     "dossiers": DOSSIERS,

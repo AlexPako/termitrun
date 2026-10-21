@@ -17,6 +17,14 @@ SERVICE = ("task", "hint", "ans", "reset", "giveup", "skip", "quit", "bug", "loo
            "keys", "ext", "book", "lesson")
 
 
+QUIT_HUB = "Назад в убежище."
+
+
+def quit_text() -> str:
+    """quit в задаче: в ране из убежища (TERMIT_HUB) — «назад в убежище» (спека 2.1)."""
+    return QUIT_HUB if os.environ.get("TERMIT_HUB") else "До встречи."
+
+
 def _load(box):
     data = sandbox.read_task_json(box)
     return registry.get(data["id"]), data["state"]
@@ -508,7 +516,7 @@ def no_task(box, cmd: str) -> int:
     """task.json пропал (например, rm -rf .*): не падаем, а подсказываем выход."""
     if cmd in ("quit", "giveup", "skip"):
         (Path(box) / ".termit").mkdir(parents=True, exist_ok=True)
-        return cmd_end(box, "quit", "До встречи.")
+        return cmd_end(box, "quit", quit_text())
     if cmd == "precmd" and sandbox.result(box):
         return EXIT_SHELL
     ui.warn(MISSING)
@@ -570,7 +578,7 @@ def main(argv) -> int:
         if cmd == "skip":
             return cmd_end(box, "skip", "Отложено.")
         if cmd == "quit":
-            return cmd_end(box, "quit", "До встречи.")
+            return cmd_end(box, "quit", quit_text())
         ui.bad(f"неизвестная команда тренажёра: {cmd}")
         return 1
     except Exception as e:   # хук не должен ронять оболочку владельца

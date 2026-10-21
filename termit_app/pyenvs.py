@@ -10,6 +10,7 @@ python3 (симлинки в .termit/bin кладёт sandbox.create задач�
 Берётся настоящий путь (os.path.realpath), а не шим: venv игрока ссылается на симлинк
 .termit/bin/python3 (pyvenv.cfg: home), и шим путал бы xcrun (спайк S0, решение 2).
 Выбор кэшируется в .cache/pytrack.json (paths.CACHE_DIR) по пути интерпретатора игры."""
+import contextlib
 import fcntl
 import hashlib
 import json
@@ -143,6 +144,21 @@ def _write_cache(key: str, info: PyInfo) -> None:
             pass
 
 
+_cache_only = False
+
+
+@contextlib.contextmanager
+def cache_only():
+    """Пока открыт: track_python ничего не запускает. Нет кэша — берётся сам Python игры
+    без проверки (оценка «задача доступна» для экрана, где подпроцессов быть не должно)."""
+    global _cache_only
+    before, _cache_only = _cache_only, True
+    try:
+        yield
+    finally:
+        _cache_only = before
+
+
 def track_python(refresh: bool = False) -> Optional[PyInfo]:
     """Интерпретатор треков (A1), из кэша, если игра запущена тем же Python. None — нет ни
     одного годного (sys.executable пуст или не исполняется)."""
@@ -151,6 +167,10 @@ def track_python(refresh: bool = False) -> Optional[PyInfo]:
         hit = _read_cache(key)
         if hit is not None:
             return hit
+    if _cache_only:
+        if not key:
+            return None
+        return PyInfo(key, tuple(sys.version_info[:3]), platform.machine())
     info = choose()
     if info is not None:
         _write_cache(key, info)

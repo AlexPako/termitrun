@@ -8,11 +8,11 @@ import time
 from dataclasses import dataclass, field as dfield
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from termit_app import book as book_mod
 from termit_app import (contracts, cosmetics, edition, extensions, field, freezes, goal,
-                        hideout, hook, implants, judge, lifehacks,
+                        hideout, hook, implants, inbox, judge, lifehacks,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
                         repute, sound, story, syserrors, theme, ui, warehouse, weekly)
 from termit_app.tasks import dbkit, registry
@@ -45,6 +45,9 @@ class Options:
     # FB3 (3): после решения — остаться в песочнице до next/more/quit (./termit ставит True;
     # тесты с подставным runner по умолчанию — прежний поток с Enter и [y/N])
     linger: bool = False
+    # убежище (хаб): ран зовут из командной строки игры — после итога вопроса MORE_PROMPT
+    # нет, следующий шаг подсказывает пульт; quit из задачи — назад в убежище
+    hub: bool = False
 
 
 def _ask(opts: Options, prompt: str) -> str:
@@ -115,8 +118,10 @@ REVIEWS_PER_RUN = 4         # столько старых дел берёт об
 REVIEWS_SHORT = 2           # и короткий (./termit short)
 
 
-def build_queue(p: dict, today: date, short: bool = False, rng=None) -> List[str]:
-    rng = rng or random.Random()
+def today_reviews(p: dict, today: date, short: bool = False) -> List[str]:
+    """Старые дела, которые возьмёт ран дня: проваленные стражи (вне лимита) и первые
+    REVIEWS_PER_RUN (REVIEWS_SHORT) просроченных. Один срез для build_queue и отработки:
+    train их не трогает, ран остаётся полным (спека 2.6)."""
     tasks = registry.all_tasks()
     # замок after — одно правило для всех путей, и для повторений по сроку тоже: пара,
     # решённая до стража в старом сохранении, ждёт замка, как в play ID и разминке
@@ -126,8 +131,13 @@ def build_queue(p: dict, today: date, short: bool = False, rng=None) -> List[str
     # вечно вытесняет его из рана, а новое в его месте не откроется, пока он не взломан
     guards = [i for i in reviews if tasks[i].boss and i not in p["bosses"]]
     rest = [i for i in reviews if i not in guards]
-    rev = rest[:REVIEWS_SHORT if short else REVIEWS_PER_RUN]
-    queue = guards + rev + next_new(p, progress.new_limit(p, today))
+    return guards + rest[:REVIEWS_SHORT if short else REVIEWS_PER_RUN]
+
+
+def build_queue(p: dict, today: date, short: bool = False, rng=None) -> List[str]:
+    rng = rng or random.Random()
+    tasks = registry.all_tasks()
+    queue = today_reviews(p, today, short) + next_new(p, progress.new_limit(p, today))
     rng.shuffle(queue)
     # сначала тренировки (новое), потом дела (повторения), схватка — в конце
     queue.sort(key=lambda i: (tasks[i].boss,
@@ -772,10 +782,16 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
                 _ask(opts, BOSS_PAUSE)      # FB12 (B6): пик — с паузой, улика не проскочит
             if clue and first_win:
                 ui.boss_clue(clue, story.new_in_case(task.id))     # первая победа: улика
-            if first_win and give_gifts(p, task.id):               # после улики — подарки
-                progress.save(opts.progress_path, p)
+            if first_win:                                          # после улики — подарки
+                with inbox.collect(p, "gift", shop.gift_from(task.id), f"gift:{task.id}",
+                                   today, on=opts.hub):
+                    gifted_boss = give_gifts(p, task.id)
+                if gifted_boss:
+                    progress.save(opts.progress_path, p)
         if solved:          # FB5 (8): первое решённое задание — доска; новые карточки — на неё
-            gifted = give_gifts(p, "first_solve")
+            with inbox.collect(p, "gift", shop.gift_from("first_solve"), "gift:first_solve",
+                               today, on=opts.hub):
+                gifted = give_gifts(p, "first_solve")
             news = hideout.board_news(p)
             for line in news:
                 ui.say(ui.story_fill(line, "   ", "   "))
@@ -831,11 +847,12 @@ def task_tips_on(p: dict) -> bool:
     return hideout.basics_on(p)
 
 
-def linger_tips(last: bool) -> str:
+def linger_tips(last: bool, hub: bool = False) -> str:
     """Строка над приглашением после решения: что набрать дальше. Ещё урок (more) — только
     после итога рана (FB3 правка владельца 17.10: more посреди рана путал счёт задач)."""
     go = "next — итог рана" if last else "next — следующее задание"
-    return f"✓ засчитано · {go} · quit — выйти · book · keys · bug"
+    out = "quit — в убежище" if hub else "quit — выйти"
+    return f"✓ засчитано · {go} · {out} · book · keys · bug"
 
 
 def _linger(task, box, state, outcome: str, opts: Options, tally: dict, prompt, rprompt,
@@ -850,7 +867,7 @@ def _linger(task, box, state, outcome: str, opts: Options, tally: dict, prompt, 
     ui.say()
     for line in lines:
         ui.say(ui.story_fill(line, "", "   "))
-    ui.say(ui.story_fill(linger_tips(last), "   ", "   "))
+    ui.say(ui.story_fill(linger_tips(last, opts.hub), "   ", "   "))
     sandbox.set_result(box, "")
     sandbox.write_box_file(box, ".termit/feedback", "")     # уже перенесены в отзывы
     sandbox.write_box_file(box, ".termit/linger", "next")
@@ -858,7 +875,7 @@ def _linger(task, box, state, outcome: str, opts: Options, tally: dict, prompt, 
                               prompt=prompt, rprompt=rprompt, task=task,
                               db_engine=state.get(dbkit.ENGINE_KEY))
     env["TERMIT_LINGER"] = "1"
-    env["TERMIT_TIPS"] = "\n".join(list(tally.get("board") or []) + [linger_tips(last)])
+    env["TERMIT_TIPS"] = "\n".join(list(tally.get("board") or []) + [linger_tips(last, opts.hub)])
     pwd = sandbox.read_pwd(box)
     cwd = pwd if pwd is not None and sandbox.inside(pwd, box) and pwd.is_dir() else \
         sandbox.start_dir(box)
@@ -987,7 +1004,6 @@ def run_queue(queue: List[str], p: dict, opts: Options, today: date,
     """offer_more — после итога рана (если игрок не вышел сам) предложить ещё урок: more.
     paydata=False — без хабара (разминка пустого дня). ritual=False — запуск вне рана дня
     (круг мастера на заказ, play ID): ритуал закрытия дня он не тратит (FB12 A3)."""
-    tasks = registry.all_tasks()
     tally = new_tally()
     # хабар данных: раз в день, по жребию даты; не в разминке, тренировке play и репетиции
     if paydata and not opts.practice and not opts.rehearsal:
@@ -996,12 +1012,41 @@ def run_queue(queue: List[str], p: dict, opts: Options, today: date,
             p["paydata_day"] = today.isoformat()
     gifts_for_old_bosses(p)
     progress.save(opts.progress_path, p)
-    streak_before = progress.current_streak(p, today)
-    book_before = len(p["grimoire"])
-    karma_before = progress.karma(p)
+    before = {
+        "streak": progress.current_streak(p, today),
+        "book": len(p["grimoire"]),
+        "karma": progress.karma(p),
+        "ritual": ritual,
+        # хаб: что уже лежало на деке — подарки за решение кладутся туда ещё внутри задачи
+        "inbox": {m["id"] for m in p["inbox"]},
+    }
+    solved_any, stopped = _play_tasks(queue, p, opts, tally)
+    if solved_any:
+        _close_run(p, opts, today, tally, before)
+    progress.save(opts.progress_path, p)
+    if not opts.rehearsal:
+        _edition_finish(p, opts)
+    if opts.hub:
+        _deck_summary(p, before["inbox"])
+    if offer_more and solved_any and not stopped and not opts.hub:
+        _offer_more(p, opts, today)
+
+
+def _deck_summary(p: dict, posted_before: set) -> None:
+    """Хаб: итог рана кончается строкой «✉ На деке N» — только про новое за этот ран."""
+    new = [m for m in inbox.unread(p) if m["id"] not in posted_before]
+    if new:
+        ui.say()
+        ui.say(inbox.summary_line(len(new)))
+
+
+def _play_tasks(queue: List[str], p: dict, opts: Options, tally: dict) -> Tuple[bool, bool]:
+    """Цикл заданий рана: next/quit из песочницы, Ctrl+C, «дальше» между заданиями. День не
+    закрывает — это _close_run (отработка зовёт только цикл, спека 2.4). Вернуть (решено ли
+    хоть одно, вышел ли игрок сам)."""
+    tasks = registry.all_tasks()
     solved_any = False
     stopped = False         # игрок вышел сам (quit, Ctrl+C) — ещё урок не предлагаем
-    choice = None
     for i, tid in enumerate(queue, 1):
         last = i == len(queue)
         tally["linger"] = {"last": last}
@@ -1026,39 +1071,42 @@ def run_queue(queue: List[str], p: dict, opts: Options, today: date,
                 print()
                 stopped = True
                 break
-    if solved_any:
-        # FB12 (A3): ритуал «ран закрыт» — раз в день, своя отметка ritual_day (не days: день
-        # закрывает и play, и круг мастера, а ритуал им не положен); урок после него (more,
-        # второй ран за день) кончается итогом в две строки; счётчик ранов — по дням
-        day_closed = not ritual or p.get("ritual_day") == today.isoformat()
-        tally["froze"] = progress.close_day(p, today)    # тут и тратятся заморозки
-        tally["froze_split"] = freezes.split_spent(p, len(tally["froze"]["bought"]))
-        earned_freeze = freezes.earn(p, today)          # 3 рана за 7 дней — в запас (М4)
-        tally["extra"] = list(tally.get("extra", ())) + freezes.lines(p, tally["froze"],
-                                                                      earned_freeze)
-        # 12 дел недели — только дела обычных ранов: тренировки, круг мастера и play не в счёт
-        # (M2 ревью C2: иначе пять кругов за вечер закрывали контракт)
-        week_pay = weekly.note(p, today, 0 if opts.practice else tally["solved"])
-        if week_pay:                                    # контракт недели: один раз (М5)
-            tally["earned"] += week_pay
-            tally["extra"].append(weekly.text("paid", pay=week_pay, cash=theme.word("money")))
-        tally["extra"] += repute.summary_lines(p, karma_before)     # репутация (М6)
-        if opts.comeback_bonus:     # выгодный ран: премия, если что-то решено, — при любом итоге
-            tally["earned"] += contracts.pay_comeback(p, opts.comeback_bonus, today)
-            tally["extra"].append(contracts.text("comeback_paid", bonus=opts.comeback_bonus,
-                                                 cash=theme.word("money")))
-        if day_closed:
-            progress.save(opts.progress_path, p)
-            _lesson_summary(p, tally, book_before)
-            _goal_talk(p)
-            progress.save(opts.progress_path, p)
-        else:
-            _close_day_ritual(p, opts, today, tally, streak_before, book_before)
-    progress.save(opts.progress_path, p)
-    if not opts.rehearsal:
-        _edition_finish(p, opts)
-    if offer_more and solved_any and not stopped:
-        _offer_more(p, opts, today)
+    return solved_any, stopped
+
+
+def _close_run(p: dict, opts: Options, today: date, tally: dict, before: dict) -> None:
+    """Конец рана, в котором что-то решено: день засчитан, заморозки, неделя, репутация,
+    премия выгодного рана, затем ритуал закрытия дня или короткий итог урока.
+    before — снимок до рана: streak, book, karma; ritual (по умолчанию True) — False у
+    запуска вне рана дня, ритуал он не тратит."""
+    # FB12 (A3): ритуал «ран закрыт» — раз в день, своя отметка ritual_day (не days: день
+    # закрывает и play, и круг мастера, а ритуал им не положен); урок после него (more,
+    # второй ран за день) кончается итогом в две строки; счётчик ранов — по дням
+    ritual = before.get("ritual", True)
+    day_closed = not ritual or p.get("ritual_day") == today.isoformat()
+    tally["froze"] = progress.close_day(p, today)    # тут и тратятся заморозки
+    tally["froze_split"] = freezes.split_spent(p, len(tally["froze"]["bought"]))
+    earned_freeze = freezes.earn(p, today)          # 3 рана за 7 дней — в запас (М4)
+    tally["extra"] = list(tally.get("extra", ())) + freezes.lines(p, tally["froze"],
+                                                                  earned_freeze)
+    # 12 дел недели — только дела обычных ранов: тренировки, круг мастера и play не в счёт
+    # (M2 ревью C2: иначе пять кругов за вечер закрывали контракт)
+    week_pay = weekly.note(p, today, 0 if opts.practice else tally["solved"])
+    if week_pay:                                    # контракт недели: один раз (М5)
+        tally["earned"] += week_pay
+        tally["extra"].append(weekly.text("paid", pay=week_pay, cash=theme.word("money")))
+    tally["extra"] += repute.summary_lines(p, before["karma"])     # репутация (М6)
+    if opts.comeback_bonus:     # выгодный ран: премия, если что-то решено, — при любом итоге
+        tally["earned"] += contracts.pay_comeback(p, opts.comeback_bonus, today)
+        tally["extra"].append(contracts.text("comeback_paid", bonus=opts.comeback_bonus,
+                                             cash=theme.word("money")))
+    if day_closed:
+        progress.save(opts.progress_path, p)
+        _lesson_summary(p, tally, before["book"])
+        _goal_talk(p)
+        progress.save(opts.progress_path, p)
+    else:
+        _close_day_ritual(p, opts, today, tally, before["streak"], before["book"])
 
 
 def _lesson_summary(p: dict, tally: dict, book_before: int) -> None:
@@ -1105,20 +1153,27 @@ def _close_day_ritual(p: dict, opts: Options, today: date, tally: dict, streak_b
     _summary(p, today, tally, streak_before, book_before)
     _goal_talk(p)
     if tally["earned"] > 0:
-        _say_shop_tip(p)
+        with inbox.collect(p, "shop", "shop", "shop_tip", today, on=opts.hub):
+            _say_shop_tip(p)
     after = progress.current_streak(p, today)
     if after != streak_before and (bonus or theme.milestone(after)):
         sound.play(p, "milestone", tally.setdefault("sounds", set()))
     if after >= shop.GIFT_STREAK:
-        give_gifts(p, "streak3")        # после вехи 3 — первый предмет в убежище
+        with inbox.collect(p, "gift", shop.gift_from("streak3"), "gift:streak3", today,
+                           on=opts.hub):
+            give_gifts(p, "streak3")    # после вехи 3 — первый предмет в убежище
     stocked = cosmetics.stock_tick(p, today)       # завоз косметики: ≤ 1 строки за ран
     if stocked:
-        ui.say()
-        ui.say(ui.story_fill(cosmetics.stock_line(stocked), "", "   "))
-    for hint in story.hunt_hints(p) + [loot.hint(p)]:   # один раз: охота существует
-        if hint:
+        with inbox.collect(p, "stock", "shop", f"stock:{today.isoformat()}", today,
+                           on=opts.hub, by_text=True):
             ui.say()
-            ui.say(ui.story_fill(hint, "", "   "))
+            ui.say(ui.story_fill(cosmetics.stock_line(stocked), "", "   "))
+    with inbox.collect(p, "hunt", "raven", f"hunt:{today.isoformat()}", today, on=opts.hub,
+                       by_text=True):
+        for hint in story.hunt_hints(p) + [loot.hint(p)]:   # один раз: охота существует
+            if hint:
+                ui.say()
+                ui.say(ui.story_fill(hint, "", "   "))
     # склад pandas/requests (часть 10, A3): трек «Python» открыт, склада нет — один
     # вопрос в день, качает только родитель и только по y. Вопрос в конце рана — один на
     # всех (M1 ревью Q4): склад или имплант, другой ждёт следующего рана
@@ -1132,17 +1187,24 @@ def _close_day_ritual(p: dict, opts: Options, today: date, tally: dict, streak_b
         contracts.expire(p, today)
         offered = contracts.offer_urgent(       # жребий — по дате, раз в день
             p, today, random.Random(f"urgent:{today.isoformat()}"))
-    _tomorrow(p, today)
+    with inbox.collect(p, "tomorrow", "raven", f"tomorrow:{today.isoformat()}", today,
+                       on=opts.hub, by_text=True):
+        _tomorrow(p, today)
     if offered:
-        ui.say(ui.story_fill(contracts.urgent_line(p, today, "urgent_offer"), "", "   "))
+        with inbox.collect(p, "urgent", "raven", f"urgent:{today.isoformat()}", today,
+                           on=opts.hub, by_text=True):
+            ui.say(ui.story_fill(contracts.urgent_line(p, today, "urgent_offer"), "", "   "))
 
 
 def _edition_finish(p: dict, opts: Options) -> None:
-    """Публичное издание: первый модуль пройден — тёплое сообщение один раз."""
+    """Публичное издание: первый модуль пройден — тёплое сообщение один раз (в убежище —
+    на деку)."""
     text = edition.finish_once(p)
     if text:
-        ui.say()
-        ui.ok(ui.story_fill(text, "", "   "))
+        today = opts.today or date.today()
+        with inbox.collect(p, "edition", "raven", "edition_done", today, on=opts.hub):
+            ui.say()
+            ui.ok(ui.story_fill(text, "", "   "))
         progress.save(opts.progress_path, p)
 
 
@@ -1280,10 +1342,13 @@ def _intro_once(p: dict, opts: Options) -> bool:
     """Вступление и две строки управления — при самом первом запуске; True, если показано."""
     today = opts.today or date.today()
     if p["intro_seen"]:
-        # «Ранее…» (FB3) — при новой вехе или после перерыва, не каждый день (FB12, S10)
+        # «Ранее…» (FB3) — при новой вехе или после перерыва, не каждый день (FB12, S10);
+        # в убежище — сообщением на деке, а не стеной текста перед раном
         if story.recap_due(p, today):
-            for line in story.recap_lines(p):
-                ui.say(ui.story_fill(line, "  ", "    "))
+            with inbox.collect(p, "recap", "raven", f"recap:{today.isoformat()}", today,
+                               on=opts.hub):
+                for line in story.recap_lines(p):
+                    ui.say(ui.story_fill(line, "  ", "    "))
             story.recap_mark(p, today)
             progress.save(opts.progress_path, p)
         return False

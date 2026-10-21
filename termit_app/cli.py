@@ -8,6 +8,7 @@ import re
 from termit_app import (citymap, contracts, cosmetics, diary, hideout, implants, loot, music,
                         paths, progress, repute, sandbox, session, story, updates, warehouse, weekly)
 from termit_app import book as book_mod
+from termit_app import inbox as inbox_mod
 from termit_app import goal
 from termit_app import commands, edition, extensions, icons, theme, tui, ui
 from termit_app import owl as owl_mod
@@ -49,7 +50,7 @@ def _opened(p) -> dict:
         "callsign": "callsign" in owned,
         "music": "player" in owned,                   # дека куплена — ей есть что сказать
         # круг мастера — когда есть что повторять на время
-        "master": any((r or {}).get("solved", 0) > 0 for r in p.get("tasks", {}).values()),
+        "master": progress.master_open(p),
         # склад pandas/requests — когда открыт трек «Python» (часть 10, A3)
         "wheels": warehouse.OPENS_AFTER in bosses,
     }
@@ -90,14 +91,14 @@ def usage(p: dict = None) -> str:
     return f"""TermitRun — тренажёр терминала ({theme.tagline()})
 
   ./termit                 {w('session')} на ~10 минут — каждый день
-{cmd("short")}{cmd("more")}{master_line}{cmd("track", "МЕСТО", f" ({places})")}\
+{cmd("run")}{cmd("short")}{cmd("more")}{master_line}{cmd("track", "МЕСТО", f" ({places})")}\
 {cmd("play", "ID")}{cmd("stats")}{cmd("intro")}{cmd("keys")}\
                            в задаче: next — дальше после решения; после итога рана — more, ещё урок
 {cmd("ext")}{cmd("shop", "[all]")}\
   ./termit shop ID         купить (например, ./termit shop freeze)
 {style_line}{rehearse_line}{cmd("list")}{cmd("map")}{cmd("home", "[look ID]")}\
 {home("prompt")}{home("board")}{home("shop")}{home("help")}\
-{callsign_line}{deck_line}{story_lines}{fence_line}{cmd("book", "[слово]")}\
+{callsign_line}{deck_line}{story_lines}{fence_line}{cmd("inbox", "[N|next]")}{cmd("book", "[слово]")}\
 {diary_line}{cmd("theme", "[ИМЯ]", themes)}{cmd("sound", "[on|off]", ";")}\
                            test, pack ID|off, vol 1..10
 {music_line}{implants_line}{wheels_line}{owl_line}{cmd("feedback")}\
@@ -574,13 +575,18 @@ def _hub_about(name: str) -> str:
 def home_hub(p: dict) -> list:
     """Панель «Куда отсюда»: команды, открытые игроку сейчас, по строке на каждую."""
     is_open = _hub_open(p)
-    out = ["  Куда отсюда (набирай после рана, не в задаче):"]
+    head = ("  Куда отсюда:" if commands.hub_on()
+            else "  Куда отсюда (набирай после рана, не в задаче):")
+    out = [head]
     for name in HUB:
         if is_open[name]:
-            cmd = f"./termit {name}"
+            if name.startswith("home "):
+                cmd = commands.home_cmd(name[5:])
+            else:
+                cmd = f"{commands.prefix()}{name}"
             out += ui.story_fill(f"{cmd:<21} {_hub_about(name)}", "    ",
                                  " " * 26).splitlines()
-    out.append("  Подробно о доме — ./termit home help")
+    out.append(f"  Подробно о доме — {commands.prefix()}home help")
     return out
 
 
@@ -963,7 +969,7 @@ def sound_cmd(args) -> int:
                              "./termit shop"}[code])
         return 0 if code in ("ok", "off") else 2
     if sub == "vol" and len(args) == 2:
-        n = int(args[1]) if args[1].isdigit() else 0
+        n = int(args[1]) if args[1].isascii() and args[1].isdigit() else 0
         if not music.set_volume(p, n):
             ui.say("Громкость — от 1 до 10: ./termit sound vol 5")
             return 2
@@ -1058,7 +1064,7 @@ def music_cmd(args) -> int:
         _music_say(code, tape)
         return 0 if code != "missing" else 2
     if sub == "vol" and len(rest) == 1:
-        n = int(rest[0]) if rest[0].isdigit() else 0
+        n = int(rest[0]) if rest[0].isascii() and rest[0].isdigit() else 0
         if not music.set_volume(p, n):
             ui.say(music.text("usage"))
             return 2
@@ -1144,7 +1150,7 @@ def fence(args) -> int:
         _print_lines(loot.fence_lines(p, today))
         return 0
     n = len(loot.FENCE_K)
-    if (args[0] != "sell" or len(args) < 2 or not args[1].isdigit()
+    if (args[0] != "sell" or len(args) < 2 or not (args[1].isascii() and args[1].isdigit())
             or not 1 <= int(args[1]) <= n):
         ui.say(f"./termit fence — курсы на сегодня · ./termit fence sell N (N от 1 до {n})")
         return 2
@@ -1252,12 +1258,39 @@ def show_feedback() -> None:
         ui.say(f"{r['when']}  [{r['task']}]  {r['text']}")
 
 
+INTERRUPTED = "Прервано — ты снова в убежище."
+
+
+IN_TASK_HUB = "Ты в задаче. quit — и вернёшься в убежище."
+
+
 def main(argv) -> int:
     if os.environ.get("TERMIT_LAUNCHED"):
         # мы внутри песочницы задачи: вложенный termit запустил бы процессы задач без защиты
-        ui.bad("termit уже запущен: ты внутри задачи. Выйди из неё (quit) и запусти termit снова.")
+        if os.environ.get("TERMIT_HUB"):
+            ui.bad(IN_TASK_HUB)
+        else:
+            ui.bad("termit уже запущен: ты внутри задачи. "
+                   "Выйди из неё (quit) и запусти termit снова.")
         return 2
     flags, args, theme_flag = parse(argv)
+    return run_once(args, flags, theme_flag)
+
+
+def entry(argv) -> int:
+    """Скрипты ./termit и ./termitrun: без слов — убежище, со словом — разовый запуск (main).
+    Тесты зовут main: cli.main([]) в них — ран, а не хаб."""
+    flags, args, theme_flag = parse(argv)
+    if args or flags - FLAGS or "--help" in flags:
+        return main(argv)
+    from termit_app import hub         # поздно: hub сам импортирует cli
+    return hub.main(flags, theme_flag)
+
+
+def run_once(args, flags, theme_flag, hub: bool = False, ask=None) -> int:
+    """Одно слово игры — тело прежнего main: тема, скин, строки первой встречи, Ctrl+C.
+    Хаб зовёт её на каждое слово (hub=True): Ctrl+C не прощается, а возвращает в убежище;
+    ask — чтение строки хаба, им же отвечают на вопросы внутри слова."""
     if theme_flag is not None and theme_flag not in theme.available():
         ui.bad(f"Нет темы {theme_flag!r}. Есть: " + ", ".join(theme.available()))
         return 2
@@ -1266,9 +1299,10 @@ def main(argv) -> int:
     if flags - FLAGS or (args and args[0] in ("help", "-h")) or "--help" in flags:
         ui.say(usage(p))
         return 0 if not (flags - FLAGS - {"--help"}) else 2
+    kw = {"ask": ask} if ask else {}
     opts = session.Options(no_sandbox="--no-sandbox" in flags, bare="--bare" in flags,
                            no_gui="--no-gui" in flags, sandbox_root=paths.SANDBOX_ROOT,
-                           linger=True)     # FB3 (3): после решения — до next/more/quit
+                           linger=True, hub=hub, **kw)     # FB3 (3): после решения — до next/more/quit
     if opts.no_sandbox:
         # без песочницы учебный PostgreSQL не запускается никогда (часть 9б): задачи стенда
         # недоступны (missing), общие задачи трека sql идут на SQLite
@@ -1282,7 +1316,7 @@ def main(argv) -> int:
         with ui.glossary(seen):
             return with_update_notice(args, opts)
     except KeyboardInterrupt:          # Ctrl+C у любого вопроса — спокойный выход без трассировки
-        ui.say("\n" + theme.msg("quit"))
+        ui.say("\n" + (INTERRUPTED if hub else theme.msg("quit")))
         return 130
     finally:
         tui.set_skin()                 # скин живёт в пределах одного запуска (и одного теста)
@@ -1323,8 +1357,60 @@ def remember_seen(seen) -> None:
     progress.save(paths.PROGRESS_FILE, q)
 
 
-GAME_CMDS = {"dozor", "short", "track", "play", "more", "rehearse", "master"}
+GAME_CMDS = {"dozor", "run", "short", "track", "play", "more", "rehearse", "master"}
 BUSY = "TermitRun уже запущен в другом окне. Доиграй там или закрой то окно — и запусти снова."
+
+
+LOCKED_INBOX = ("Ответ на вопрос меняет игру, а она сейчас идёт в другом окне. "
+                "Доиграй там — и открой сообщение снова.")
+
+
+def _inbox_pick(p, args):
+    """Какое сообщение открыть: (сообщение, код ошибки)."""
+    if args[0] == "next":
+        new = inbox_mod.unread(p)
+        return (new[0] if new else None), 0
+    msg = inbox_mod.get(p, int(args[0])) if args[0].isascii() and args[0].isdigit() else None
+    return msg, 2
+
+
+def inbox_cmd(args, opts) -> int:
+    """inbox - список сообщений на деке; inbox N - открыть; inbox next - первое новое.
+    Открыл - прочитал; на вопрос отвечают прямо здесь (спека 2.5). Открытие пишет
+    прогресс, поэтому идёт под замком игры: ран в другом окне не затрётся."""
+    today = opts.today or date.today()
+    p = progress.load(opts.progress_path)
+    if not args:
+        for line in inbox_mod.list_lines(p, today):
+            ui.say(line)
+        return 0
+    msg, bad = _inbox_pick(p, args)
+    if msg is None:
+        if bad:
+            ui.say(inbox_mod.NO_SUCH.format(n=args[0]))
+        else:
+            ui.say(inbox_mod.NO_NEW)
+        return bad
+    for line in inbox_mod.open_lines(msg, today):
+        ui.say(line)
+    lock = sandbox.lock_instance(opts.sandbox_root)
+    if lock is None:
+        ui.bad(LOCKED_INBOX)
+        return 1
+    try:
+        p = progress.load(opts.progress_path)       # под замком - свежий прогресс
+        msg = inbox_mod.get(p, msg["id"])
+        if msg is None:
+            return 0
+        if msg["ask"]:
+            reply = session._ask(opts, inbox_mod.ASK_PROMPT)
+            inbox_mod.answer(p, msg, reply, today, opts)
+        else:
+            msg["read"] = True
+        progress.save(opts.progress_path, p)
+    finally:
+        sandbox.unlock_instance(lock)
+    return 0
 
 
 def dispatch(args, opts) -> int:
@@ -1342,7 +1428,7 @@ def dispatch(args, opts) -> int:
 
 
 def _dispatch(cmd, args, opts) -> int:
-    if cmd == "dozor":
+    if cmd in ("dozor", "run"):        # run — то же слово, что в убежище
         session.dozor(opts)
     elif cmd == "short":
         session.dozor(opts, short=True)
@@ -1400,6 +1486,8 @@ def _dispatch(cmd, args, opts) -> int:
         return owl_cmd(args[1:])
     elif cmd == "fence":
         return fence(args[1:])
+    elif cmd == "inbox":
+        return inbox_cmd(args[1:], opts)
     elif cmd == "feedback":
         show_feedback()
     elif cmd == "report":

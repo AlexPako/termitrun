@@ -78,23 +78,34 @@ def _glossary(s: str) -> None:
         _flush()
 
 
+# Режим убежища: «./termit shop» на выводе — «shop»; «./termit home look|board|prompt» —
+# «look|board|prompt» (эти слова дома в хабе подняты наверх, спека 2.2). Остальное
+# «home …» остаётся как есть. Упоминания для строк первой встречи ищутся ДО фильтра.
+HUB_CMD = re.compile(
+    "\\./termit[ \u00a0](?:home[ \u00a0](?=(?:look|board|prompt)\\b))?(?=[a-z])")
+
+
+def hub_text(s: str) -> str:
+    return HUB_CMD.sub("", s) if commands.hub_on() else s
+
+
 def say(s: str = "") -> None:
-    print(s)
+    print(hub_text(s))
     _glossary(s)
 
 
 def ok(s: str) -> None:
-    print(c("32", s))
+    print(c("32", hub_text(s)))
     _glossary(s)
 
 
 def bad(s: str) -> None:
-    print(c("31", s))
+    print(c("31", hub_text(s)))
     _glossary(s)
 
 
 def warn(s: str) -> None:
-    print(c("33", "⚠ " + s))
+    print(c("33", "⚠ " + hub_text(s)))
     _glossary(s)
 
 
@@ -661,18 +672,34 @@ def answer_guide() -> str:
 
 # Первая минута (П3.4): одна строка — как сдать, одна — как выбраться. Остальные способы
 # сдачи приходят по мере надобности — в уроках и «можно и так» следующих задач.
-INTRO_KEYS = ("Ответ сдают так: ans ОТВЕТ. Команда повисла и молчит — Ctrl+C.\n"
-              "Застрял — набери hint, это нормально: на тренировке подсказки бесплатны и на "
-              "прогресс не влияют.\n"
-              "Ещё: reset — собрать задачу заново · skip — отложить на завтра · giveup — "
-              "сдаться и посмотреть разбор.\n"
-              "Клавиши терминала — стрелки, история команд, прокрутка — в задаче набери keys.\n"
-              "Решил — песочница остаётся: пробуй другие способы. Дальше — next. Когда ран "
-              "окончен, игра предложит ещё урок — more. Что-то не так — bug, игра спросит текст.\n"
-              # FB5: общее правило про ./termit СЛОВО — один раз и рано
-              "Команды вида ./termit слово (./termit shop, ./termit home …) — команды самой "
-              "игры: их набирают не в задаче, а в обычном терминале — после рана или вместо "
-              "него. Список всех — ./termit help.")
+_INTRO_KEYS_HEAD = (
+    "Ответ сдают так: ans ОТВЕТ. Команда повисла и молчит — Ctrl+C.\n"
+    "Застрял — набери hint, это нормально: на тренировке подсказки бесплатны и на "
+    "прогресс не влияют.\n"
+    "Ещё: reset — собрать задачу заново · skip — отложить на завтра · giveup — "
+    "сдаться и посмотреть разбор.\n"
+    "Клавиши терминала — стрелки, история команд, прокрутка — в задаче набери keys.\n"
+    "Решил — песочница остаётся: пробуй другие способы. Дальше — next. ")
+INTRO_KEYS = (
+    _INTRO_KEYS_HEAD
+    + "Когда ран окончен, игра предложит ещё урок — more. Что-то не так — bug, игра "
+    "спросит текст.\n"
+    # FB5: общее правило про ./termit СЛОВО — один раз и рано
+    "Команды вида ./termit слово (./termit shop, ./termit home …) — команды самой "
+    "игры: их набирают не в задаче, а в обычном терминале — после рана или вместо "
+    "него. Список всех — ./termit help.")
+# в убежище хвост памятки другой: слова игры набирают там, без ./termit
+INTRO_KEYS_HUB = (
+    _INTRO_KEYS_HEAD
+    + "Ещё урок — слово lesson в убежище. Что-то не так — bug, игра спросит текст.\n"
+    "Слова игры (shop, home, stats …) набирают в убежище — оно открывается, когда "
+    "запускаешь игру, и после каждого рана. Все слова — help.")
+
+
+def intro_keys() -> str:
+    return INTRO_KEYS_HUB if commands.hub_on() else INTRO_KEYS
+
+
 # FB5 (владелец 19.10): запас у новичка большой, поэтому таймер дела идёт сразу, с открытия
 # задания (было: с первой команды — и ответ первой же командой давал «решено за 0:00»).
 # Первая встреча — без таймера.
@@ -781,16 +808,23 @@ KEYS_SHEET = """\
   в каждой задаче: ./termit home board (набирать после рана, не в задаче)"""
 
 
+KEYS_AFTER_RUN = "./termit home board (набирать после рана, не в задаче)"
+KEYS_IN_HUB = "board (набирают в убежище)"
+
+
 def keys_sheet(args=()) -> str:
     """Шпаргалка клавиш: keys в задаче и ./termit keys. FB10: keys hacks [РАЗДЕЛ] — весь
     каталог лайфхаков (termit_app/lifehacks.py) или один его раздел. FB12: keys iterm —
-    экран настройки iTerm2."""
+    экран настройки iTerm2. В убежище и в задаче рана из убежища (TERMIT_HUB) — без
+    ./termit и без «после рана»."""
     words = " ".join(args).split()
     if words and words[0] == "hacks":
         return lifehacks.sheet(lifehacks.sections_of(words[1:]))
     if words and words[0] == "iterm":       # FB12 (N9): настройка iTerm2 по шагам
         from termit_app import iterm_setup
         return iterm_setup.screen()
+    if commands.hub_on() or os.environ.get("TERMIT_HUB"):
+        return KEYS_SHEET.replace(KEYS_AFTER_RUN, KEYS_IN_HUB)
     return KEYS_SHEET
 
 
@@ -855,7 +889,7 @@ def _show_intro(text: str, guide: bool) -> None:
     say()
     if cp.level != "plain":
         say(tui.rule(cp, indent="  "))
-    for line in INTRO_KEYS.split("\n"):
+    for line in intro_keys().split("\n"):
         say(c("36", textwrap.fill(line, 78, initial_indent="  ", subsequent_indent="    ",
                                   break_long_words=False, break_on_hyphens=False)))
     if guide:

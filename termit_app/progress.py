@@ -77,6 +77,9 @@ def empty() -> dict:
             "extensions": [],
             # FB5: команды ./termit СЛОВО, которым уже показана строка «что это» (ui.glossary)
             "cmds_seen": [],
+            # убежище (хаб): разовое знакомство показано; слова, уже показанные в подсказке
+            "hub": {"tour": False, "shown": []},
+            "inbox": [], "inbox_seq": 0,            # сообщения на деке (хаб, inbox.py)
             # FB12 (N6): системные ошибки, которые игрок уже видел с переводом (syserrors)
             "errors_seen": []}
 
@@ -116,8 +119,9 @@ def _broken(path: Path) -> dict:
 _NESTED = {"field": (("done", list), ("pending", (str, type(None))), ("later", dict)),
            "deck": (("installed", list), ("slots", int)),
            "implants": (("declined", list), ("later", dict), ("offered", dict),
-                        ("seen_installed", list), ("compare", dict))}
-_DICTS = ("settings", "grimoire", "field", "deck", "implants", "said", "master")
+                        ("seen_installed", list), ("compare", dict)),
+           "hub": (("tour", bool), ("shown", list))}
+_DICTS = ("settings", "grimoire", "field", "deck", "implants", "said", "master", "hub")
 
 
 def _iso_day(d) -> bool:
@@ -179,6 +183,7 @@ def _normalize(p: dict) -> None:
                                 and not isinstance(n, bool) and n > 0 else 0)
     if not _iso_day(p.get("freeze_earned")):     # C2 М4: дата или None
         p["freeze_earned"] = None
+    p["hub"]["shown"] = [x for x in p["hub"]["shown"] if isinstance(x, str)]
     # круг мастера (C2): paid {задача: ISO-дата}, pending {задача: вариант}; мусор — прочь
     paid, pending = p["master"].get("paid"), p["master"].get("pending")
     p["master"] = {"paid": {k: v for k, v in paid.items() if isinstance(k, str) and _iso_day(v)}
@@ -187,6 +192,9 @@ def _normalize(p: dict) -> None:
                    "pending": {k: v for k, v in pending.items() if isinstance(k, str)
                                and isinstance(v, int) and not isinstance(v, bool) and v >= 0}
                    if isinstance(pending, dict) else {}}
+    from termit_app import inbox                 # хаб: сообщения на деке — чистые
+    p["inbox"] = inbox.clean(p.get("inbox"))
+    p["inbox_seq"] = inbox.next_id(p) - 1
 
 
 # FB9b: поручения, переехавшие в место дальше по игре: {задача: новый трек}. Запись из
@@ -580,6 +588,11 @@ def buy_freeze(p: dict) -> bool:
     p["money"] -= FREEZE_PRICE
     p["freezes"] += 1
     return True
+
+
+def master_open(p: dict) -> bool:
+    """Круг мастера открыт: есть хоть одно решённое дело, которое можно повторять на время."""
+    return any((r or {}).get("solved", 0) > 0 for r in p.get("tasks", {}).values())
 
 
 def seen(p: dict, task_id: str) -> bool:

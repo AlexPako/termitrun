@@ -4,11 +4,14 @@
 сообщениях игры (ui.glossary, FB5: владелец не понял, что за ./termit home после подарка).
 Описания — с подстановками слов темы: {xp_gen}, {xp_title_low}, {money_name}, {owl},
 {book}."""
+import contextlib
+import contextvars
 import re
 
 from termit_app import theme
 
 ABOUT = {
+    "run": "ран дня: новые и повторы, ~10 минут",
     "short": "короткий вариант: меньше повторений, новое — как обычно",
     "more": "ещё одна новая команда сверх нормы рана",
     "master": "круг мастера: знакомые дела на время, против своего рекорда",
@@ -28,6 +31,7 @@ ABOUT = {
     "case": "доска дела: улики, вопросы, версия",
     "memory": "найденные осколки памяти",
     "dossier": "досье персонажей: купленные страницы",
+    "inbox": "сообщения на деке: inbox N — открыть, inbox next — новое",
     "fence": "тайник с хабаром — вынесенными файлами; sell N — продать скупщику",
     "book": "{book} — выученные команды",
     "diary": "дневник: уроки и разборы пройденного, бесплатно",
@@ -57,16 +61,53 @@ HOME_ABOUT = {
 }
 
 
+def raised(sub: str) -> bool:
+    """В убежище слово дома набирают без home — только если это живое слово хаба
+    (look, board, prompt…); home help и всё, чего в WORDS нет, остаётся «home X»."""
+    if not hub_on():
+        return False
+    from termit_app import hub      # hub сам импортирует commands — подгружаем позже
+    word = hub.find(sub)
+    return word is not None and not word.own
+
+
+def home_cmd(sub: str) -> str:
+    return sub if raised(sub) else f"{prefix()}home {sub}"
+
+
 def home_line(sub: str) -> str:
-    """Строка справки для ./termit home СЛОВО — той же колонкой, что line()."""
+    """Строка справки для ./termit home СЛОВО — той же колонкой, что line(); в убежище
+    слова дома подняты наверх (board, а не home board), кроме home help."""
     args, text = HOME_ABOUT[sub]
-    cmd = f"./termit home {sub}" + (f" {args}" if args else "")
+    cmd = home_cmd(sub) + (f" {args}" if args else "")
     return f"  {cmd.ljust(24)} {text}\n"
 
 
 # Когда набирать — одна и та же оговорка у каждой строки первой встречи
 WHEN = "набирают в обычном терминале после рана, не в задаче"
 MENTION = re.compile(r"\./termit ([a-z]+)")
+
+# Режим убежища (хаб, спека 2.7): команды набирают без ./termit — справка строится без
+# префикса, строка первой встречи говорит «в убежище». Включает его hub.Hub на свой цикл.
+_HUB = contextvars.ContextVar("termit_hub", default=False)
+HUB_WHEN = "набирают в убежище"
+
+
+@contextlib.contextmanager
+def hub_mode(on: bool = True):
+    token = _HUB.set(on)
+    try:
+        yield
+    finally:
+        _HUB.reset(token)
+
+
+def hub_on() -> bool:
+    return _HUB.get()
+
+
+def prefix() -> str:
+    return "" if hub_on() else "./termit "
 
 
 def about(name: str) -> str:
@@ -78,7 +119,7 @@ def about(name: str) -> str:
 
 def line(name: str, args: str = "", tail: str = "") -> str:
     """Строка справки: «  ./termit ИМЯ АРГУМЕНТЫ   описание» с колонкой описаний."""
-    cmd = f"./termit {name}" + (f" {args}" if args else "")
+    cmd = f"{prefix()}{name}" + (f" {args}" if args else "")
     return f"  {cmd.ljust(24)} {about(name)}{tail}\n"
 
 
@@ -93,4 +134,6 @@ def mentioned(text: str) -> list:
 
 def note(name: str) -> str:
     """Строка «что это» при первой встрече команды в сообщении игры."""
+    if hub_on():
+        return f"ⓘ {name} — {about(name)}; {HUB_WHEN}."
     return f"ⓘ ./termit {name} — {about(name)}; {WHEN}."

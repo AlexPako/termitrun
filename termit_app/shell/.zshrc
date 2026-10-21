@@ -322,3 +322,22 @@ if [[ -n $TERMIT_AUTORUN ]]; then
   eval "$TERMIT_AUTORUN"
   unset TERMIT_AUTORUN
 fi
+
+# HUB-WORDS:START
+# Слово убежища, набранное в задаче рана из убежища (хаб, спека 2.1):
+# подсказка, как вернуться, вместо «command not found». Настоящие команды не трогаются.
+# Список слов — hub.WORDS без команд задачи (hook.SERVICE: lesson, quit… остаются самими
+# собой) и без зарезервированного слова case; полноту сверяет tests/test_hub.py.
+if [[ -n $TERMIT_HUB ]]; then
+  command_not_found_handler() {
+    _termit_layout_hint "$1" && return 127
+    case $1 in
+      board|callsign|clear|deck|diary|dossier|feedback|fence|help|home|hub|implants|inbox|intro|list|look|map|master|music|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|update|wheels)
+        print -r -- "$1 — слово убежища. quit — и ты в убежище, там набери $1."
+        return 127 ;;
+    esac
+    print -u2 -r -- "zsh: command not found: $1"
+    return 127
+  }
+fi
+# HUB-WORDS:END
