@@ -1,4 +1,4 @@
-"""Командная строка datapeek: datapeek ФАЙЛ.csv [--top N]."""
+"""datapeek command line: datapeek FILE.csv [--top N]."""
 import argparse
 import sys
 
@@ -6,11 +6,11 @@ import datapeek
 
 
 def main(argv=None) -> int:
-    """Точка входа консольной команды datapeek (и python3 -m datapeek)."""
+    """Entry point of the datapeek command (and python3 -m datapeek)."""
     ap = argparse.ArgumentParser(prog="datapeek",
-                                 description="Сводка CSV: колонки, строки, частые значения.")
-    ap.add_argument("file", help="CSV-файл с шапкой")
-    ap.add_argument("--top", type=int, default=3, help="сколько частых значений (по умолчанию 3)")
+                                 description="CSV summary: columns, rows, most common values.")
+    ap.add_argument("file", help="CSV file with a header row")
+    ap.add_argument("--top", type=int, default=3, help="how many common values (default 3)")
     ap.add_argument("--version", action="version", version="datapeek " + datapeek.__version__)
     args = ap.parse_args(sys.argv[1:] if argv is None else argv)
     try:

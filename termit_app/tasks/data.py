@@ -421,7 +421,7 @@ class RedirectReport(Task):
         first = int(rows[0]["id"][2:])
         k = rng.randint(2, 5)
         ids = sorted(rng.sample(range(first - 400, first - 1), k))
-        old = [{"id": f"A-{i}", "date": f"2026-08-{d:02d}", "city": rng.choice(datakit.CITIES),
+        old = [{"id": f"A-{i}", "date": f"2726-08-{d:02d}", "city": rng.choice(datakit.CITIES),
                 "product": kit.latin(rng), "amount": rng.randint(100, 9999), "status": "refund",
                 "note": ""} for i, d in zip(ids, sorted(rng.choices(range(1, 32), k=k)))]
         base = datakit.render_orders(old).splitlines()
@@ -508,7 +508,7 @@ class CutUniq(_DataAnswer):
                 alternatives=("grep ',{city},' orders.csv | cut -d, -f4 | sort | uniq -c — "
                               "заодно и сколько раз брали каждый",)),
         Variant("В orders.csv заказы за несколько месяцев. В скольких разных месяцах были "
-                "заказы? Дата — вторая колонка, вида 2026-03-15; месяц — её первые 7 символов. "
+                "заказы? Дата — вторая колонка, вида 2726-03-15; месяц — её первые 7 символов. "
                 "Ответ: ans ЧИСЛО",
                 hints=("Колонку вырежет cut -d, -f2, кусок строки — cut -c, повторы — sort -u.",
                        "Месяц — первые 7 символов даты: cut -c1-7. Заголовок date срежет "
@@ -567,8 +567,8 @@ class CutUniq(_DataAnswer):
     def _months(box, rng, rows):
         """Даты разложены по 4–9 месяцам подряд кусками; порядок строк и дней сохранён."""
         # без февраля: дни в выгрузке — до 30-го
-        pool = ([f"2025-{m:02d}" for m in (10, 11, 12)] +
-                [f"2026-{m:02d}" for m in range(1, 10) if m != 2])
+        pool = ([f"2725-{m:02d}" for m in (10, 11, 12)] +
+                [f"2726-{m:02d}" for m in range(1, 10) if m != 2])
         months = sorted(rng.sample(pool, rng.randint(4, 9)))
         cuts = sorted(rng.sample(range(1, len(rows)), len(months) - 1))
         for i, (a, b) in enumerate(zip([0] + cuts, cuts + [len(rows)])):
@@ -986,7 +986,7 @@ class LogPeriod(_DataAnswer):
               "строки, [0-9] — любая цифра, [45] — 4 или 5, [3-6] — от 3 до 6, (a|b) — a или b, "
               ". — любой символ; 'WARN|ERROR' — то или другое; + — одно или больше: [0-9]+ — "
               "число.\n"
-              "Время в логе: 2026-09-28 14:05:31. Голое '14:' зацепит и минуты — привязывай к "
+              "Время в логе: 2726-09-28 14:05:31. Голое '14:' зацепит и минуты — привязывай к "
               "началу строки и дате.")
     variants = (
         Variant("Сколько ошибок ERROR было в app.log {date} с {h1}:00 до {h2}:59? "
@@ -1233,7 +1233,7 @@ class JoinParts(Task):
             first = int(rows[0].split(",")[0][2:])
             k = rng.randint(4, 9)
             ids = sorted(rng.sample(range(first - 300, first - 1), k))
-            old = [{"id": f"A-{i}", "date": f"2026-08-{d:02d}", "city": rng.choice(datakit.CITIES),
+            old = [{"id": f"A-{i}", "date": f"2726-08-{d:02d}", "city": rng.choice(datakit.CITIES),
                     "product": kit.latin(rng), "amount": rng.randint(100, 9999),
                     "status": rng.choice(datakit.STATUSES), "note": ""}
                    for i, d in zip(ids, sorted(rng.choices(range(20, 32), k=k)))]
@@ -1630,7 +1630,7 @@ class TeeLog(Task):
         errs = rng.randint(3, 5)
         k = errs + rng.randint(6, 7)
         day = rng.randint(27, 30)
-        stamp = f"2026-09-{day:02d} {rng.randint(8, 22):02d}:{rng.randint(0, 59):02d}"
+        stamp = f"2726-09-{day:02d} {rng.randint(8, 22):02d}:{rng.randint(0, 59):02d}"
         seq = _sync_run(rng, pool[:k], stamp, errs)
         lines = [f"echo '{x}'" + (" >&2" if n == 2 else "") for n, x in seq]
         text = "#!/bin/sh\n" + "\n".join(lines) + "\n"
@@ -1638,7 +1638,7 @@ class TeeLog(Task):
         st = {"out": [x for n, x in seq if n == 1], "err": [x for n, x in seq if n == 2],
               "sha": _sha(text.encode("utf-8")), "base": []}
         if variant == 1:        # журнал прошлого запуска: другие файлы, другой день
-            old = f"2026-09-{day - rng.randint(1, 3):02d} {rng.randint(8, 22):02d}:" \
+            old = f"2726-09-{day - rng.randint(1, 3):02d} {rng.randint(8, 22):02d}:" \
                   f"{rng.randint(0, 59):02d}"
             prev = _sync_run(rng, pool[k:k + 8], old, rng.randint(1, 2))
             st["base"] = [x for _, x in prev]
@@ -1787,8 +1787,8 @@ class SedFix(Task):
               "[0-9]{2} — две цифры; \\. — сама точка.")
     variants = (
         Variant("В выгрузке excel.csv разделитель ; вместо запятой, а в датах точки "
-                "(05.03.2026). Сделай fixed.csv: разделитель — запятая, в датах — дефисы "
-                "(05-03-2026). Исходник не трогай.",
+                "(05.03.2726). Сделай fixed.csv: разделитель — запятая, в датах — дефисы "
+                "(05-03-2726). Исходник не трогай.",
                 wrong=("sed 's/;/,/' excel.csv > fixed.csv",
                        "sed -e 's/;/,/g' -e 's/./-/g' excel.csv > fixed.csv"),
                 alternatives=(r"sed 's/;/,/g; s/\./-/g' excel.csv > fixed.csv — две замены "
@@ -1804,7 +1804,7 @@ class SedFix(Task):
                 alternatives=("sed 's/;/,/g' excel.csv > tmp.csv && mv tmp.csv excel.csv — "
                               "переносимо: так работает и на Linux",)),
         Variant("Для базы нужен dates.csv: тот же excel.csv, но даты ДД.ММ.ГГГГ переписаны в "
-                "ГГГГ-ММ-ДД (05.03.2026 → 2026-03-05). Разделитель ; оставь как есть, исходник "
+                "ГГГГ-ММ-ДД (05.03.2726 → 2726-03-05). Разделитель ; оставь как есть, исходник "
                 "не трогай.",
                 hints=("Замены делает sed; куски даты запоминают группы ( ) — это sed -E.",
                        r"([0-9]{{2}}) — две цифры в группе, \. — сама точка; \3-\2-\1 расставит "
@@ -1922,8 +1922,8 @@ class SedFix(Task):
             if any(_DMY.search(x) for x in got):
                 return ("В датах остались точки: вторая замена — второй -e: -e 's/\\./-/g'.")
             if any(_ISO.search(x) for x in got):
-                return ("Даты переставлять не надо: только точки на дефисы — 05.03.2026 станет "
-                        "05-03-2026.")
+                return ("Даты переставлять не надо: только точки на дефисы — 05.03.2726 станет "
+                        "05-03-2726.")
         if v == 1 and any(_ISO.search(x) for x in got):
             return "Даты трогать не надо — здесь меняется только разделитель." + again
         if v == 2:
@@ -2608,7 +2608,7 @@ class CurlPost(_DataAnswer):
         st = {"order": {"item": item, "qty": qty}, "item": item, "qty": qty,
               "order_id": rng.randint(1000, 9999),
               "key": "k-" + "".join(rng.choice("abcdef0123456789") for _ in range(12)),
-              "day": f"2026-10-{rng.randint(1, 28):02d}", "revenue": rng.randint(10000, 99999),
+              "day": f"2726-10-{rng.randint(1, 28):02d}", "revenue": rng.randint(10000, 99999),
               "task_id": f"t-{rng.randint(10000, 99999)}", "result": rng.randint(100, 999)}
         kit.write(Path(box) / "key.txt", st["key"] + "\n")
         # FB14, ревью: вариант 0 — самый простой (один заголовок с ключом), 1 — POST с JSON
@@ -2832,7 +2832,7 @@ class BossData(Task):
               "10.0.0.1 зацепит и 10.0.0.15). Сумма по условию — awk '$5==200 {s+=$6} END "
               "{print s}'. mkdir -p папка — создать папку отчёта.")
     steps = ("report/hour.txt — час атаки: дата и час, когда запросов больше всего (вида "
-             "2026-01-05T09)",
+             "2726-01-05T09)",
              "report/top5.txt — 5 адресов, чаще всех стучавших в этот час, по убыванию",
              "report/leader.log — все строки лидера топа за час атаки, как в access.log",
              "report/bytes.txt — сколько байт он унёс: сумма байт (шестое поле, после кода "
@@ -2982,7 +2982,7 @@ class BossData(Task):
 
     msg = {
         "hour_form": "В report/hour.txt нужны дата и час, как в начале строки журнала — вида "
-                     "2026-01-05T09: это первые 13 символов, cut -c1-13.",
+                     "2726-01-05T09: это первые 13 символов, cut -c1-13.",
         "hour": "Это не час атаки. Час атаки — тот, где строк больше всего: посчитай "
                 "cut -c1-13 access.log | sort | uniq -c | sort -rn.",
         "week": "В top5.txt топ за всю неделю, а нужен час атаки: сначала отбери его строки "

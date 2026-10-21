@@ -1,9 +1,9 @@
-"""datapeek — быстрый взгляд на CSV: колонки, число строк, частые значения.
+"""datapeek: a quick look at a CSV file: columns, row count, most common values.
 
     $ datapeek sales.csv
     $ python3 -m datapeek sales.csv --top 2
 
-Печатает таблицу через tabprint (зависимость пакета: pip ставит её сам). В коде:
+Prints the table with tabprint (a dependency: pip installs it too). In code:
 
     >>> import datapeek
     >>> datapeek.summary("sales.csv")["rows"]
@@ -17,10 +17,10 @@ __all__ = ["summary", "report", "__version__"]
 
 
 def summary(path, top=3) -> dict:
-    """Сводка CSV: {"file", "rows", "columns": [{"name", "filled", "unique", "top"}]}.
+    """CSV summary: {"file", "rows", "columns": [{"name", "filled", "unique", "top"}]}.
 
-    top — сколько частых значений на колонку: список пар (значение, сколько раз), по
-    убыванию, при равенстве — по алфавиту. Пустые клетки в частые не идут."""
+    top is how many common values per column: a list of (value, count) pairs, most common
+    first, ties in alphabetical order. Empty cells are not counted as values."""
     rows = tabprint.from_csv(path)
     names = list(rows[0]) if rows else []
     if not rows:
@@ -39,7 +39,7 @@ def summary(path, top=3) -> dict:
 
 
 def report(path, top=3) -> str:
-    """Сводка текстом: строка «файл: N rows, M columns» и таблица колонок."""
+    """Text summary: a line "file: N rows, M columns" and a table of columns."""
     s = summary(path, top)
     head = f"{s['file']}: {s['rows']} rows, {len(s['columns'])} columns"
     grid = [["column", "filled", "unique", "top"]]

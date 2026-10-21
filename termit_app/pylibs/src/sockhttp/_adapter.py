@@ -1,13 +1,13 @@
-"""Транспортный адаптер requests на unix-сокет (как в requests-unixsocket и docker-py).
+"""requests transport adapter for a unix socket (as in requests-unixsocket and docker-py).
 
-Пул — urllib3.HTTPConnectionPool, его соединение делает connect() через AF_UNIX. Адаптер
-переопределяет get_connection и get_connection_with_tls_context (requests 2.32.2+ зовёт
-второй) и отдаёт серверу путь без хоста (request_url)."""
+The pool is urllib3.HTTPConnectionPool whose connection does connect() over AF_UNIX. The
+adapter overrides get_connection and get_connection_with_tls_context (requests 2.32.2+ calls
+the second one) and sends the server the path without the host (request_url)."""
 import socket
 
 
 def make(HTTPAdapter, urllib3, sock_path: str):
-    """Собрать адаптер (классы берутся из уже импортированных requests и urllib3)."""
+    """Build the adapter (classes come from the already imported requests and urllib3)."""
 
     class UnixHTTPConnection(urllib3.connection.HTTPConnection):
         def __init__(self, *args, **kwargs):

@@ -119,7 +119,7 @@ def extras_for(task, state: dict, p: dict, seed: int) -> list:
 FOUND_CHANCE = 0.35
 FOUND_REQUIRES = "script_audit"
 FOUND_DIR = "downloads"
-FOUND_TIP = "совет: чужой скрипт сначала читают — head и grep -n, запускают потом"
+FOUND_TIP = "tip: read a stranger's script first with head and grep -n, run it later"
 FOUND_RAN = ("Найденный скрипт ты запустил, не читая: его строка легла в ~/.zshrc песочницы. "
              "Здесь она безвредна, штрафа нет. В жизни — сначала head и grep -n.")
 FOUND_READ = "Найденный скрипт ты прочёл и не запустил — так и надо."
@@ -285,9 +285,9 @@ def shard_lines(shard: Shard, placeholder: bool = False) -> Optional[List[str]]:
     if t is None:
         if not placeholder:
             return None
-        t = {"title": "проверка", "code": "ПРОВЕРКА", "text": ["строка один", "строка два"]}
-    return ([_ui("head", "ЗАПИСЬ · {title}").format(title=t["title"]), ""] + list(t["text"]) +
-            ["", _ui("code", "код: {code}").format(code=t["code"])])
+        t = {"title": "check", "code": "CHECK", "text": ["line one", "line two"]}
+    return ([_ui("head", "RECORD · {title}").format(title=t["title"]), ""] + list(t["text"]) +
+            ["", _ui("code", "code: {code}").format(code=t["code"])])
 
 
 def shard_extras(shard: Shard, state: dict, seed: int, have: int = 0,
@@ -296,7 +296,7 @@ def shard_extras(shard: Shard, state: dict, seed: int, have: int = 0,
     lines = shard_lines(shard, placeholder)
     if lines is None:
         return []
-    t = shard_text(shard) or {"title": "проверка", "code": "ПРОВЕРКА", "file": "record"}
+    t = shard_text(shard) or {"title": "check", "code": "CHECK", "file": "record"}
     # в метке нет ни кода, ни его sha: скопировать её в .termit/claimed бесполезно
     meta = {"id": shard.id, "title": t["title"], "have": have, "total": SHARD_TOTAL}
     return (place(shard.kind, shard.host, t.get("file") or "record", lines, seed, state) +
@@ -617,7 +617,7 @@ def _lines_for(item_id: str, src: Optional[Source] = None) -> Optional[List[str]
     who, k = st.rsplit("_", 1)
     text = _page_text(who, int(k), src)
     name = ((src or theme.story)("dossiers").get(who) or {}).get("name", who)
-    return _file_lines([f"{name} · стр. {k}", ""] + text) if text else None
+    return _file_lines([f"{name} · p. {k}", ""] + text) if text else None
 
 
 def drop_extras(p: dict, src: Optional[Source] = None) -> list:
@@ -803,7 +803,7 @@ def _home_case_lines(p: dict) -> List[str]:
 
 # --- Раскладка находок по видам -----------------------------------------------------------
 
-LOG_END = "--- конец лога ---"
+LOG_END = "--- end of log ---"
 _NOISE = ("sync ok", "cache hit", "heartbeat", "queue empty", "retry 1/3 ok", "gc done",
           "session closed", "token refreshed", "disk check ok", "backup skipped")
 
@@ -812,7 +812,7 @@ def _climb_top(state: Optional[dict]) -> str:
     """Верхняя папка, куда ведёт вариант climb_down: путь к записке или папка из readme."""
     state = state or {}
     top = str(state.get("path") or state.get("target") or "").split("/")[0]
-    return top or "old_projects_backup_2019"
+    return top or "old_projects_backup_2719"
 
 
 def _back_up_place(state: Optional[dict], dot: str) -> Tuple[str, str]:
@@ -914,16 +914,16 @@ def lines_sql(lines: List[str]) -> str:
 def lines_sh(lines: List[str]) -> str:
     """Фрагмент скриптом: #!/bin/sh и printf по строке в одинарных кавычках (кавычка внутри —
     '\\''). Ничего, кроме печати, не делает."""
-    out = ["#!/bin/sh", "# печатает текст — больше ничего"]
+    out = ["#!/bin/sh", "# prints text, nothing else"]
     for x in lines:
         out.append("printf '%s\\n' '" + x.replace("'", "'\\''") + "'")
     return "\n".join(out) + "\n"
 
 
 SCRIPT_DIR = "downloads"
-_SCRIPT_NOISE = ('echo "проверка: ок"', "# TODO: убрать отладку", 'n=$(ls | wc -l)',
-                 'echo "файлов: $n"', "# старый способ, не трогать", "sleep 0",
-                 'echo "готово"', "# автор: неизвестен", 'date +%H:%M')
+_SCRIPT_NOISE = ('echo "check: ok"', "# TODO: remove debug output", 'n=$(ls | wc -l)',
+                 'echo "files: $n"', "# old way, do not touch", "sleep 0",
+                 'echo "done"', "# author: unknown", 'date +%H:%M')
 
 
 def script_line_body(lines: List[str], rng: random.Random, name: str = "old") -> str:
@@ -931,8 +931,8 @@ def script_line_body(lines: List[str], rng: random.Random, name: str = "old") ->
     безобидного шума и одна строка-комментарий «# NOL: …» (непустые строки находки через
     « · ») не в первых десяти: head её не покажет, найдёт grep -n NOL."""
     from termit_app.tasks import envkit
-    head = ["#!/bin/sh", "# старый скрипт: проверяет папку и печатает отчёт",
-            f"# Запуск: ./{name}.sh",
+    head = ["#!/bin/sh", "# old script: checks the folder and prints a report",
+            f"# Usage: ./{name}.sh",
             envkit.HONEST_NOTE] + list(envkit._GUARD)
     body = [rng.choice(_SCRIPT_NOISE) for _ in range(rng.randint(12, 20))]
     body.insert(rng.randint(3, len(body) - 2), "# " + NOL_MARK + " · ".join(
@@ -954,10 +954,10 @@ def place(kind: str, host: str, name: str, lines: List[str], seed: int,
         root, path = _deep_place(host, name, rng)
         return [extra(root, path, "\n".join(lines) + "\n")]
     if kind == "nol_line":
-        year = rng.randint(2019, 2024)
+        year = rng.randint(2719, 2724)
         return [extra("home", f"{OLD_LOGS}/{name}_{year}.log", nol_log_body(lines, year, rng))]
     if kind == "db_row":
-        year = rng.randint(2018, 2024)
+        year = rng.randint(2718, 2724)
         return [extra("home", f"{ARCHIVE}/{name}_{year}.db", notes_db(lines, year, rng))]
     if kind == "script_line":
         return [extra("box", f"{SCRIPT_DIR}/{name}.sh", script_line_body(lines, rng, name),
@@ -983,9 +983,9 @@ def _tgz(files: Dict[str, str]) -> bytes:
 
 
 _PLACEHOLDER = {   # заглушки досье и фрагментов: хозяев проверяем раскладкой, не сюжетом
-    "dossiers": {w: {"name": w, "pages": [["стр. 1"], ["стр. 2"], ["стр. 3"]]}
+    "dossiers": {w: {"name": w, "pages": [["p. 1"], ["p. 2"], ["p. 3"]]}
                  for w in ("x", "y", "z")},
-    "fragments": {k: {"title": f"фрагмент {k}", "text": [f"половина {k}"]}
+    "fragments": {k: {"title": f"fragment {k}", "text": [f"half {k}"]}
                   for k in (1, 2, 3, 4, 5, 6, 7)},
 }
 
@@ -993,7 +993,7 @@ _PLACEHOLDER = {   # заглушки досье и фрагментов: хоз
 def sample_extras(kind: str, host: str, seed: int) -> list:
     """Максимальный набор файлов вида kind для задачи host — заглушки-тексты: проверяем
     раскладку, а не сюжет."""
-    lines = ["ЗАПИСЬ · проверка", "строка один", "строка два", "код: ПРОВЕРКА"]
+    lines = ["RECORD · check", "line one", "line two", "code: CHECK"]
     if kind in ("hidden", "log_tail", "deep_mem", "nol_line", "db_row", "script_line"):
         return place(kind, host, "record", lines, seed)
     if kind == "drop":     # настоящая раскладка ~/drop: все страницы и фрагменты куплены

@@ -240,12 +240,12 @@ class WhereAmI(AnswerTask):
             start = f"projects/{name}/src"
             for d in (start, f"projects/{name}/docs", f"projects/{kit.latin(rng)}_old"):
                 (box / d).mkdir(parents=True, exist_ok=True)
-            kit.write(box / start / "main.txt", "Черновик кода.\n")
+            kit.write(box / start / "main.txt", "Code draft.\n")
             return {"start": start, "name": name, "answer": start}
         parent = f"work/{name}"
         start = f"{parent}/{rng.choice(['inbox', 'tmp', 'drafts'])}"
         (box / start).mkdir(parents=True)
-        kit.write(box / parent / "plan.txt", "План на неделю.\n")
+        kit.write(box / parent / "plan.txt", "Plan for the week.\n")
         return {"start": start, "name": name, "answer": parent, "traps": [["here", start]]}
 
 
@@ -273,8 +273,8 @@ class ClimbDown(AnswerTask):
                        "перед каждым пробелом.",
                        'cd "{path}" && cat note.txt — потом ans $(cat note.txt)'),
                 solution='cd "{path}" && cat note.txt',
-                wrong=("cd Old Projects 2019/{sub} && cat note.txt", "cat note.txt"),
-                alternatives=("cd Old\\ Projects\\ 2019/{sub} — пробелы через \\ (так их "
+                wrong=("cd Old Projects 2719/{sub} && cat note.txt", "cat note.txt"),
+                alternatives=("cd Old\\ Projects\\ 2719/{sub} — пробелы через \\ (так их "
                               "пишет Tab)",)),
         Variant("Здесь три папки, и в каждой лежит свой note.txt. Какая записка настоящая, "
                 "сказано в readme.txt. Найди её и сдай слово: ans СЛОВО",
@@ -304,21 +304,21 @@ class ClimbDown(AnswerTask):
             for d, w in zip(dirs, words):
                 kit.write(box / d / "note.txt", f"{w}\n")
             target, decoy = dirs[0], dirs[1]
-            kit.write(box / "readme.txt", f"Настоящая записка — в папке {target}.\n")
+            kit.write(box / "readme.txt", f"The real note is in the {target} folder.\n")
             return {"target": target, "decoy": decoy, "answer": words[0],
                     "traps": [["decoy", w] for w in words[1:]],
                     "sources": sources(box, f"{target}/note.txt", "readme.txt")}
         sub = f"{rng.choice(['archive', 'misc', 'drafts'])}_{kit.latin(rng)}"
         w = kit.word(rng)
         if variant == 1:
-            path = f"Old Projects 2019/{sub}"
+            path = f"Old Projects 2719/{sub}"
             kit.write(box / path / "note.txt", f"{w}\n")
-            kit.write(box / "Old Projects 2019" / "readme.txt", "Записка глубже.\n")
+            kit.write(box / "Old Projects 2719" / "readme.txt", "The note is deeper.\n")
             return {"path": path, "sub": sub, "answer": w,
                     "sources": sources(box, f"{path}/note.txt")}
-        path = "/".join(["old_projects_backup_2019", sub, "notes"])
+        path = "/".join(["old_projects_backup_2719", sub, "notes"])
         kit.write(box / path / "note.txt", f"{w}\n")
-        kit.write(box / "old_projects_backup_2019" / "readme.txt", "Записка глубже.\n")
+        kit.write(box / "old_projects_backup_2719" / "readme.txt", "The note is deeper.\n")
         return {"path": path, "answer": w, "sources": sources(box, f"{path}/note.txt")}
 
 
@@ -366,10 +366,10 @@ class BackUp(Task):
     spell = "cd .. — на уровень выше; cd ../.. — на два"
 
     def setup_variant(self, box, rng, variant):
-        year = str(rng.randint(2019, 2025))
+        year = str(rng.randint(2719, 2725))
         (box / "archive" / year / "q3" / "docs").mkdir(parents=True)
         (box / "archive" / "other").mkdir()
-        kit.write(box / "archive" / "other" / "list.txt", "Список дел.\n")
+        kit.write(box / "archive" / "other" / "list.txt", "To-do list.\n")
         if variant == 1:
             return {"year": year, "start": f"archive/{year}/q3", "target": "archive/other"}
         target = (str(kit.home(box).relative_to(box)) if variant == 2 else "archive")
@@ -429,12 +429,12 @@ class HomeTilde(AnswerTask):
         w = kit.word(rng)
         home = kit.home(box)
         if variant == 2:
-            kit.write(home / "notes" / "today.txt", f"На сегодня: {w}\n")
+            kit.write(home / "notes" / "today.txt", f"Today: {w}\n")
             old = kit.word(rng)
-            kit.write(home / "notes" / "yesterday.txt", f"Вчера: {old}\n")
+            kit.write(home / "notes" / "yesterday.txt", f"Yesterday: {old}\n")
             return {"answer": w, "traps": [["yesterday", old]],
                     "sources": sources(box, ".termit/home/notes/today.txt")}
-        f = kit.write(home / "memo.txt", f"Слово дня: {w}\n")
+        f = kit.write(home / "memo.txt", f"Today's word: {w}\n")
         st = {"answer": w, "sha": kit.sha(f)}
         if variant == 0:
             st["sources"] = sources(box, ".termit/home/memo.txt")
@@ -528,23 +528,23 @@ class HiddenCache(AnswerTask):
             folder = rng.choice(["inbox", "drop", "mail"])
             docs = rng.randint(4, 8)
             for i in range(docs):
-                kit.write(box / folder / f"doc_{i + 1}.txt", "Здесь пусто.\n")
+                kit.write(box / folder / f"doc_{i + 1}.txt", "Nothing here.\n")
             n = rng.randint(2, 6)
             for name in rng.sample(kit.LATIN, n):
-                kit.write(box / folder / f".{name}", "скрыто\n")
+                kit.write(box / folder / f".{name}", "hidden\n")
             return {"folder": folder, "answer": str(n),
                     "traps": [["dots", n + 2], ["all", n + docs], ["all", n + docs + 2]]}
         for i in range(rng.randint(6, 10)):
-            kit.write(box / f"doc_{i + 1}.txt", "Здесь пусто.\n")
+            kit.write(box / f"doc_{i + 1}.txt", "Nothing here.\n")
         if variant == 1:
             kit.write(box / ".stash" / "note.txt", f"{w}\n")
-            kit.write(box / ".secret", "Не здесь.\n")
-            return {"answer": w, "traps": [["secret", "Не здесь"], ["secret", ".secret"],
+            kit.write(box / ".secret", "Not here.\n")
+            return {"answer": w, "traps": [["secret", "Not here"], ["secret", ".secret"],
                                            ["stashdir", ".stash"]],
                     "sources": sources(box, ".stash/note.txt")}
         kit.write(box / ".secret", f"{w}\n")
-        kit.write(box / ".old_cache", "Только старый кэш.\n")
-        return {"answer": w, "traps": [["old", "Только старый кэш"], ["old", "старый кэш"],
+        kit.write(box / ".old_cache", "Old cache only.\n")
+        return {"answer": w, "traps": [["old", "Old cache only"], ["old", "old cache"],
                                        ["old", ".old_cache"]],
                 "sources": sources(box, ".secret")}
 
@@ -605,11 +605,11 @@ class RunScript(AnswerTask):
                     "на запуск сперва chmod +x). Сдай то, что она выведет.")
         return super().wrong_message(given, ctx)
 
-    BY_DIRNAME = ("#!/bin/sh\n# Читает слово задом наперёд.\n"
+    BY_DIRNAME = ("#!/bin/sh\n# Prints the word backwards.\n"
                   'rev "$(dirname "$0")/.word"\n')
-    BY_CWD = ("#!/bin/sh\n# Читает слово задом наперёд — из папки, где стоишь.\n"
+    BY_CWD = ("#!/bin/sh\n# Prints the word backwards, from the current folder.\n"
               "if [ ! -f .word ]; then\n"
-              '  echo "decode.sh: запусти меня из моей папки" >&2\n'
+              '  echo "decode.sh: run me from my own folder" >&2\n'
               "  exit 1\n"
               "fi\n"
               "rev .word\n")
@@ -623,7 +623,7 @@ class RunScript(AnswerTask):
         os.chmod(script, 0o755 if variant == 2 else 0o644)
         traps = [["reversed", w[::-1]]]
         if variant == 2:
-            traps.append(["cwd", "decode.sh: запусти меня из моей папки"])
+            traps.append(["cwd", "decode.sh: run me from my own folder"])
         rel = where.relative_to(box)
         return {"answer": w, "traps": traps,
                 "sources": sources(box, rel / ".word", rel / "decode.sh")}
@@ -673,7 +673,7 @@ class MkdirP(Task):
     spell = "mkdir -p a/b/c — создать цепочку папок"
 
     def setup_variant(self, box, rng, variant):
-        year = str(rng.randint(2019, 2026))
+        year = str(rng.randint(2719, 2726))
         if variant == 1:
             month = f"{rng.randint(1, 12):02d}"
             other = f"{(int(month) % 12) + 1:02d}"
@@ -735,9 +735,9 @@ class CopyMove(Task):
 
     def setup_variant(self, box, rng, variant):
         if variant == 1:
-            year = str(rng.randint(2019, 2026))
-            draft = kit.write(box / "draft.txt", f"Итог: {kit.word(rng)} и {kit.word(rng)}\n")
-            kit.write(box / "backup" / year / "old_final.txt", "Прошлогодний итог.\n")
+            year = str(rng.randint(2719, 2726))
+            draft = kit.write(box / "draft.txt", f"Final: {kit.word(rng)} and {kit.word(rng)}\n")
+            kit.write(box / "backup" / year / "old_final.txt", "Last year's final.\n")
             # должно быть: имя → sha; отсутствовать: имена
             return {"year": year, "want": {"final.txt": kit.sha(draft),
                                            f"backup/{year}/final.txt": kit.sha(draft)},
@@ -747,14 +747,15 @@ class CopyMove(Task):
             names = [f"{a}.csv", f"{b}.csv", "index.csv"]
             sha = {n: kit.sha(kit.write(box / n, f"id,{n}\n{rng.randint(1, 99)},x\n"))
                    for n in names}
-            kit.write(box / "notes.txt", "Не таблица.\n")
+            kit.write(box / "notes.txt", "Not a table.\n")
             (box / "data").mkdir()
             want = {f"data/{n}": sha[n] for n in names}
             want["index.csv"] = sha["index.csv"]
             return {"a": a, "b": b, "csv": names, "want": want,
                     "gone": [f"{a}.csv", f"{b}.csv"]}
-        contract = kit.write(box / "contract.txt", f"Договор №{rng.randint(1, 999)}: {kit.word(rng)}\n")
-        draft = kit.write(box / "draft.txt", f"Черновик: {kit.word(rng)} и {kit.word(rng)}\n")
+        contract = kit.write(box / "contract.txt",
+                             f"Contract #{rng.randint(1, 999)}: {kit.word(rng)}\n")
+        draft = kit.write(box / "draft.txt", f"Draft: {kit.word(rng)} and {kit.word(rng)}\n")
         (box / "backup").mkdir()
         (box / "archive").mkdir()
         return {"want": {"contract.txt": kit.sha(contract),
@@ -874,9 +875,9 @@ class FileExt(AnswerTask):
         if variant == 1:
             stem = rng.choice(["plan", "memo", "todo", "brief"])
             word, old = rng.sample(kit.WORDS, 2)
-            kit.write(box / f"{stem}.txt", f"Слово: {word}\n")
-            kit.write(box / f"{stem}.bak", f"Слово: {old}\n")
-            kit.write(box / "photo.jpg", "не картинка, а заглушка\n")
+            kit.write(box / f"{stem}.txt", f"Word: {word}\n")
+            kit.write(box / f"{stem}.bak", f"Word: {old}\n")
+            kit.write(box / "photo.jpg", "not an image, just a placeholder\n")
             return {"stem": stem, "answer": word, "traps": [["old", old]],
                     "sources": sources(box, f"{stem}.txt")}
         if variant == 2:
@@ -890,7 +891,7 @@ class FileExt(AnswerTask):
             (box / folder / image).write_bytes(self.PNG)
             packed = io.BytesIO()
             with zipfile.ZipFile(packed, "w") as z:
-                z.writestr("readme.txt", "пусто\n")
+                z.writestr("readme.txt", "empty\n")
             (box / folder / archive).write_bytes(packed.getvalue())
             a, b, c = sorted(names)
             return {"folder": folder, "a": a, "b": b, "c": c, "text": text, "answer": word,
@@ -898,10 +899,10 @@ class FileExt(AnswerTask):
                               ["text_name", text]],
                     "sources": sources(box, f"{folder}/{text}")}
         name = rng.choice(["sales", "clients", "orders", "prices"])
-        files = {f"{name}.csv": "id,sum\n1,10\n2,25\n", "notes.txt": "Заметки.\n",
+        files = {f"{name}.csv": "id,sum\n1,10\n2,25\n", "notes.txt": "Notes.\n",
                  "readme.md": "# Readme\n", "config.json": '{"debug": false}\n',
-                 "server.log": "12:00 start\n", "photo.jpg": "заглушка\n",
-                 "backup.zip": "заглушка\n"}
+                 "server.log": "12:00 start\n", "photo.jpg": "placeholder\n",
+                 "backup.zip": "placeholder\n"}
         for fname, body in files.items():
             kit.write(box / fname, body)
         traps = [["stem", name]] + [["other", f] for f in files if not f.endswith(".csv")]
@@ -987,9 +988,9 @@ class StarMask(Task):
                     [f"plan_{i}.md" for i in range(3)] + ["tmp_plan.txt", "notes.tmp.txt"])
             moved = {}
         for n in hit:
-            kit.write(box / n, "мусор\n" if not moved else f"id\n{n}\n")
+            kit.write(box / n, "junk\n" if not moved else f"id\n{n}\n")
         for n in keep:
-            kit.write(box / n, "дело\n")
+            kit.write(box / n, "keep\n")
         return {"tmp": hit, "keep": keep, "moved": moved}
 
     def check(self, ctx):
@@ -1057,7 +1058,7 @@ class QuestionMask(Task):
             for n in three + other:
                 kit.write(box / f"{n}.txt", f"{n}\n")
             trap = rng.choice([n for n in self.THREE if n not in three])
-            kit.write(box / f"{trap}.md", "не txt\n")
+            kit.write(box / f"{trap}.md", "not a txt\n")
             (box / "short").mkdir()
             files = [f"{n}.txt" for n in three + other] + [f"{trap}.md"]
             return {"want": [f"{n}.txt" for n in three], "files": files}
@@ -1070,7 +1071,7 @@ class QuestionMask(Task):
             return {"gone": two, "keep": keep}
         n = rng.randint(12, 19)
         for i in range(1, n + 1):
-            kit.write(box / f"chapter{i}.txt", f"Глава {i}\n")
+            kit.write(box / f"chapter{i}.txt", f"Chapter {i}\n")
         (box / "part1").mkdir()
         return {"n": n}
 
@@ -1225,30 +1226,30 @@ class DeepDig(Task):
                 want[p.name], loc = kit.sha(p), loc + [_rel(box, p)]
             for i in range(rng.randint(3, 5)):
                 kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}"
-                          f"{rng.choice(['.csv.old', '.txt', '.md'])}", "не таблица\n")
+                          f"{rng.choice(['.csv.old', '.txt', '.md'])}", "not a table\n")
             (box / "tables").mkdir()
             return {"start": "app", "want": want, "dest": "tables", "loc": loc}
         if variant == 2:
-            name = rng.choice(["plan_final.txt", "budget_2025.csv", "contacts.txt"])
+            name = rng.choice(["plan_final.txt", "budget_2725.csv", "contacts.txt"])
             dirs = _tree(box / "notes", rng, rng.randint(8, 12))
             hidden = rng.choice(dirs[1:]) / ".old"
-            p = kit.write(hidden / name, f"нужный файл {rng.random()}\n")
+            p = kit.write(hidden / name, f"the file you need {rng.random()}\n")
             stem, ext = name.rsplit(".", 1)
             for decoy in (f"{name}.bak", f"{stem}_draft.{ext}"):
-                kit.write(rng.choice(dirs) / decoy, "обманка\n")
+                kit.write(rng.choice(dirs) / decoy, "decoy\n")
             for i in range(rng.randint(4, 7)):
-                kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.txt", "заметка\n")
+                kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.txt", "note\n")
             return {"start": ".", "name": name, "want": {name: kit.sha(p)}, "dest": ".",
                     "loc": [_rel(box, p)]}
         dirs = _tree(box / "archive", rng, rng.randint(10, 14))
         want, loc = {}, []
         for i in range(rng.randint(5, 8)):
             name = f"{kit.latin(rng)}_{i}.pdf"
-            p = kit.write(rng.choice(dirs[1:]) / name, f"отчёт {name} {rng.random()}\n")
+            p = kit.write(rng.choice(dirs[1:]) / name, f"report {name} {rng.random()}\n")
             want[name], loc = kit.sha(p), loc + [_rel(box, p)]
         for i in range(rng.randint(3, 5)):
             kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}{rng.choice(['.pdf.part', '.txt'])}",
-                      "не отчёт\n")
+                      "not a report\n")
         (box / "collected").mkdir()
         return {"start": ".", "want": want, "dest": "collected", "loc": loc}
 
@@ -1325,29 +1326,29 @@ class DeepRm(Task):
         if variant == 2:
             dirs = _tree(box / "old", rng, rng.randint(4, 7))
             for i in range(rng.randint(6, 10)):
-                kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.txt", "старьё\n")
-            kit.write(rng.choice(dirs) / ".env", "старьё\n")
-            keep = [kit.write(box / "new" / f"{kit.latin(rng)}_{i}.txt", "новое\n")
+                kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.txt", "old stuff\n")
+            kit.write(rng.choice(dirs) / ".env", "old stuff\n")
+            keep = [kit.write(box / "new" / f"{kit.latin(rng)}_{i}.txt", "new\n")
                     for i in range(rng.randint(3, 5))]
             return {"start": ".", "gone": ["old"], "keep": [_rel(box, p) for p in keep]}
         root = "build" if variant == 0 else "project"
         dirs = _tree(box / root, rng, rng.randint(8, 12))
         hidden = rng.choice(dirs) / ".cache"
-        gone = [kit.write(rng.choice(dirs[1:]) / f"{kit.latin(rng)}_{i}.tmp", "мусор\n")
+        gone = [kit.write(rng.choice(dirs[1:]) / f"{kit.latin(rng)}_{i}.tmp", "junk\n")
                 for i in range(rng.randint(5, 8))]
-        gone += [kit.write(box / root / "session.tmp", "мусор\n"),
-                 kit.write(hidden / f"{kit.latin(rng)}.tmp", "мусор\n")]
-        keep = [kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.txt", "дело\n")
+        gone += [kit.write(box / root / "session.tmp", "junk\n"),
+                 kit.write(hidden / f"{kit.latin(rng)}.tmp", "junk\n")]
+        keep = [kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.txt", "keep\n")
                 for i in range(rng.randint(5, 8))]
-        keep += [kit.write(rng.choice(dirs) / "tmp_notes.md", "дело\n"),
-                 kit.write(rng.choice(dirs) / "plan.tmp.bak", "дело\n"),
-                 kit.write(hidden / "index.db", "дело\n")]
+        keep += [kit.write(rng.choice(dirs) / "tmp_notes.md", "keep\n"),
+                 kit.write(rng.choice(dirs) / "plan.tmp.bak", "keep\n"),
+                 kit.write(hidden / "index.db", "keep\n")]
         gone = [_rel(box, p) for p in gone]
         if variant == 1:
             tdirs = _tree(box / "trash", rng, rng.randint(2, 4))
             for i in range(rng.randint(3, 6)):
-                kit.write(rng.choice(tdirs) / f"{kit.latin(rng)}_{i}.txt", "хлам\n")
-            kit.write(box / "trash" / ".leftover", "хлам\n")
+                kit.write(rng.choice(tdirs) / f"{kit.latin(rng)}_{i}.txt", "clutter\n")
+            kit.write(box / "trash" / ".leftover", "clutter\n")
             gone.append("trash")
         return {"start": "build" if variant == 0 else ".", "gone": gone,
                 "keep": [_rel(box, p) for p in keep]}
@@ -1466,7 +1467,7 @@ class LineEdit(Task):
     spell = "↑ — прошлая команда; Ctrl+A/E — начало/End; Ctrl+W — Word; Option+← → — прыжок"
 
     def setup_variant(self, box, rng, variant):
-        year = str(rng.randint(2024, 2026))
+        year = str(rng.randint(2724, 2726))
         fill = list(rng.sample(FILLER, 8))
         if variant == 1:
             want = {}
@@ -1568,7 +1569,7 @@ class HistoryRecall(Task):
             want = {}
             for i in range(rng.randint(3, 5)):
                 for name in (f"IMG_{rng.randint(1000, 9999)}_{i}.jpg", f"screenshot_{i}.png"):
-                    f = kit.write(box / "downloads" / name, f"снимок {name} {rng.random()}\n")
+                    f = kit.write(box / "downloads" / name, f"shot {name} {rng.random()}\n")
                     want[f"photos/{name}"] = kit.sha(f)
             stay = []
             for name in ("invoice.pdf", "contract.docx", "backup.zip", "IMG_notes.txt"):
@@ -1588,7 +1589,7 @@ class HistoryRecall(Task):
         names = ("invoice_base.txt", "letter_base.txt", "report_base.txt")
         for name in names:
             f = kit.write(box / "templates" / name, f"{name}: {kit.word(rng)}\n")
-            kit.write(box / "clients" / old / name, f"{name}: старая копия\n")
+            kit.write(box / "clients" / old / name, f"{name}: old copy\n")
             want[f"templates/{name}"] = want[f"clients/{new}/{name}"] = kit.sha(f)
         (box / "clients" / new).mkdir(parents=True)
         mid = len(fill) // 2
@@ -1614,8 +1615,8 @@ class ScreenScroll(AnswerTask):
               "так в ASCII звали прогон бумаги у принтеров.")
     variants = (
         Variant("Журнал journal.txt длинный: cat вывалит его, и начало убежит за край окна. "
-                "Слово дня записано в самой первой строке. Выведи журнал командой cat, "
-                "прокрути к началу и сдай слово: ans СЛОВО",
+                "Слово дня (строка Today's word) — в самой первой строке. Выведи журнал "
+                "командой cat, прокрути к началу и сдай слово: ans СЛОВО",
                 wrong=("echo {old}",),
                 alternatives=("cat journal.txt, затем Cmd+fn+← — сразу в самое начало "
                               "вывода",)),
@@ -1632,15 +1633,15 @@ class ScreenScroll(AnswerTask):
                 wrong=("echo {old}",),
                 alternatives=("cat part1.txt — одного первого файла хватит: слово в конце, "
                               "прямо над приглашением",)),
-        Variant("Где-то в середине длинного отчёта report.txt есть строка «Метка: …». "
+        Variant("Где-то в середине длинного отчёта report.txt есть строка «Tag: …» (метка). "
                 "Выведи отчёт командой cat и листай вверх страницами, пока не найдёшь. Сдай "
                 "слово после метки: ans СЛОВО",
                 hints=("Вывод длиннее окна — его прокручивают вверх.",
                        "Shift+fn+↑ — страница вверх, Shift+fn+↓ — вниз; колесо мыши тоже "
                        "годится.",
-                       "cat report.txt, затем Shift+fn+↑ до строки «Метка:» — ans СЛОВО"),
+                       "cat report.txt, затем Shift+fn+↑ до строки «Tag:» — ans СЛОВО"),
                 solution="cat report.txt",
-                solution_script="grep 'Метка:' report.txt | cut -d' ' -f2",
+                solution_script="grep 'Tag:' report.txt | cut -d' ' -f2",
                 wrong=("echo {old}",),
                 alternatives=("cat report.txt, затем Cmd+F в iTerm2 — поиск по экрану",)),
     )
@@ -1662,24 +1663,24 @@ class ScreenScroll(AnswerTask):
         word, old = rng.sample(kit.WORDS, 2)
 
         def lines(n, tag):
-            return [f"{tag} {i}: в порядке" for i in range(1, n + 1)]
+            return [f"{tag} {i}: ok" for i in range(1, n + 1)]
 
         if variant == 1:
-            kit.write(box / "part1.txt", "\n".join(lines(rng.randint(250, 320), "строка")
-                                                   + [f"Слово: {word}"]) + "\n")
-            kit.write(box / "part2.txt", "\n".join(lines(rng.randint(250, 320), "запись")
-                                                   + [f"Слово: {old}"]) + "\n")
+            kit.write(box / "part1.txt", "\n".join(lines(rng.randint(250, 320), "line")
+                                                   + [f"Word: {word}"]) + "\n")
+            kit.write(box / "part2.txt", "\n".join(lines(rng.randint(250, 320), "entry")
+                                                   + [f"Word: {old}"]) + "\n")
             return {"answer": word, "old": old, "traps": [["old", old]],
                     "sources": sources(box, "part1.txt")}
         if variant == 2:
-            body = lines(rng.randint(400, 480), "пункт")
-            body.insert(rng.randint(150, 250), f"Метка: {word}")
-            body.append(f"Итог: {old}")
+            body = lines(rng.randint(400, 480), "item")
+            body.insert(rng.randint(150, 250), f"Tag: {word}")
+            body.append(f"Total: {old}")
             kit.write(box / "report.txt", "\n".join(body) + "\n")
             return {"answer": word, "old": old, "traps": [["old", old]],
                     "sources": sources(box, "report.txt")}
-        body = [f"Слово дня: {word}"] + lines(rng.randint(350, 420), "запись") + \
-            [f"Слово вчера: {old}"]
+        body = ([f"Today's word: {word}"] + lines(rng.randint(350, 420), "entry")
+                + [f"Yesterday's word: {old}"])
         kit.write(box / "journal.txt", "\n".join(body) + "\n")
         return {"answer": word, "old": old, "traps": [["old", old]],
                 "sources": sources(box, "journal.txt")}
@@ -1700,15 +1701,15 @@ class ScreenFind(AnswerTask):
               "Cmd+W — закрыть.")
     variants = (
         Variant("Склад выдал опись stock.txt на сотни строк. Где-то в середине одна строка "
-                "помечена словом ПРОПУСК. Выведи опись командой cat, найди метку поиском "
+                "помечена словом MISSING (пропуск). Выведи опись командой cat, найди метку поиском "
                 "Cmd+F и сдай слово, что стоит после неё: ans СЛОВО",
                 wrong=("echo {old}",),
-                alternatives=("cat stock.txt, затем Cmd+F и ПРОПУСК — Enter прыгает к "
+                alternatives=("cat stock.txt, затем Cmd+F и MISSING — Enter прыгает к "
                               "совпадению",)),
         Variant("Выведи три журнала по очереди: cat day1.txt, cat day2.txt, cat day3.txt. "
-                "Слово дня — в первой строке второго журнала. После третьей команды оно уедет "
-                "далеко вверх: прыгай к началу вывода day2.txt метками Cmd+Shift+↑ и сдай "
-                "его: ans СЛОВО",
+                "Слово дня (Today's word) — в первой строке второго журнала. После третьей "
+                "команды оно уедет далеко вверх: прыгай к началу вывода day2.txt метками "
+                "Cmd+Shift+↑ и сдай его: ans СЛОВО",
                 hints=("Слово — сразу под командой cat day2.txt.",
                        "Cmd+Shift+↑ прыгает к прошлой команде (с интеграцией iTerm2); без неё — "
                        "Cmd+F и day2.txt.",
@@ -1735,10 +1736,10 @@ class ScreenFind(AnswerTask):
     )
     par = 40
     hints = ("Вывод длинный, читать глазами долго — пусть ищет терминал.",
-             "Cmd+F открывает поиск: набери ПРОПУСК, Enter — к совпадению.",
-             "cat stock.txt, затем Cmd+F и ПРОПУСК — ans СЛОВО после метки")
+             "Cmd+F открывает поиск: набери MISSING, Enter — к совпадению.",
+             "cat stock.txt, затем Cmd+F и MISSING — ans СЛОВО после метки")
     solution = "cat stock.txt"
-    solution_script = "grep 'ПРОПУСК' stock.txt | cut -d' ' -f4"
+    solution_script = "grep 'MISSING' stock.txt | cut -d' ' -f4"
     explain = ("Искать глазами — долго: Cmd+F находит слово в выводе, Cmd+Shift+↑ ↓ прыгает от "
                "команды к команде. Нашёл командой — тоже честно; Cmd+F — когда вывод "
                "уже на экране.")
@@ -1750,8 +1751,8 @@ class ScreenFind(AnswerTask):
         word, old = rng.sample(kit.WORDS, 2)
         if variant == 1:
             for day, n in (("day1", 120), ("day2", 140), ("day3", 160)):
-                head = [f"Слово дня: {word}"] if day == "day2" else [f"Слово дня: {old}"]
-                body = [f"{day} запись {i}: в порядке" for i in range(1, n + rng.randint(0, 40))]
+                head = [f"Today's word: {word}"] if day == "day2" else [f"Today's word: {old}"]
+                body = [f"{day} entry {i}: ok" for i in range(1, n + rng.randint(0, 40))]
                 kit.write(box / f"{day}.txt", "\n".join(head + body) + "\n")
             return {"answer": word, "old": old, "traps": [["old", old]],
                     "sources": sources(box, "day2.txt")}
@@ -1761,9 +1762,9 @@ class ScreenFind(AnswerTask):
             kit.write(box / "ticket.txt", code + "\n")
             return {"answer": code, "old": old, "traps": [["old", old]],
                     "sources": sources(box, "ticket.txt")}
-        body = [f"позиция {i}: на месте" for i in range(1, rng.randint(500, 600))]
-        body.insert(rng.randint(200, 350), f"позиция {rng.randint(600, 900)}: ПРОПУСК {word}")
-        body.append(f"Итог: {old}")
+        body = [f"position {i}: in place" for i in range(1, rng.randint(500, 600))]
+        body.insert(rng.randint(200, 350), f"position {rng.randint(600, 900)}: MISSING {word}")
+        body.append(f"Total: {old}")
         kit.write(box / "stock.txt", "\n".join(body) + "\n")
         return {"answer": word, "old": old, "traps": [["old", old]],
                 "sources": sources(box, "stock.txt")}
@@ -1824,13 +1825,13 @@ class QuickFix(Task):
     SERVERS = ("alpha", "bravo", "cobalt", "delta")
 
     def setup_variant(self, box, rng, variant):
-        year = str(rng.randint(2024, 2026))
+        year = str(rng.randint(2724, 2726))
         fill = list(rng.sample(FILLER, 8))
         if variant == 1:
             want = {}
             for q in ("q1", "q2", "q3"):
                 f = kit.write(box / "reports" / year / f"summary_{q}.txt",
-                              f"Отчёт {q} {year}: {kit.word(rng)}\n")
+                              f"Report {q} {year}: {kit.word(rng)}\n")
                 want[f"reports/{year}/summary_{q}.txt"] = kit.sha(f)
                 if q in ("q1", "q2"):
                     want[f"archive/{year}/summary_{q}.txt"] = kit.sha(f)
@@ -1925,11 +1926,11 @@ class CopyDir(Task):
             names = ["cover.jpg"] + [f"{n}.jpg" for n in rng.sample(kit.LATIN, 3)]
             want = {}
             for n in names:
-                f = kit.write(box / "photos" / n, f"снимок {n} {rng.randint(1, 999)}\n")
+                f = kit.write(box / "photos" / n, f"shot {n} {rng.randint(1, 999)}\n")
                 if n != "cover.jpg":
                     want[f"backup/{n}"] = kit.sha(f)
                 want[f"photos/{n}"] = kit.sha(f)
-            fresh = kit.write(box / "backup" / "cover.jpg", f"новая обложка {rng.randint(1, 999)}\n")
+            fresh = kit.write(box / "backup" / "cover.jpg", f"new cover {rng.randint(1, 999)}\n")
             want["backup/cover.jpg"] = kit.sha(fresh)
             return {"want": want}
         if variant == 1:
@@ -1991,7 +1992,7 @@ class CopyDir(Task):
 # Части имён для fzf_pick: ни одна не сидит внутри другой и внутри слов kit.LATIN
 # (проверяет tests/test_implant_tasks; короткий месяц may не берём — такой кусок легко
 # оказывается внутри чужого слова).
-PICK_YEARS = ("2022", "2023", "2024", "2025")
+PICK_YEARS = ("2722", "2723", "2724", "2725")
 PICK_MONTHS = ("january", "february", "march", "april", "june", "july", "august",
                "september", "october", "november", "december")
 PICK_KINDS = ("final", "draft", "review", "backup", "summary")
@@ -2058,7 +2059,7 @@ class FzfPick(AnswerTask):
     spell = "ls | grep a | grep -i b — отфильтровать длинный список по кускам имени"
 
     STARTS = ("reports", "projects", "drafts")
-    SWAPS = (("черновик", "готово"), ("ждёт", "принят"), ("открыт", "закрыт"))
+    SWAPS = (("draft", "done"), ("pending", "accepted"), ("open", "closed"))
 
     @staticmethod
     def _name(rng, y, m, k):
@@ -2094,13 +2095,13 @@ class FzfPick(AnswerTask):
             if variant == 1:
                 kit.write(root / name / "readme.txt", f"{other()}\n")
             elif variant == 2:
-                kit.write(root / f"{name}.txt", f"статус: {old}\n")
+                kit.write(root / f"{name}.txt", f"status: {old}\n")
             else:
                 kit.write(root / f"{name}.txt", f"{other()}\n")
         if variant == 1:
             kit.write(root / target / "readme.txt", f"{word}\n")
         else:
-            kit.write(root / f"{target}.txt", f"{word}\n" if variant == 0 else f"статус: {old}\n")
+            kit.write(root / f"{target}.txt", f"{word}\n" if variant == 0 else f"status: {old}\n")
         st = {"start": start, "y": y, "m": m, "k": k, "old": old, "new": new,
               "target": target + ("" if variant == 1 else ".txt"), "answer": word}
         if variant != 2:
@@ -2209,14 +2210,14 @@ class ZJump(Task):
         leaves = rng.sample(kit.LATIN, 4)
         dirs = []
         for area, leaf in zip(areas, leaves):
-            rel = f"{area}/{rng.randint(2019, 2025)}/{kit.latin(rng)}_{rng.randint(10, 99)}/{leaf}"
+            rel = f"{area}/{rng.randint(2719, 2725)}/{kit.latin(rng)}_{rng.randint(10, 99)}/{leaf}"
             kit.write(home / rel / "list.txt", f"{kit.word(rng)}\n")
             dirs.append(rel)
         st = {f"d{i + 1}": f"~/{d}" for i, d in enumerate(dirs)}
         st.update({f"leaf{i + 1}": leaf for i, leaf in enumerate(leaves)})
         if variant == 2:
             idx = rng.randrange(2)                  # первая или вторая: cd - туда не ведёт
-            kit.write(home / dirs[idx] / "marker.txt", "здесь\n")
+            kit.write(home / dirs[idx] / "marker.txt", "here\n")
             st.update({"k": 3 - idx, "wk": 2 + idx, "leaf": leaves[idx], "target": dirs[idx]})
         else:
             st["target"] = dirs[1] if variant == 1 else dirs[0]
@@ -2363,19 +2364,19 @@ class BossBasics(Task):
         keys, loc = {}, {}
         for i in range(rng.randint(8, 11)):
             name = f"{kit.latin(rng)}_{i}.{ext}"
-            p = kit.write(rng.choice(dirs) / name, f"ключ {name} {rng.random()}\n")
+            p = kit.write(rng.choice(dirs) / name, f"key {name} {rng.random()}\n")
             keys[name], loc[name] = kit.sha(p), str(p.relative_to(box))
         hname = f"{kit.latin(rng)}_hidden.{ext}"
         hidden_dir = rng.choice(dirs) / ".hidden"
-        hp = kit.write(hidden_dir / hname, f"скрытый ключ {rng.random()}\n")
+        hp = kit.write(hidden_dir / hname, f"hidden key {rng.random()}\n")
         keys[hname], loc[hname] = kit.sha(hp), str(hp.relative_to(box))
         for i in range(rng.randint(4, 7)):
-            kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}{rng.choice(fakes)}", "подделка\n")
+            kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}{rng.choice(fakes)}", "fake\n")
         state = {"mode": mode, "folder": folder, "keys": keys, "loc": loc, "hidden": hname,
                  "trap": None, "baks": []}
         if trap_name:
             trap = rng.choice(dirs[1:]) / trap_name
-            kit.write(trap / "bait.txt", "Попался!\n")
+            kit.write(trap / "bait.txt", "Gotcha!\n")
             state["trap"] = str(trap.relative_to(box))
         else:
             # .bak — и рядом с ключами (x.key.bak — не ключ), и в скрытой папке
@@ -2383,7 +2384,7 @@ class BossBasics(Task):
                     for i in range(rng.randint(4, 7))]
             baks.append(hidden_dir / f"{kit.latin(rng)}_old.bak")
             for b in baks:
-                kit.write(b, "резервная копия\n")
+                kit.write(b, "backup copy\n")
             state["baks"] = [str(b.relative_to(box)) for b in baks]
         return state
 

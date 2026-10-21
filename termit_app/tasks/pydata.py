@@ -181,7 +181,7 @@ class PdInstall(Task):
         ver = pandas_version()
         lines = [f"pandas=={ver}"]
         if rng.random() < 0.5:
-            lines.insert(0, "# пакеты отчёта")
+            lines.insert(0, "# report packages")
         kit.write(box / REQ, "\n".join(lines) + "\n")
         return {"ver": ver}
 

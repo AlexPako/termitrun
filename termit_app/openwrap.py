@@ -26,8 +26,8 @@ DOC_APPS = {"txt": "TextEdit", "md": "TextEdit", "csv": "TextEdit", "log": "Text
             "json": "TextEdit", "png": "Preview", "jpg": "Preview", "jpeg": "Preview",
             "gif": "Preview", "pdf": "Preview"}
 APPS = {"finder": "Finder", "textedit": "TextEdit", "preview": "Preview"}
-REFUSE = ("open в тренажёре открывает только папки задачи (в Finder) и документы txt, md, csv, "
-          "log, json, png, jpg, gif, pdf (в TextEdit или Preview).")
+REFUSE = ("In the trainer, open only opens task folders (in Finder) and txt, md, csv, log, "
+          "json, png, jpg, gif, pdf documents (in TextEdit or Preview).")
 
 Plan = Tuple[Optional[List[List[str]]], str]
 
@@ -40,33 +40,33 @@ def _inside(real: str, box: str) -> bool:
 def _target(arg: str, cwd: str, box: str) -> Tuple[Optional[str], str, str]:
     """(раскрытый путь, вид: dir|doc, программа для документа) или (None, причина, '')."""
     if "://" in arg or arg.startswith("file:"):
-        return None, f"{arg}: ссылки open здесь не открывает", ""
+        return None, f"{arg}: open does not follow links here", ""
     try:
         real = os.path.realpath(os.path.join(cwd, arg))
         st = os.stat(real)
     except OSError:
-        return None, f"{arg}: такого файла или папки нет", ""
+        return None, f"{arg}: no such file or directory", ""
     if not _inside(real, box):
-        return None, f"{arg}: путь ведёт за пределы задачи", ""
+        return None, f"{arg}: the path leads outside the task", ""
     name = os.path.basename(real)
     ext = name.rsplit(".", 1)[1].lower() if "." in name.lstrip(".") else ""
     if stat.S_ISDIR(st.st_mode):
         if ext or os.path.exists(os.path.join(real, "Contents", "Info.plist")):
-            return None, f"{arg}: это пакет программы, а не папка", ""
+            return None, f"{arg}: this is an app bundle, not a folder", ""
         return real, "dir", "Finder"
     if not stat.S_ISREG(st.st_mode):
-        return None, f"{arg}: это не обычный файл", ""
+        return None, f"{arg}: not a regular file", ""
     if st.st_mode & 0o111:
-        return None, f"{arg}: исполняемый файл open здесь не запускает", ""
+        return None, f"{arg}: open does not run executables here", ""
     if ext not in DOC_APPS:
-        return None, f"{arg}: такой тип файла open здесь не открывает", ""
+        return None, f"{arg}: open does not open this file type here", ""
     return real, "doc", DOC_APPS[ext]
 
 
 def plan(args: List[str], cwd: str, box: str) -> Plan:
     """Что передать настоящему open (список вызовов) или (None, причина отказа)."""
     if not box:
-        return None, "нет песочницы"
+        return None, "no sandbox"
     app = None          # явная программа -a / -e / -t
     reveal = False
     paths = []
@@ -75,11 +75,11 @@ def plan(args: List[str], cwd: str, box: str) -> Plan:
         a = args[i]
         if a == "-a":
             if i + 1 >= len(args):
-                return None, "после -a нужно имя программы"
+                return None, "-a needs an application name"
             name = args[i + 1].lower()
             name = name[:-4] if name.endswith(".app") else name
             if name not in APPS:
-                return None, f"-a {args[i + 1]}: здесь можно только Finder, TextEdit или Preview"
+                return None, f"-a {args[i + 1]}: only Finder, TextEdit or Preview are allowed here"
             app = APPS[name]
             i += 2
             continue
@@ -88,13 +88,13 @@ def plan(args: List[str], cwd: str, box: str) -> Plan:
         elif a == "-R":
             reveal = True
         elif a.startswith("-"):
-            return None, f"ключ {a} здесь не поддерживается"
+            return None, f"option {a} is not supported here"
         else:
             paths.append(a)
         i += 1
     if not paths:
         if reveal or app in (None, "Finder"):
-            return None, "укажи, что открыть"
+            return None, "say what to open"
         return [["-a", app]], ""
     cmds = []
     for a in paths:
@@ -105,11 +105,11 @@ def plan(args: List[str], cwd: str, box: str) -> Plan:
             cmds.append(["-R", real])
         elif kind == "dir":
             if app not in (None, "Finder"):
-                return None, f"{a}: папки открывает Finder, а не {app}"
+                return None, f"{a}: folders are opened by Finder, not {app}"
             cmds.append(["-a", "Finder", real])
         else:
             if app == "Finder":
-                return None, f"{a}: документ открывают TextEdit или Preview, а не Finder"
+                return None, f"{a}: documents are opened by TextEdit or Preview, not Finder"
             cmds.append(["-a", app or default, real])
     return cmds, ""
 

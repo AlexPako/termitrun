@@ -12,7 +12,7 @@
 Ключи: -r/--recursive, -i/--infected, -d/--database БАЗА (можно несколько, можно папку),
 --no-summary, -V/--version, -h/--help. Коды: 0 — чисто, 1 — найдено, 2 — ошибки.
 Ничего не исполняет и не качает: только читает файлы. Файлы больше 4 МБ и не обычные файлы
-пропускаются, симлинки не обходятся. Пометка «учебный clamscan: без сети» — в stderr (stdout
+пропускаются, симлинки не обходятся. Пометка «training clamscan: no network» — в stderr (stdout
 как у настоящего). Каждый вызов пишется в .termit/av.log (подделку проверка терпит: по нему
 одному решение не засчитывается). Строки EICAR здесь нет: тестовый образец назван только
 словами в уроке."""
@@ -25,12 +25,12 @@ import sys
 import time
 from typing import List, Optional, Tuple
 
-NOTE = "(учебный clamscan: без сети)"
+NOTE = "(training clamscan: no network)"
 LOG = "av.log"
 MAX_FILE = 4 * 1024 * 1024          # файлы больше — мимо (как --max-filesize)
 MAX_DB = 4 * 1024 * 1024            # база больше — не читаем
 DEFAULT_DB = os.path.join("av", "main.hsb")     # от $HOME (дом песочницы)
-VERSION = "ClamAV 1.4.3/учебная база"
+VERSION = "ClamAV 1.4.3/training database"
 DB_EXT = (".hsb", ".hdb", ".ndb")
 _NAME = re.compile(r"^[A-Za-z0-9_.+-]{1,64}$")
 _HEX = re.compile(r"^(?:[0-9a-fA-F]{2}|\?\?)+$")
@@ -365,7 +365,7 @@ def main(argv: List[str]) -> int:
         took = time.monotonic() - started
         print("\n----------- SCAN SUMMARY -----------")
         print(f"Known viruses: {db.count}")
-        print("Engine version: 1.4.3 (учебный)")
+        print("Engine version: 1.4.3 (training)")
         print(f"Scanned directories: {scan.dirs}")
         print(f"Scanned files: {scan.files}")
         print(f"Infected files: {scan.found}")

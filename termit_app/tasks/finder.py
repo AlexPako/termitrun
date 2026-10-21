@@ -106,10 +106,10 @@ class OpenGui(Task):
             rgb = (rng.randrange(256), rng.randrange(256), rng.randrange(256))
             p = box / "plan.png"
             p.write_bytes(png(rng.randint(40, 80), rng.randint(30, 60), rgb))
-            kit.write(box / "plan.txt", "План — на картинке.\n")
+            kit.write(box / "plan.txt", "The plan is in the picture.\n")
             return {}
         if variant == 2:
-            year = rng.randint(2022, 2026)
+            year = rng.randint(2722, 2726)
             months = rng.sample(range(1, 13), 3)
             for m in months:
                 for i in range(rng.randint(2, 4)):
@@ -117,9 +117,10 @@ class OpenGui(Task):
                               f"{kit.word(rng)}\n")
             month = f"{months[0]:02d}"
             path = f"docs/{year}/{month}/inventory.txt"
-            kit.write(box / path, "Опись:\n" + "".join(f"- {kit.word(rng)}\n" for _ in range(5)))
+            kit.write(box / path,
+                      "Inventory:\n" + "".join(f"- {kit.word(rng)}\n" for _ in range(5)))
             return {"year": year, "month": month, "path": path}
-        kit.write(box / "inventory.txt", "Опись:\n" +
+        kit.write(box / "inventory.txt", "Inventory:\n" +
                   "".join(f"- {kit.word(rng)}\n" for _ in range(5)))
         return {}
 
@@ -233,10 +234,10 @@ class FindName(AnswerTask):
         for i in range(rng.randint(150, 220)):
             kit.write(rng.choice(dirs) / f"record_{i}.txt", f"{kit.word(rng)}\n")
         if variant == 1:
-            decoys = [kit.write(rng.choice(dirs) / name, "не дамп\n") for name in
+            decoys = [kit.write(rng.choice(dirs) / name, "not a dump\n") for name in
                       ("sql_notes.txt", f"{kit.latin(rng)}.sql.gz", "old_sql.bak")]
             target = kit.write(rng.choice(dirs[1:]) / f"{kit.latin(rng)}_dump.sql",
-                               "-- дамп базы\n")
+                               "-- database dump\n")
             return {"answer": str(target.relative_to(box)),
                     "traps": [["notdump", str(d.relative_to(box))] for d in decoys],
                     "sources": sources(box, target.relative_to(box))}
@@ -251,10 +252,10 @@ class FindName(AnswerTask):
                                   str(p.relative_to(box))])
             kit.write(rng.choice(dirs) / "config.yaml.example", "env: ?\n")
             return {"answer": answer, "traps": traps, "sources": sources(box, answer)}
-        kit.write(box / "storage" / "lists" / "license_list.txt", "Список лицензий.\n")
+        kit.write(box / "storage" / "lists" / "license_list.txt", "List of licenses.\n")
         # не маленькими: иначе find -name 'license*' находил бы файл, а ловушка — нет
         base = rng.choice(["License", "LICENSE"])
-        target = kit.write(rng.choice(dirs[1:]) / f"{base}_{kit.latin(rng)}.dat", "Лицензия!\n")
+        target = kit.write(rng.choice(dirs[1:]) / f"{base}_{kit.latin(rng)}.dat", "License!\n")
         return {"answer": str(target.relative_to(box)),
                 "traps": [["list", "storage/lists/license_list.txt"]],
                 "sources": sources(box, target.relative_to(box))}
@@ -274,20 +275,21 @@ class GrepR(AnswerTask):
               "вывода (l — lines).")
     variants = (
         Variant("В каком из файлов папки archive/ записан пароль от сейфа? Известны только "
-                "слова «пароль от сейфа». Ответ: ans ПУТЬ_К_ФАЙЛУ",
-                wrong=("grep -rl 'пароль' archive",),
-                alternatives=("grep -rl 'от сейфа' archive — хватит и куска фразы, если он "
+                "слова «safe password» (пароль от сейфа). Ответ: ans ПУТЬ_К_ФАЙЛУ",
+                wrong=("grep -rl 'password' archive",),
+                alternatives=("grep -rl 'safe pass' archive — хватит и куска фразы, если он "
                               "редкий",)),
-        Variant("В каком файле архива archive/ упомянут заказ №{n}? Ответ: ans ПУТЬ_К_ФАЙЛУ",
+        Variant("В каком файле архива archive/ упомянут заказ «order #{n}»? Ответ: "
+                "ans ПУТЬ_К_ФАЙЛУ",
                 hints=("Искать внутри файлов умеет grep: -r — во всех подпапках, -l — только "
                        "имена.",
-                       "Число {n} есть и в другом файле — ищи фразу целиком, в кавычках. № — это "
-                       "Shift+3 на русской раскладке. Или grep -r '{n}' archive без -l: увидишь "
-                       "обе строки и выберешь глазами.",
-                       "grep -rl 'заказ №{n}' archive"),
-                solution="grep -rl 'заказ №{n}' archive",
+                       "Число {n} есть и в другом файле — ищи фразу целиком, в кавычках. # — это "
+                       "Shift+3 на английской раскладке. Или grep -r '{n}' archive без -l: "
+                       "увидишь обе строки и выберешь глазами.",
+                       "grep -rl 'order #{n}' archive"),
+                solution="grep -rl 'order #{n}' archive",
                 wrong=("grep -rl '{n}' archive",),
-                alternatives=("grep -rl '№{n}' archive — хватит и номера со значком",)),
+                alternatives=("grep -rl '#{n}' archive — хватит и номера со значком",)),
         Variant("Сколько файлов в archive/ упоминают слово «{word}»? Ответ — число: "
                 "ans ЧИСЛО. Посчитать строки вывода поможет | wc -l",
                 hints=("Список файлов, где есть слово, даёт grep -rl.",
@@ -303,17 +305,17 @@ class GrepR(AnswerTask):
     par = 40
     hints = ("Искать внутри файлов умеет grep.",
              "Во всех подпапках сразу — флаг -r, только имена файлов — -l.",
-             "grep -rl 'пароль от сейфа' archive")
-    solution = "grep -rl 'пароль от сейфа' archive"
+             "grep -rl 'safe password' archive")
+    solution = "grep -rl 'safe password' archive"
     explain = "grep -r ищет по содержимому всех файлов — Spotlight в одну строку."
     spell = "grep -rl 'текст' папка — в каких файлах встречается текст"
 
-    WORDS_C = ("облава", "контрабанда", "шифровка", "сигнализация")
+    WORDS_C = ("raid", "smuggling", "cipher", "alarm")
     trap_messages = {
         "content": "Это то, что записано в файле, а нужен путь к самому файлу: grep -rl "
                    "печатает пути.",
         "decoy": "В этом файле пароль сменён — это не тот. Ищи фразу целиком, в кавычках.",
-        "invoice": "Тут номер есть, но без «заказ №» — ищи фразу целиком.",
+        "invoice": "Тут номер есть, но без «order #» — ищи фразу целиком.",
         "lines": "Посчитаны строки, а не файлы: в одном файле слово встречается дважды. -l "
                  "печатает каждый файл один раз.",
     }
@@ -341,10 +343,10 @@ class GrepR(AnswerTask):
             others = rng.sample([x for x in range(1000, 10000) if x != n], 12)
             for k in others:
                 lines = rng.choice(files)[1]
-                lines.insert(rng.randrange(len(lines) + 1), f"заказ №{k}: {kit.word(rng)}")
+                lines.insert(rng.randrange(len(lines) + 1), f"order #{k}: {kit.word(rng)}")
             target, decoy = rng.sample(files, 2)
-            target[1].append(f"заказ №{n}: {kit.word(rng)}, отгружен")
-            decoy[1].append(f"накладная {n}, без заказа")
+            target[1].append(f"order #{n}: {kit.word(rng)}, shipped")
+            decoy[1].append(f"invoice {n}, no order")
             self._save(files)
             return {"n": n, "answer": str(target[0].relative_to(box)),
                     "traps": [["invoice", str(decoy[0].relative_to(box))]],
@@ -360,14 +362,14 @@ class GrepR(AnswerTask):
         decoys = []
         for path, lines in files:
             if rng.random() < 0.3:
-                lines.insert(rng.randrange(len(lines) + 1), "сейф пуст, пароль сменён")
+                lines.insert(rng.randrange(len(lines) + 1), "safe is empty, password changed")
                 decoys.append(path)
         target = rng.choice(files)
         if not [d for d in decoys if d != target[0]]:     # ловушка «пароль» есть всегда
             other = rng.choice([f for f in files if f is not target])
-            other[1].append("сейф пуст, пароль сменён")
+            other[1].append("safe is empty, password changed")
         secret = kit.word(rng)
-        target[1].append(f"пароль от сейфа: {secret}")
+        target[1].append(f"safe password: {secret}")
         self._save(files)
         traps = [["content", secret]] + [["decoy", str(d.relative_to(box))]
                                          for d in decoys if d != target[0]]
@@ -553,7 +555,7 @@ class LsNewest(AnswerTask):
                         key=lambda i: ages[i])
                 ages[newest], ages[j] = ages[j], ages[newest]
         for n, age in zip(names, ages):
-            p = kit.write(box / n, "данные\n")
+            p = kit.write(box / n, "data\n")
             os.utime(p, (now - age, now - age))
         newest = names[ages.index(min(ages))]
         if variant == 1:
@@ -671,7 +673,7 @@ def _lost_files(box, shas) -> Verdict:
 
 
 class BatchRename(Task):
-    """Первый цикл игры. FB12 (N10, N17): первая встреча — приставка "2025_$f" (один приём:
+    """Первый цикл игры. FB12 (N10, N17): первая встреча — приставка "2725_$f" (один приём:
     цикл); отрезать хвост ${f%.ext} — повторы 1 и 2."""
     id = "batch_rename"
     track = "finder"
@@ -682,11 +684,11 @@ class BatchRename(Task):
               'Проверь без риска: поставь echo перед mv — цикл только напечатает команды.\n'
               "Опытные в zsh берут zmv: autoload zmv; zmv '(*).JPEG' '$1.jpg'")
     variants = (
-        Variant("Ко всем .txt здесь допиши спереди 2025_: «report march.txt» → «2025_report "
+        Variant("Ко всем .txt здесь допиши спереди 2725_: «report march.txt» → «2725_report "
                 "march.txt». Другие файлы не трогай. Новое имя склеивается прямо в кавычках: "
-                "\"2025_$f\".",
-                wrong=('for f in *; do mv "$f" "2025_$f"; done',),
-                alternatives=("autoload zmv; zmv '(*.txt)' '2025_$1' — то же через zmv",)),
+                "\"2725_$f\".",
+                wrong=('for f in *; do mv "$f" "2725_$f"; done',),
+                alternatives=("autoload zmv; zmv '(*.txt)' '2725_$1' — то же через zmv",)),
         Variant("Снимки пришли как «Photo 12.JPEG». Переименуй все в .jpg — имена "
                 "сохрани, пробелы тоже. Скриншоты .png не трогай.",
                 wrong=("mv *.JPEG *.jpg",),
@@ -711,11 +713,11 @@ class BatchRename(Task):
     )
     par = 75
     hints = ("Много файлов — цикл for по *.txt, как в карточке.",
-             "Внутри цикла: mv \"$f\" \"2025_$f\" — приставка просто пишется перед $f.",
-             "for f in *.txt; do mv \"$f\" \"2025_$f\"; done")
-    solution = 'for f in *.txt; do mv "$f" "2025_$f"; done'
+             "Внутри цикла: mv \"$f\" \"2725_$f\" — приставка просто пишется перед $f.",
+             "for f in *.txt; do mv \"$f\" \"2725_$f\"; done")
+    solution = 'for f in *.txt; do mv "$f" "2725_$f"; done'
     explain = ("Цикл for повторяет mv для каждого файла по маске, $f — имя текущего; кавычки "
-               "\"2025_$f\" склеивают приставку с именем и берегут пробелы.")
+               "\"2725_$f\" склеивают приставку с именем и берегут пробелы.")
     spell = 'for f in *.JPEG; do mv "$f" "${f%.JPEG}.jpg"; done — переименовать все разом'
 
     def setup_variant(self, box, rng, variant):
@@ -725,7 +727,7 @@ class BatchRename(Task):
             want, keep, gone = {}, {}, []
             for st in stems:
                 p = kit.write_random(box / f"{st}.txt", rng.randint(200, 900), rng)
-                want[f"2025_{st}.txt"] = kit.sha(p)
+                want[f"2725_{st}.txt"] = kit.sha(p)
                 gone.append(p.name)
             for name in ("photo 1.jpg", "list.md", "report.csv"):
                 p = kit.write_random(box / name, rng.randint(200, 900), rng)
@@ -834,20 +836,20 @@ class ZipPack(Task):
                               f"{rng.random()}\n")
                 files.append(str(p.relative_to(box)))
             for i, sub in enumerate(["", "src", "docs"]):
-                kit.write(box / "project" / sub / f"~black_{i}.tmp", "временное\n")
+                kit.write(box / "project" / sub / f"~black_{i}.tmp", "temporary\n")
             for i in range(rng.randint(3, 5)):
-                kit.write(box / "project" / "cache" / f"{kit.latin(rng)}_{i}.dat", "кэш\n")
-            kit.write(box / "project" / "cache" / "old.tmp", "временное\n")
+                kit.write(box / "project" / "cache" / f"{kit.latin(rng)}_{i}.dat", "cache\n")
+            kit.write(box / "project" / "cache" / "old.tmp", "temporary\n")
             return {"zip": "project.zip", "files": sorted(files)}
         if variant == 2:
             pdfs = []
             for i in range(rng.randint(3, 6)):
                 name = f"{kit.latin(rng)}_{i}.pdf"
-                kit.write(box / "docs" / name, "%PDF-1.4 условный\n")
+                kit.write(box / "docs" / name, "%PDF-1.4 placeholder\n")
                 pdfs.append(name)
             for i in range(rng.randint(3, 6)):
                 ext = rng.choice(["docx", "txt", "jpg", "xlsx"])
-                kit.write(box / "docs" / f"{kit.latin(rng)}_{10 + i}.{ext}", "не pdf\n")
+                kit.write(box / "docs" / f"{kit.latin(rng)}_{10 + i}.{ext}", "not a pdf\n")
             return {"zip": "pdf.zip", "pdfs": sorted(pdfs)}
         files = []
         for i in range(rng.randint(5, 10)):
@@ -855,7 +857,7 @@ class ZipPack(Task):
             p = kit.write(box / "report" / sub / f"{kit.latin(rng)}_{i}.txt", f"{rng.random()}\n")
             files.append(str(p.relative_to(box)))
         for sub in ("", "part1", "part2"):
-            kit.write(box / "report" / sub / ".DS_Store", "мусор Finder")
+            kit.write(box / "report" / sub / ".DS_Store", "Finder junk")
         return {"files": sorted(files)}
 
     def check(self, ctx):
@@ -939,11 +941,12 @@ class PbcopyList(Task):
         for n in pdfs + others:
             kit.write(box / n, "x\n")
         if variant == 1:
-            text = (f"г. Москва, ул. {kit.word(rng).capitalize()}ная, д. {rng.randint(1, 99)}\n"
-                    f"кв. {rng.randint(1, 300)}, домофон {rng.randint(10, 99)}#\n"
-                    f"Получатель: {kit.word(rng)}\n")
+            text = (f"{rng.randint(100, 2999)} {kit.word(rng).capitalize()} Street, "
+                    "San Francisco\n"
+                    f"Apt {rng.randint(1, 300)}, intercom {rng.randint(10, 99)}#\n"
+                    f"Recipient: {kit.word(rng)}\n")
             kit.write(box / "address.txt", text)
-            kit.write(box / "address_old.txt", "Старый адрес — не нужен.\n")
+            kit.write(box / "address_old.txt", "Old address, not needed.\n")
             return {"text": text}
         if variant == 2:
             return {"path": True}
@@ -1039,7 +1042,7 @@ class KillFrozen(Task):
     BACKUP_LIFE = 1800
 
     def _spawn(self, box, name: str, stubborn: bool, life: int) -> int:
-        body = ("#!/bin/sh\n# Завис и ничего не делает.\n" +
+        body = ("#!/bin/sh\n# Hangs and does nothing.\n" +
                 ("trap '' TERM\n" if stubborn else "") +
                 f'end=$(( $(date +%s) + {life} ))\n'
                 f'while [ "$(date +%s)" -lt "$end" ] && [ -d {kit.quote(box / ".termit")} ]; '
@@ -1363,10 +1366,10 @@ class DiskSweep(Task):
         dirs = maze(root, rng, rng.randint(8, 12))
         empty_files = [kit.write(rng.choice(dirs) / f"{kit.latin(rng)}_{i}.tmp", "")
                        for i in range(rng.randint(5, 8))]
-        full = [kit.write(rng.choice(dirs[1:]) / f"{kit.latin(rng)}_{i}.txt", "дело\n")
+        full = [kit.write(rng.choice(dirs[1:]) / f"{kit.latin(rng)}_{i}.txt", "keep\n")
                 for i in range(rng.randint(5, 8))]
         # недокачанные — только рядом с настоящими файлами: их папки не опустеют
-        parts = [kit.write(p.parent / f"{kit.latin(rng)}_{i}.part", "недокачано\n")
+        parts = [kit.write(p.parent / f"{kit.latin(rng)}_{i}.part", "partial download\n")
                  for i, p in enumerate(rng.sample(full, min(3, len(full))))]
         # папка, где только пустышки: опустеет после файлов; и пустая с самого начала
         ghost = root / "blanks"
@@ -1568,7 +1571,7 @@ class DupSort(Task):
             dups.append(d)
         # имя с «1» без скобок — не дубль: маска *1* его заденет, *\ \(1\).* — нет
         tricky = name(("txt",)).replace(".txt", " 1.txt")
-        keep[tricky] = kit.sha(kit.write(z / tricky, "не дубль\n"))
+        keep[tricky] = kit.sha(kit.write(z / tricky, "not a duplicate\n"))
         if variant == 0:
             return {"keep": keep, "dups": dups}
         # снимки обоих видов, и хоть один — большими буквами: без (#i) маска его не увидит
@@ -1576,7 +1579,7 @@ class DupSort(Task):
             n = name(exts)
             keep[n] = kit.sha(kit.write_random(z / n, 900, rng))
         wallpaper = z / "wallpaper.jpg"
-        kit.write(wallpaper / "sunset.png", "обои\n")
+        kit.write(wallpaper / "sunset.png", "wallpaper\n")
         return {"keep": keep, "dups": dups, "dir": "wallpaper.jpg",
                 "pics": sorted(n for n in keep if n.rsplit(".", 1)[1].lower() in ("jpg", "png"))}
 
@@ -1726,14 +1729,14 @@ class RgHunt(AnswerTask):
             files[f"src/{rng.choice(pkgs)}/{kit.latin(rng)}_{i}.py"] = self._filler(rng, i)
         for i in range(rng.randint(3, 5)):
             files[f"tests/test_{kit.latin(rng)}_{i}.py"] = self._filler(rng, 100 + i)
-        files["README.md"] = ["# Проект", "", "Исходники — в src/, тесты — в tests/."]
+        files["README.md"] = ["# Project", "", "Sources are in src/, tests are in tests/."]
         return files
 
     @staticmethod
     def _foreign(proj, rng, lines):
         """Те же строки в чужом: vendor/ (библиотека) и .git (потерянная копия)."""
         kit.write(proj / "vendor" / kit.latin(rng) / "compat.py",
-                  "\n".join(["# сторонняя библиотека"] + lines) + "\n")
+                  "\n".join(["# third-party library"] + lines) + "\n")
         kit.write(proj / ".git" / "lost-found" / "other" / f"{rng.getrandbits(40):010x}",
                   "\n".join(lines) + "\n")
 
@@ -1884,13 +1887,13 @@ class FdHunt(AnswerTask):
         own = rng.randint(4, 9)
         for i in range(own):
             d = rng.choice(["db/migrations", "db/seeds", "scripts", f"db/{pkgs[0]}"])
-            kit.write(proj / d / f"{i:03d}_{kit.latin(rng)}.sql", "-- миграция\n")
-        kit.write(proj / "db" / ".draft.sql", "-- черновик\n")
-        kit.write(proj / ".cache" / f"q_{kit.latin(rng)}.sql", "-- кэш\n")
+            kit.write(proj / d / f"{i:03d}_{kit.latin(rng)}.sql", "-- migration\n")
+        kit.write(proj / "db" / ".draft.sql", "-- draft\n")
+        kit.write(proj / ".cache" / f"q_{kit.latin(rng)}.sql", "-- cache\n")
         for p in pkgs:
-            kit.write(nm / p / "sql" / f"{kit.latin(rng)}.sql", "-- пакет\n")
-        kit.write(proj / "db" / "dump.sql.gz", "не sql\n")
-        kit.write(proj / "docs" / "sql_notes.txt", "заметки\n")
+            kit.write(nm / p / "sql" / f"{kit.latin(rng)}.sql", "-- package\n")
+        kit.write(proj / "db" / "dump.sql.gz", "not sql\n")
+        kit.write(proj / "docs" / "sql_notes.txt", "notes\n")
         # .env.example: две мельче и одна глубже всех (ответ); в node_modules — ещё глубже
         deep = rng.randint(4, 5)
         target = ""
@@ -1903,12 +1906,12 @@ class FdHunt(AnswerTask):
         full = rng.randint(3, 7)
         for i in range(full):
             kit.write(proj / "logs" / rng.choice(["", "archive", "jobs"]) / f"run_{i}.log",
-                      f"запуск {i}: ок\n")
+                      f"run {i}: ok\n")
         for i in range(rng.randint(1, 3)):
             kit.write(proj / "logs" / f"empty_{i}.log", "")
-        kit.write(nm / pkgs[2] / "npm-debug.log", "ошибка\n")
-        kit.write(proj / ".cache" / "old.log", "старое\n")
-        kit.write(proj / "logs" / ".last.log", "последний\n")
+        kit.write(nm / pkgs[2] / "npm-debug.log", "error\n")
+        kit.write(proj / ".cache" / "old.log", "old\n")
+        kit.write(proj / "logs" / ".last.log", "latest\n")
         if variant == 1:
             nm_env = f"node_modules/{pkgs[1]}/examples/a/b/c/d/.env.example"
             return {"answer": target, "traps": [["deep_nm", f"{PROJ}/{nm_env}"]]}
@@ -2092,7 +2095,7 @@ class BossFinder(Task):
             used.add(name.lower())
             return name
 
-        stems = ["IMG_{n}", "Scan 2026-09-{d}", "statement {n}", "report_{n}",
+        stems = ["IMG_{n}", "Scan 2726-09-{d}", "statement {n}", "report_{n}",
                  "Screenshot {n}", "contract_{n}", "track_{n}"]
 
         def stem_name(exts):

@@ -148,7 +148,7 @@ class EnvVars(AnswerTask):
 # --- E6 -------------------------------------------------------------------------------------
 
 GREET = """#!/bin/sh
-# Приветствие: пишет в greet.txt, что видит в окружении.
+# Greeting: writes into greet.txt what it sees in the environment.
 cd "$(dirname "$0")" || exit 1
 if [ -n "$DEBUG" ]; then
   echo "greet.sh: DEBUG set — refusing" >&2
@@ -156,7 +156,7 @@ if [ -n "$DEBUG" ]; then
   exit 1
 fi
 echo "mode=${MODE:-none} lang=${LANG_CODE:-none}" > greet.txt
-echo "greet.sh: готово, смотри greet.txt"
+echo "greet.sh: done, see greet.txt"
 """
 MODES = ("fast", "quiet", "safe", "night", "batch", "live", "eco", "turbo")
 LANGS = ("ru", "en", "de", "fr", "es", "it", "fi", "pt")
@@ -334,7 +334,7 @@ echo "daily_report: done, see report.txt"
 REPORT_MODES = ("short", "full", "night", "brief", "weekly", "sales")
 ALIAS_NAME = "rep"
 ALIAS_RC_HEAD = "# my settings\nexport EDITOR=nano\n"
-MKCD_DIRS = ("reports/2026-10", "photos/trip", "notes/work", "backup/old", "music/live")
+MKCD_DIRS = ("reports/2726-10", "photos/trip", "notes/work", "backup/old", "music/live")
 _ALIAS_LINE = re.compile(r"^\s*alias\s+(?:--\s+)?([A-Za-z_][\w-]*)=(.+)$")
 _ALIAS_SPACED = re.compile(r"^\s*alias\s+[A-Za-z_][\w-]*\s+=|^\s*alias\s+[A-Za-z_][\w-]*=\s")
 _FUNC_LINE = re.compile(r"^\s*(?:function\s+mkcd\b|mkcd\s*\(\s*\))")
@@ -583,7 +583,7 @@ class PermBasics(AnswerTask):
 
     def setup_variant(self, box, rng, variant):
         name, group, uid, gid = _me()
-        kit.write(Path(box) / "readme.txt", "Тут ничего прятать не нужно: ответ — у тебя.\n")
+        kit.write(Path(box) / "readme.txt", "Nothing to hide here: you have the answer.\n")
         if variant == 2:
             return {"answer": str(uid), "traps": [["gid", str(gid)]] if gid != uid else []}
         if variant == 1:
@@ -660,7 +660,7 @@ class PermRwx(AnswerTask):
         if variant == 2:
             names = rng.sample(RWX_FILES, rng.randint(2, 4))
             for name in names:
-                kit.write(box / folder / name, "Обычный текст.\n")
+                kit.write(box / folder / name, "Plain text.\n")
             os.chmod(box / folder, 0o300)
             return {"dir": folder, "answer": str(len(names))}
         if variant == 1:
@@ -769,11 +769,11 @@ class ReadLongList(AnswerTask):
         if variant == 0:
             names = rng.sample(PLAIN_FILES, 3)
             for name in names:
-                os.chmod(kit.write(box / name, "Обычный текст.\n"), 0o644)
+                os.chmod(kit.write(box / name, "Plain text.\n"), 0o644)
             decoy = rng.choice(SCRIPT_DECOYS)
-            os.chmod(kit.write(box / decoy, "#!/bin/sh\necho пусто\n"), 0o644)
+            os.chmod(kit.write(box / decoy, "#!/bin/sh\necho empty\n"), 0o644)
             answer = rng.choice(EXEC_NAMES)
-            os.chmod(kit.write(box / answer, "#!/bin/sh\necho готово\n"), 0o755)
+            os.chmod(kit.write(box / answer, "#!/bin/sh\necho done\n"), 0o755)
             folder = box / "tools"
             folder.mkdir(exist_ok=True)
             os.chmod(folder, 0o755)
@@ -781,15 +781,15 @@ class ReadLongList(AnswerTask):
         if variant == 1:
             names = rng.sample(PLAIN_FILES, 1 + len(MODE_TRAPS))
             answer, rest = names[0], names[1:]
-            os.chmod(kit.write(box / answer, "Обычный текст.\n"), MODE_ANSWER)
+            os.chmod(kit.write(box / answer, "Plain text.\n"), MODE_ANSWER)
             traps = []
             for name, (mode, key) in zip(rest, MODE_TRAPS.items()):
-                os.chmod(kit.write(box / name, "Обычный текст.\n"), mode)
+                os.chmod(kit.write(box / name, "Plain text.\n"), mode)
                 traps.append([key, name])
             return {"answer": answer, "traps": traps}
         names = rng.sample(PLAIN_FILES, 4)
         for name in names:
-            kit.write(box / name, "Обычный текст.\n")
+            kit.write(box / name, "Plain text.\n")
         file = rng.choice(names)
         owner, group = _owner_group(box / file)
         traps = [["group", group]] if group != owner else []
@@ -886,18 +886,18 @@ class PermDigits(Task):
             names = rng.sample(PERM_FILES, 4)
             target, rest = names[0], names[1:]
             keep = {}
-            os.chmod(kit.write(box / "share" / target, "Общий файл.\n"), 0o777)
+            os.chmod(kit.write(box / "share" / target, "Shared file.\n"), 0o777)
             for name, mode in zip(rest, (0o644, 0o664, 0o600)):
-                os.chmod(kit.write(box / "share" / name, "Обычный текст.\n"), mode)
+                os.chmod(kit.write(box / "share" / name, "Plain text.\n"), mode)
                 keep[f"share/{name}"] = mode
             return {"file": target, "target": f"share/{target}", "want": 0o755, "start": 0o777,
                     "keep": keep}
         if variant == 1:
             name = rng.choice(PERM_SCRIPTS)
-            os.chmod(kit.write(box / name, "#!/bin/sh\necho готово\n"), 0o644)
+            os.chmod(kit.write(box / name, "#!/bin/sh\necho done\n"), 0o644)
             return {"file": name, "target": name, "want": 0o755, "start": 0o644, "keep": {}}
         name = rng.choice(PERM_FILES)
-        os.chmod(kit.write(box / name, "Обычный текст.\n"), 0o644)
+        os.chmod(kit.write(box / name, "Plain text.\n"), 0o644)
         return {"file": name, "target": name, "want": 0o600, "start": 0o644, "keep": {}}
 
     def check(self, ctx):
@@ -922,26 +922,26 @@ class PermDigits(Task):
 # --- E7 -------------------------------------------------------------------------------------
 
 APP_SH = """#!/bin/sh
-# Подключение к учебной базе: ждёт DB_HOST, DB_USER и DB_PASS в окружении.
+# Connects to the training database: needs DB_HOST, DB_USER and DB_PASS in the environment.
 cd "$(dirname "$0")" || exit 1
 for v in DB_HOST DB_USER DB_PASS; do
   eval "val=\\${$v}"
   if [ -z "$val" ]; then
-    echo "app.sh: в окружении нет $v" >&2
+    echo "app.sh: $v is not set in the environment" >&2
     exit 1
   fi
 done
 if [ "$DB_PASS" != '{pw}' ]; then
-  echo "app.sh: пароль не подошёл" >&2
+  echo "app.sh: wrong password" >&2
   exit 1
 fi
 echo "connected $DB_USER@$DB_HOST" > app.log
-echo "app.sh: подключено"
+echo "app.sh: connected"
 """
-NOTE = """Доступ к учебной базе для app.sh (значения ненастоящие):
-адрес:  {host}
-логин:  {user}
-пароль: {pw}
+NOTE = """Access to the training database for app.sh (not real values):
+host:     {host}
+user:     {user}
+password: {pw}
 """
 GITIGNORE_LINES = ("*.log", "__pycache__/", ".DS_Store", "build/", "dist/", "*.tmp",
                    "node_modules/")
@@ -1077,12 +1077,12 @@ class Dotenv(Task):
 # --- E8 -------------------------------------------------------------------------------------
 
 STAMP = """#!/bin/sh
-# Ставит отметку: пишет в stamp.txt свою версию.
+# Puts a stamp: writes its version into stamp.txt.
 echo "stamp {ver}" > {out}
-echo "stamp {ver}: отметка поставлена"
+echo "stamp {ver}: stamp written"
 """
 # ~/.zshrc песочницы (box/.termit/home), не настоящий: пара безобидных строк для урока
-HOME_RC_TEXT = "# мои настройки\nalias ll='ls -la'\n"
+HOME_RC_TEXT = "# my settings\nalias ll='ls -la'\n"
 _EXPORT_PATH = 'export PATH="$HOME/tools/bin:$PATH"'
 
 
@@ -1254,7 +1254,7 @@ class PathWhich(Task):
 # же строке (syntax error), не исполнив ни одной команды.
 COUNT_PY = '''#!/usr/bin/python
 def main(argv):
-    """Число строк данных в CSV — без строки заголовка."""
+    """Number of data rows in a CSV, without the header row."""
     with open(argv[1], encoding="utf-8") as f:
         rows = f.read().splitlines()
     print(len(rows) - 1)
@@ -1265,7 +1265,7 @@ if __name__ == "__main__":
     main(sys.argv)
 '''
 STATS_PY = '''def main(argv):
-    """Сводка по ценам: сколько, самая низкая и самая высокая."""
+    """Price summary: how many, the lowest and the highest."""
     with open(argv[1], encoding="utf-8") as f:
         prices = [int(x) for x in f.read().split()]
     print("count", len(prices), "min", min(prices), "max", max(prices))
@@ -1276,12 +1276,12 @@ if __name__ == "__main__":
     main(sys.argv)
 '''
 BACKUP_SH = """#!/bin/bash
-# Кладёт копию файла в backups/: ./backup.sh ФАЙЛ
+# Puts a copy of the file into backups/: ./backup.sh FILE
 if [ -z "$1" ]; then
-  echo "usage: ./backup.sh ФАЙЛ" >&2
+  echo "usage: ./backup.sh FILE" >&2
   exit 2
 fi
-mkdir -p backups && cp "$1" backups/ && echo "копия: backups/$(basename "$1")"
+mkdir -p backups && cp "$1" backups/ && echo "copy: backups/$(basename "$1")"
 """
 _SHEBANG_OK = re.compile(r"^#!\s*/usr/bin/env\s+python3(?:\.\d+)?\s*$")
 
@@ -1457,34 +1457,34 @@ class ShebangRun(Task):
 # --- E10 ------------------------------------------------------------------------------------
 
 CHECK_SH = """#!/bin/sh
-# Проверка конфигов: сводку пишет в поток ошибок, итог — кодом возврата.
-echo "check.sh: файлов проверено: {k}, замечаний: {m}" >&2
+# Config check: prints a summary to stderr, the result is the exit code.
+echo "check.sh: files checked: {k}, warnings: {m}" >&2
 exit {n}
 """
 BUILD_SH = """#!/bin/sh
-# Сборка: из src/main.txt — build/app.txt.
+# Build: src/main.txt becomes build/app.txt.
 cd "$(dirname "$0")" || exit 1
 if [ ! -f src/main.txt ]; then
-  echo "build.sh: нет файла src/main.txt — собирать нечего" >&2
+  echo "build.sh: no src/main.txt, nothing to build" >&2
   exit 3
 fi
-mkdir -p build && cp src/main.txt build/app.txt && echo "build.sh: собрано"
+mkdir -p build && cp src/main.txt build/app.txt && echo "build.sh: built"
 """
 DEPLOY_SH = """#!/bin/sh
-# Выкатка: отдаёт то, что лежит в build/. Сама ничего не проверяет.
+# Deploy: ships whatever is in build/. Checks nothing by itself.
 cd "$(dirname "$0")" || exit 1
 if [ -f build/app.txt ]; then
   echo "deployed $(head -n 1 build/app.txt)" > deploy.log
 else
   echo "deployed nothing" > deploy.log
 fi
-echo "deploy.sh: выкачено"
+echo "deploy.sh: deployed"
 """
 NOTIFY_SH = """#!/bin/sh
-# Уведомление о провале сборки.
+# Build failure notification.
 cd "$(dirname "$0")" || exit 1
 echo "build failed" > notify.log
-echo "notify.sh: команда предупреждена"
+echo "notify.sh: team notified"
 """
 # цепочки — по командам строки (envkit.sequence, линейно), а не регэкспом по тексту: echo
 # с цепочкой в кавычках — не цепочка (ревью P2, I3)
@@ -2704,16 +2704,16 @@ class AvScan(Task):
 
 # --- E15 ------------------------------------------------------------------------------------
 
-MAIN_PY = '''"""Пишет в where.txt, из какого окружения запущен Python (sys.prefix)."""
+MAIN_PY = '''"""Writes into where.txt which environment Python runs from (sys.prefix)."""
 import sys
 from pathlib import Path
 
 here = Path(__file__).resolve().parent
 (here / "where.txt").write_text(sys.prefix + "\\n", encoding="utf-8")
 if sys.prefix == sys.base_prefix:
-    print("main.py: запущен без окружения, Python —", sys.prefix)
+    print("main.py: running without a venv, Python is", sys.prefix)
 else:
-    print("main.py: окружение", sys.prefix)
+    print("main.py: venv", sys.prefix)
 '''
 FOREIGN_USERS = ("anna", "dev", "max", "olga", "build", "ivan")
 FOREIGN_DIRS = ("work", "projects", "src", "code")

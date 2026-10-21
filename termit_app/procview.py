@@ -24,8 +24,8 @@ SANDBOX_ENV = "TERMIT_SANDBOXED"     # ставит игра, когда zsh з�
 def note(tool: str = "ps") -> str:
     """Пометка внизу: «только процессы игры» — правда лишь под профилем песочницы."""
     if os.environ.get(SANDBOX_ENV) == "1":
-        return "учебная версия: видны только процессы игры"
-    return f"учебная версия {tool}: видны твои процессы"
+        return "training version: only game processes are visible"
+    return f"training version of {tool}: your processes are visible"
 
 
 def safe(text: str) -> str:
@@ -262,9 +262,9 @@ class Usage(Exception):
     pass
 
 
-PS_USAGE = ("использование: ps [aux] [-e|-A] [-f] [-r|-m] [-p PID[,PID]] [-o поле,поле]\n"
-            "  ps aux — все процессы подробно; ps aux -r — прожорливые сверху; "
-            "ps -p PID — один процесс\n")
+PS_USAGE = ("usage: ps [aux] [-e|-A] [-f] [-r|-m] [-p PID[,PID]] [-o field,field]\n"
+            "  ps aux: all processes in detail; ps aux -r: hungriest first; "
+            "ps -p PID: one process\n")
 
 PS_FIELDS = {   # ключ: (заголовок, ширина; отрицательная — по левому краю)
     "user": ("USER", -16), "uid": ("UID", 5), "pid": ("PID", 5), "ppid": ("PPID", 5),
@@ -307,11 +307,11 @@ def parse_ps(args):
             elif ch in "po":
                 rest = s[i + 1:] or next(it, None)
                 if rest is None:
-                    raise Usage(f"ps: ключу -{ch} нужно значение")
+                    raise Usage(f"ps: option requires an argument -- {ch}")
                 if ch == "p":
                     for x in rest.replace(",", " ").split():
                         if not x.isdigit():
-                            raise Usage(f"ps: неверный PID: {x}")
+                            raise Usage(f"ps: illegal process id: {x}")
                         o["pids"].append(int(x))
                 else:
                     for f in rest.replace(",", " ").split():
@@ -320,7 +320,8 @@ def parse_ps(args):
             elif ch == "h":
                 raise Usage(PS_USAGE + note("ps"))
             else:
-                raise Usage(f"ps: учебная версия не знает ключ -{ch}\n{PS_USAGE}{note('ps')}")
+                raise Usage(f"ps: training version does not know option -{ch}\n"
+                            f"{PS_USAGE}{note('ps')}")
 
     it = iter(args)
     for a in it:
@@ -342,7 +343,7 @@ def _field(key):
         key, head = key.split("=", 1)
     key = ALIASES.get(key, key)
     if key not in PS_FIELDS:
-        raise Usage(f"ps: учебная версия не знает поле {key}\n{PS_USAGE}{note('ps')}")
+        raise Usage(f"ps: {key}: keyword not found (training version)\n{PS_USAGE}{note('ps')}")
     title, width = PS_FIELDS[key]
     return key, (title if head is None else head), width
 
@@ -461,8 +462,8 @@ def ps_main(args, out=None) -> int:
 
 # ---------------------------------------------------------------------- top
 
-TOP_USAGE = ("использование: top [-o cpu|mem|pid|time|command] [-n ЧИСЛО] [-l ЗАМЕРЫ] "
-             "[-s СЕКУНД]\n  top -o cpu — прожорливые сверху; q или Ctrl+C — выход\n")
+TOP_USAGE = ("usage: top [-o cpu|mem|pid|time|command] [-n NUMBER] [-l SAMPLES] "
+             "[-s SECONDS]\n  top -o cpu: hungriest first; q or Ctrl+C to quit\n")
 TOP_KEYS = {"cpu": lambda p: -p.get("pcpu", 0.0), "mem": lambda p: -p["mem"],
             "rsize": lambda p: -p["rss"], "pid": lambda p: -p["pid"],
             "time": lambda p: -p["cpu_ns"], "command": lambda p: p["name"].lower(),
@@ -482,11 +483,12 @@ def parse_top(args):
                                                      and len(a) > 2):
             key, val = a[:2], (a[2:] or next(it, None))
             if val is None:
-                raise Usage(f"top: ключу {key} нужно значение")
+                raise Usage(f"top: option {key} requires an argument")
             if key == "-o":
                 val = val.lower().lstrip("+-")
                 if val not in TOP_KEYS:
-                    raise Usage(f"top: учебная версия не умеет сортировать по {val}\n{TOP_USAGE}{note('top')}")
+                    raise Usage(f"top: training version cannot sort by {val}\n"
+                                f"{TOP_USAGE}{note('top')}")
                 o["sort"] = val
             elif key == "-O":
                 pass        # вторичная сортировка — молча принимаем
@@ -494,10 +496,10 @@ def parse_top(args):
                 try:
                     num = float(val) if key == "-s" else int(val)
                 except ValueError:
-                    raise Usage(f"top: {key} ждёт число, а не {val}")
+                    raise Usage(f"top: {key} expects a number, not {val}")
                 o[{"-n": "n", "-l": "l", "-s": "s"}[key]] = num
             continue
-        raise Usage(f"top: учебная версия не знает ключ {a}\n{TOP_USAGE}{note('top')}")
+        raise Usage(f"top: training version does not know option {a}\n{TOP_USAGE}{note('top')}")
     return o
 
 
@@ -513,7 +515,7 @@ def render_top(snap, o, rows=None):
         f"Processes: {len(procs)} total, {running} running, {len(procs) - running} sleeping, "
         f"{threads} threads {time.strftime('%H:%M:%S'):>10}",
         f"Load Avg: {la[0]:.2f}, {la[1]:.2f}, {la[2]:.2f}",
-        f"PhysMem: {fmt_mem(mem)} total, видимые процессы занимают {fmt_mem(used)}.",
+        f"PhysMem: {fmt_mem(mem)} total, visible processes use {fmt_mem(used)}.",
         note("top"),
         "",
         f"{'PID':<7}{'COMMAND':<17}{'%CPU':<6}{'TIME':<10}{'#TH':<5}{'MEM':<7}{'PPID':<7}"
@@ -579,7 +581,7 @@ def _top_loop(o, out, inp, me) -> int:
             size = shutil.get_terminal_size((80, 24))
             lines = [l[:size.columns] for l in render_top(snap, o, rows=size.lines)]
             out.write("\033[H\033[2J" + "\n".join(lines))
-            out.write(f"\n\033[7m q — выход \033[0m")
+            out.write("\n\033[7m q to quit \033[0m")
             out.flush()
             end = time.monotonic() + max(o["s"], 0.2)
             while not stop and time.monotonic() < end:
@@ -604,7 +606,7 @@ def _top_loop(o, out, inp, me) -> int:
 
 def main(argv) -> int:
     if not argv or argv[0] not in ("ps", "top"):
-        print("использование: python3 -m termit_app.procview ps|top [ключи]", file=sys.stderr)
+        print("usage: python3 -m termit_app.procview ps|top [options]", file=sys.stderr)
         return 2
     try:
         if argv[0] == "ps":

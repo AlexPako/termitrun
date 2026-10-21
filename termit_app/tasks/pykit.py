@@ -500,8 +500,8 @@ def run_data(rng) -> dict:
             "wrong_order": a * (b + k)}
 
 
-HELLO_PY = '# hello.py — первый скрипт\nprint("{greet}")\n'
-COUNT_PY = ("# count.py — сумма заказов из файла: python3 count.py ФАЙЛ\n"
+HELLO_PY = '# hello.py: the first script\nprint("{greet}")\n'
+COUNT_PY = ("# count.py: total of the orders in a file: python3 count.py FILE\n"
             "import sys\n"
             "\n"
             "total = 0\n"
@@ -532,9 +532,9 @@ def broken_script(rng) -> Tuple[str, str, int, int]:
     typ, _, body, tail = rng.choice(_BROKEN)
     fill = {"x": rng.randint(10, 99), "y": rng.randint(10, 99), "z": rng.randint(10, 99),
             "item": rng.choice(("jam", "milk", "honey")), "far": rng.randint(5, 9)}
-    lines = ["# broken.py — скрипт с ошибкой: запусти и прочти traceback"]
-    lines += ["# " + x for x in rng.sample(("считает по списку", "версия 2", "не трогать",
-                                             "проверено вчера"), rng.randint(0, 2))]
+    lines = ["# broken.py: a script with a bug, run it and read the traceback"]
+    lines += ["# " + x for x in rng.sample(("counts over a list", "version 2", "do not touch",
+                                             "checked yesterday"), rng.randint(0, 2))]
     lines.append("")
     err = call = 0
     for chunk in (body, [""] * rng.randint(1, 2), tail):
@@ -782,8 +782,8 @@ MSG_JSON_BROKEN = ("{out} — не JSON. Пиши его json.dump(…), а не
 MSG_JSON_REPR = ("В {out} — печать Python (одинарные кавычки), а не JSON: записывай "
                  "json.dump(x, f), а не print(x) или str(x).")
 MSG_JSON_DEEP = "{out} вложен слишком глубоко — это не файл задачи. Набери reset."
-MSG_JSON_ASCII = ("Кириллица в {out} — кодами \\u…: допиши в json.dump ensure_ascii=False — и "
-                  "буквы останутся буквами.")
+MSG_JSON_ASCII = ("Буквы вроде ü в {out} — кодами \\u…: допиши в json.dump ensure_ascii=False "
+                  "— и буквы останутся буквами.")
 MSG_JSON_INDENT = ("{out} — одной строкой: допиши в json.dump indent=2 — каждая запись с новой "
                    "строки.")
 
@@ -812,10 +812,14 @@ def read_json(box, rel: str, run: str = "") -> Tuple[Optional[object], Optional[
     return doc, None, text
 
 
-def json_form(text: str, rel: str, cyrillic: bool) -> Optional[str]:
-    """Форма записи JSON: с отступами (indent) и, если в данных кириллица, — буквами, а не
-    кодами \\u (ensure_ascii=False). Вид файла, а не верность данных."""
-    if cyrillic and "\\u04" in text:
+_U_ESCAPE = re.compile(r"\\u[0-9a-fA-F]{4}")
+
+
+def json_form(text: str, rel: str, non_ascii: bool) -> Optional[str]:
+    """Форма записи JSON: с отступами (indent) и, если в данных буквы не из ASCII (ü, ã;
+    FB12-data: данные песочницы по-английски, без кириллицы), — буквами, а не кодами \\u
+    (ensure_ascii=False). Вид файла, а не верность данных."""
+    if non_ascii and _U_ESCAPE.search(text):
         return MSG_JSON_ASCII.format(out=rel)
     if "\n " not in text.strip():
         return MSG_JSON_INDENT.format(out=rel)
@@ -824,12 +828,14 @@ def json_form(text: str, rel: str, cyrillic: bool) -> Optional[str]:
 
 # --- py_json: заказы словарь → список → словарь ---------------------------------------------
 
-CITIES_RU = ("Казань", "Омск", "Тверь", "Пермь", "Сочи", "Уфа", "Курск", "Самара")
+# города с буквами не из ASCII: на них виден ensure_ascii (без него ü станет \\u00fc)
+CITIES_ACCENT = ("Zürich", "São Paulo", "Kraków", "Málaga", "Montréal", "Düsseldorf",
+                 "Göteborg", "Reykjavík")
 STATUSES = ("paid", "new", "cancelled")
 
 
 def orders_doc(rng) -> dict:
-    """orders.json: {"shop", "updated", "orders": [{"id", "cust", "city" (кириллица),
+    """orders.json: {"shop", "updated", "orders": [{"id", "cust", "city" (буквы не из ASCII),
     "status", "items": [{"name", "price", "qty"}]}]}. Постройкой: оплаченных и прочих — не
     меньше двух, у какой-то позиции qty ≥ 2 (цена без количества ≠ сумма)."""
     n = rng.randint(6, 9)
@@ -842,7 +848,7 @@ def orders_doc(rng) -> dict:
         items = [{"name": x, "price": rng.randint(20, 900), "qty": rng.randint(1, 5)}
                  for x in names]
         orders.append({"id": f"A-{101 + i}", "cust": kit.latin(rng),
-                       "city": rng.choice(CITIES_RU), "status": status, "items": items})
+                       "city": rng.choice(CITIES_ACCENT), "status": status, "items": items})
     if all(it["qty"] == 1 for o in orders for it in o["items"]):
         orders[rng.randrange(n)]["items"][0]["qty"] = rng.randint(2, 5)
     day = f"2026-{rng.randint(1, 9):02d}-{rng.randint(10, 28)}"
@@ -984,7 +990,7 @@ def files_data(rng, variant: int) -> dict:
             for i in range(rng.randint(1, 2) + (1 if not sub else 0)):
                 files[f"{folder}{rng.choice(LOG_WORDS)}-{i + 1}.log"] = _log_text(
                     rng, rng.randint(2, 9))
-        files["logs/readme.txt"] = "логи сервиса: *.log — по папкам\n"
+        files["logs/readme.txt"] = "service logs: *.log, by folder\n"
         files[f"logs/{rng.choice(LOG_SUBDIRS)}/notes.txt"] = _log_text(rng, rng.randint(1, 3))
         size = {k: len(v.encode("utf-8")) for k, v in files.items()}
         logs = sum(n for k, n in size.items() if k.endswith(".log"))
@@ -1020,8 +1026,8 @@ def files_data(rng, variant: int) -> dict:
     cutoff = iso[cut]
     names = [f"report-{d}.txt" for d in iso]
     for name in names:
-        files[f"reports/{name}"] = f"отчёт {name[7:17]}\n"
-    files["reports/readme.md"] = "отчёты по дням: report-ГГГГ-ММ-ДД.txt\n"
+        files[f"reports/{name}"] = f"report {name[7:17]}\n"
+    files["reports/readme.md"] = "daily reports: report-YYYY-MM-DD.txt\n"
     return {"files": files, "cutoff": cutoff, "expect": names[:cut],
             "traps": [["le", names[:cut + 1]], ["newer", names[cut + 1:]]]}
 
@@ -1095,10 +1101,10 @@ def stock_handler(items: List[dict], per_page: int):
         rows = [x for x in items if city is None or x["city"] == city]
         raw = (req.query.get("page") or ["1"])[0]
         if not raw.isdigit():
-            return 400, {"error": "page — номер страницы: ?page=1"}
+            return 400, {"error": "page must be a page number: ?page=1"}
         page, pages = int(raw), max(1, math.ceil(len(rows) / per_page))
         if not 1 <= page <= pages:
-            return 404, {"error": "нет такой страницы", "pages": pages}
+            return 404, {"error": "no such page", "pages": pages}
         chunk = rows[(page - 1) * per_page:page * per_page]
         return 200, {"page": page, "next": page + 1 if page < pages else None, "items": chunk}
     return handle
@@ -1106,7 +1112,7 @@ def stock_handler(items: List[dict], per_page: int):
 
 def stock_routes(state: dict) -> dict:
     """Маршруты API задачи: / — подсказка, /stock — обработчик по state."""
-    return {"/": (200, {"routes": ["/stock", "/stock?page=N", "/stock?city=ГОРОД"]}),
+    return {"/": (200, {"routes": ["/stock", "/stock?page=N", "/stock?city=CITY"]}),
             "/stock": stock_handler(state["stock"], state["per_page"])}
 
 
@@ -1152,7 +1158,7 @@ def urllib_hits(service, path: str = "/stock") -> List[dict]:
 
 # сводка по городам у варианта: (колонка, что копится по заказу)
 BOSS_GROUPS = (("total", "сумма заказов"), ("orders", "число заказов"), ("qty", "штук товара"))
-FAKE_CSV = ('# csv.py — «быстрый csv»: пришёл вместе с отчётом, не трогать\n'
+FAKE_CSV = ('# csv.py: "fast csv", came with the report, do not touch\n'
             'VERSION = "0.1"\n')
 
 
@@ -1184,28 +1190,28 @@ def boss_py_data(rng, variant: int) -> dict:
 def boss_report(variant: int, fixed=()) -> str:
     """report.py стража: врёт в четырёх местах — подмена (A: лишний import requests, B: двойник
     csv.py рядом — его в тексте нет, C: чужой ключ town), одна страница API вместо двух,
-    json.dump без отступов и кириллицы, CSV без шапки. fixed — что уже починено: «swap»,
+    json.dump без отступов и ensure_ascii, CSV без шапки. fixed — что уже починено: «swap»,
     «pages», «json», «header» (эталон и неверные решения собираются отсюда)."""
     col = BOSS_GROUPS[variant][0]
     key = "town" if variant == 2 and "swap" not in fixed else "city"
-    head = ["# report.py — отчёт магазина: остатки с API, оплаченные заказы, сводка по городам",
+    head = ["# report.py: shop report: API stock, paid orders, summary by city",
             "import csv", "import json", "import urllib.request", ""]
     if variant == 0 and "swap" not in fixed:
         head.append("import requests")
     head += ["import sockhttp", "",
-             "sockhttp.install()    # только для учебного сервера: дальше — обычный urllib", "",
-             "# 1. остатки со всех страниц API — в stock.json", "stock = []",
+             "sockhttp.install()    # only for the training server: plain urllib after this", "",
+             "# 1. stock from all API pages into stock.json", "stock = []",
              "for page in [1, 2]:" if "pages" in fixed else "for page in [1]:",
              '    r = urllib.request.urlopen(f"http://api/stock?page={page}")',
              '    stock += json.load(r)["items"]', 'with open("stock.json", "w") as f:',
              "    json.dump(stock, f, indent=2)", "",
-             "# 2. оплаченные заказы — в paid.json", 'with open("orders.json") as f:',
+             "# 2. paid orders into paid.json", 'with open("orders.json") as f:',
              "    data = json.load(f)",
              'paid = [order for order in data["orders"] if order["status"] == "paid"]',
              'with open("paid.json", "w") as f:',
              ("    json.dump(paid, f, indent=2, ensure_ascii=False)" if "json" in fixed else
               "    json.dump(paid, f)"), "",
-             "# 3. сводка по городам — в summary.csv", "sums = {}", "for order in paid:",
+             "# 3. summary by city into summary.csv", "sums = {}", "for order in paid:",
              f'    city = order["{key}"]']
     if variant == 1:
         head.append("    sums[city] = sums.get(city, 0) + 1")

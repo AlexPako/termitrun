@@ -536,11 +536,11 @@ class SqlTask(VaultData, VaultTask):
 
 # свои таблицы задачи (сверх общей схемы): сколько их — от зерна, у граф — разные типы
 _NAV_EXTRA = {
-    "archive_2025": dbkit.Extra(
+    "archive_2725": dbkit.Extra(
         ("id", "customer_id", "amount", "closed_on"),
-        "CREATE TABLE archive_2025 (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, "
+        "CREATE TABLE archive_2725 (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, "
         "amount INTEGER NOT NULL, closed_on TEXT NOT NULL)",
-        "CREATE TABLE archive_2025 (id integer PRIMARY KEY, customer_id integer NOT NULL, "
+        "CREATE TABLE archive_2725 (id integer PRIMARY KEY, customer_id integer NOT NULL, "
         "amount integer NOT NULL, closed_on date NOT NULL)"),
     "flags": dbkit.Extra(
         ("id", "code", "active"),
@@ -571,10 +571,10 @@ NAV_DT_FRAME = 5                         # строк рамки у psql -c "\dt
 def _nav_extra_rows(rng, table: str, n: int) -> List[dict]:
     out = []
     for i in range(1, n + 1):
-        if table == "archive_2025":
+        if table == "archive_2725":
             out.append({"id": i, "customer_id": rng.randrange(1, 60),
                         "amount": rng.randrange(100, 9000),
-                        "closed_on": f"2025-{rng.randrange(1, 13):02d}-{rng.randrange(1, 28):02d}"})
+                        "closed_on": f"2725-{rng.randrange(1, 13):02d}-{rng.randrange(1, 28):02d}"})
         elif table == "flags":
             out.append({"id": i, "code": f"f{i}{rng.choice('abcxyz')}",
                         "active": rng.random() < 0.5})
@@ -583,7 +583,7 @@ def _nav_extra_rows(rng, table: str, n: int) -> List[dict]:
                         "comment": rng.choice((None, "base", "vip"))})
         else:
             out.append({"id": i, "district": rng.choice(dbkit.DISTRICTS),
-                        "opened_on": f"2024-{rng.randrange(1, 13):02d}-{rng.randrange(1, 28):02d}",
+                        "opened_on": f"2724-{rng.randrange(1, 13):02d}-{rng.randrange(1, 28):02d}",
                         "meta": dbkit.jsonb_text({"floor": rng.randrange(1, 9)})})
     return out
 
@@ -2212,7 +2212,7 @@ def null_first_desc(line: str) -> bool:
     return bool(re.search(r"\bDESC\b", _OVER_BODY.sub(" ", body), re.I))
 
 _MONTHLY = "m AS (SELECT {month} AS mon, SUM(amount) AS s FROM payments GROUP BY mon)"
-# месяц, сданный датой первого дня (date_trunc, ::date): 2026-08-01 [00:00:00] — это 2026-08
+# месяц, сданный датой первого дня (date_trunc, ::date): 2726-08-01 [00:00:00] — это 2726-08
 _MONTH_DAY1 = re.compile(r"(?<![\d-])(\d{4}-\d{2})-01(?:[ T]00:00:00(?:\+00(?::00)?)?)?(?![\d:])")
 
 
@@ -3813,7 +3813,7 @@ def _boss_rank_state(rng, data) -> dict:
     net, charge = _ledger_nets(data)
     glob = sorted(net, key=lambda c: (-net[c], c))
     in_d = sorted((c for c in net if dist[c] == d), key=lambda c: (-charge[c], c))
-    _ensure_invoices(rng, data, ans, "2026-09")
+    _ensure_invoices(rng, data, ans, "2726-09")
     traps = [["first", top], ["tie_hi", hi], ["all", glob[1]], ["charge", in_d[1]]]
     return {"district": d, "pid": ans, "traps": _distinct_traps(ans, traps)}
 
@@ -3915,7 +3915,7 @@ def _boss_oldest_state(rng, data) -> dict:
         x = pick()
         if x["customer_id"] == pid and x is not o:
             x["customer_id"] = rng.choice(others)
-    _ensure_invoices(rng, data, pid, "2026-09")
+    _ensure_invoices(rng, data, pid, "2726-09")
     opened = min((x for x in inv if x["status"] == "open"), key=lambda x: (x["issued_at"],
                                                                            x["id"]))
     traps = [["all", early["customer_id"]], ["open", opened["customer_id"]],
@@ -4010,7 +4010,7 @@ CLICK_AGENTS = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.
                 "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Mobile/15E148",
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36")
 SHORT_AGENTS = ("curl/8.7.1", "wget/1.24", "httpie/3.2")
-LONG_PAGES = tuple(f"/catalog/{p}?utm_source=newsletter&utm_campaign=autumn-sale-2026"
+LONG_PAGES = tuple(f"/catalog/{p}?utm_source=newsletter&utm_campaign=autumn-sale-2726"
                    f"&utm_medium=email" for p in ("lamps", "desks", "rugs", "mugs"))
 CLICK_HOST = "https://shop.example.com"
 _INT4 = 4                                 # pg_column_size(integer)

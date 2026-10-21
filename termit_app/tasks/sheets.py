@@ -30,7 +30,7 @@ CITIES = tuple(CITY_STREET)
 STREETS = ("Lenina", "Mira", "Sadovaya", "Lesnaya", "Shkolnaya", "Zarechnaya", "Polevaya")
 STATUSES = ("delivered", "shipped", "paid", "cancelled", "refunded", "cancelled_by_bank")
 STATUS_WEIGHTS = (40, 20, 15, 10, 8, 7)
-MONTHS = tuple(f"2026-{m:02d}" for m in range(1, 7))
+MONTHS = tuple(f"2726-{m:02d}" for m in range(1, 7))
 # лишние колонки варианта «какая по счёту»: значения без запятых и не похожи на суммы
 EXTRA = {"channel": ("web", "app", "phone", "shop"),
          "manager": ("ivanova", "petrov", "sidorova", "orlov", "kim"),

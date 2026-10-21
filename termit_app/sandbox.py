@@ -23,14 +23,14 @@ from termit_app.tasks.base import Cmd, Ctx
 
 # Обёртки зовут модули игры через paths.py_line: python -I -B с явным корнем (решение 12).
 OPEN_STUB = """#!/bin/sh
-# Обёртка тренажёра над open: пропускает только формы урока (файлы и папки задачи — в Finder,
-# TextEdit, Preview), пишет вызов в журнал и передаёт настоящему open (termit_app/openwrap.py).
+# Trainer wrapper around open: lets through only the lesson forms (task files and folders in
+# Finder, TextEdit, Preview), logs the call and hands it to the real open.
 {run}
 """
 
 MKTEMP_STUB = """#!/bin/sh
-# mktemp без шаблона (и с -t) на macOS берёт системную временную папку, а не $TMPDIR, —
-# а писать туда из песочницы нельзя. Направляем в $TMPDIR песочницы.
+# On macOS mktemp without a template (and with -t) uses the system temp folder, not $TMPDIR,
+# and the sandbox cannot write there. Send it to the sandbox $TMPDIR.
 skip=
 for a in "$@"; do
   if [ -n "$skip" ]; then skip=; continue; fi
@@ -46,35 +46,34 @@ exec /usr/bin/mktemp -p "${TMPDIR:-$TERMIT_BOX/.termit/tmp}" "$@"
 
 
 PROCVIEW_STUB = """#!/bin/sh
-# Учебный {name} тренажёра: настоящий (setuid) под sandbox-exec не запускается.
+# Training {name}: the real one (setuid) does not run under sandbox-exec.
 {run}
 """
 
 
 BREW_STUB = """#!/bin/sh
-# Учебный brew тренажёра: в песочнице нет сети, ставить программы на машину отсюда нельзя.
-# Ищет и показывает формулы, «ставит» понарошку, пишет вызов в .termit/brew.log.
+# Training brew: the sandbox has no network and cannot install programs on the machine.
+# Searches and shows formulae, "installs" for pretend, logs the call to .termit/brew.log.
 {run}
 """
 
 
 AV_STUB = """#!/bin/sh
-# Учебный clamscan тренажёра (часть 7): урезанные базы ClamAV, ничего не исполняет и не качает,
-# пишет вызов в .termit/av.log (termit_app/avstub.py). Есть только у задач с uses_av.
+# Training clamscan: trimmed ClamAV databases, runs and downloads nothing,
+# logs the call to .termit/av.log.
 {run}
 """
 
 
 SHELLCHECK_STUB = """#!/bin/sh
-# Учебный shellcheck тренажёра (FB14): знает несколько проверок, ничего не исполняет и не
-# качает (termit_app/shellstub.py). Есть только у задач с uses_shellcheck.
+# Training shellcheck: knows a few checks, runs and downloads nothing.
 {run}
 """
 
 
 CRONTAB_STUB = """#!/bin/sh
-# Учебный crontab тренажёра (FB14): расписание — в .termit/crontab песочницы, настоящий
-# crontab владельца не трогает (termit_app/cronstub.py). Есть только у задач с uses_crontab.
+# Training crontab: the schedule lives in the sandbox .termit/crontab, the owner's real
+# crontab is never touched.
 {run}
 """
 
@@ -175,14 +174,14 @@ del _termit_out_log
 
 
 PIN_STUB = """#!/bin/sh
-# {name} вне venv — закреплённый python3 треков (часть 7): {what}
+# {name} outside a venv: the pinned python3 of the tracks: {what}
 exec {py3} {args}"$@"
 """
 
 
 def pin_wrappers(py3: str) -> dict:
     """Обёртки python, pip, pip3 для .termit/bin (py3 — путь к закреплённому python3)."""
-    return {"python": PIN_STUB.format(name="python", what="python — это python3", py3=py3,
+    return {"python": PIN_STUB.format(name="python", what="python is python3", py3=py3,
                                       args=""),
             "pip": PIN_STUB.format(name="pip", what="python3 -m pip", py3=py3, args="-m pip "),
             "pip3": PIN_STUB.format(name="pip3", what="python3 -m pip", py3=py3, args="-m pip ")}

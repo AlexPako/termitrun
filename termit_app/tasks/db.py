@@ -803,7 +803,7 @@ class OrderLimit(_DbAnswer):
               "DESC — по убыванию.\n"
               "LIMIT 3 — только первые три строки; LIMIT 1 OFFSET 2 — пропусти две, возьми одну "
               "(третью).\n"
-              "Даты вида 2026-08-31 сортируются по порядку: при ASC свежие — внизу.")
+              "Даты вида 2726-08-31 сортируются по порядку: при ASC свежие — внизу.")
     variants = (
         Variant("Какой счёт в records.db третий по величине баланса (таблица accounts, колонка "
                 "balance)? Ответ: ans ID БАЛАНС",
@@ -1014,7 +1014,7 @@ class InBetween(_DbAnswer):
     par = 60
     scroll = ("Из списка: city IN ('omsk', 'tver'). От и до, ОБЕ границы включены: amount "
               "BETWEEN 500 AND 1500.\n"
-              "Время здесь — текст вида 2026-09-30 14:05:00, сравнивается как строка, по порядку.\n"
+              "Время здесь — текст вида 2726-09-30 14:05:00, сравнивается как строка, по порядку.\n"
               "Весь месяц: ts >= 'первое число' AND ts < 'первое следующего'. BETWEEN по "
               "последний день потеряет его часы после полуночи.")
     variants = (
@@ -1045,34 +1045,34 @@ class InBetween(_DbAnswer):
                        "sqlite3 records.db \"SELECT id FROM transfers WHERE amount >= {lo}\" "
                        "| wc -l"),
                 alternatives=("amount >= {lo} AND amount <= {hi} — то же длиннее",)),
-        Variant("Сколько переводов было в сентябре 2026 года? Время — колонка ts таблицы "
-                "transfers, вида 2026-09-14 18:03:11. Ответ: ans ЧИСЛО",
+        Variant("Сколько переводов было в сентябре 2726 года? Время — колонка ts таблицы "
+                "transfers, вида 2726-09-14 18:03:11. Ответ: ans ЧИСЛО",
                 hints=("Время — строка: «весь сентябрь» — от его первого дня до первого дня "
                        "октября, не включая его.",
-                       "ts >= '2026-09-01' AND ts < '2026-10-01'. BETWEEN по '2026-09-30' "
+                       "ts >= '2726-09-01' AND ts < '2726-10-01'. BETWEEN по '2726-09-30' "
                        "потеряет 30-е после 00:00.",
-                       "sqlite3 records.db \"SELECT id FROM transfers WHERE ts >= '2026-09-01' "
-                       "AND ts < '2026-10-01'\" | wc -l"),
-                solution="sqlite3 records.db \"SELECT id FROM transfers WHERE ts >= '2026-09-01' "
-                         "AND ts < '2026-10-01'\" | wc -l",
+                       "sqlite3 records.db \"SELECT id FROM transfers WHERE ts >= '2726-09-01' "
+                       "AND ts < '2726-10-01'\" | wc -l"),
+                solution="sqlite3 records.db \"SELECT id FROM transfers WHERE ts >= '2726-09-01' "
+                         "AND ts < '2726-10-01'\" | wc -l",
                 wrong=("sqlite3 records.db \"SELECT id FROM transfers WHERE ts BETWEEN "
-                       "'2026-09-01' AND '2026-09-30'\" | wc -l",
-                       "sqlite3 records.db \"SELECT id FROM transfers WHERE ts >= '2026-09-01' "
-                       "AND ts <= '2026-09-30'\" | wc -l"),
+                       "'2726-09-01' AND '2726-09-30'\" | wc -l",
+                       "sqlite3 records.db \"SELECT id FROM transfers WHERE ts >= '2726-09-01' "
+                       "AND ts <= '2726-09-30'\" | wc -l"),
                 alternatives=("sqlite3 records.db \"SELECT id FROM transfers WHERE ts LIKE "
-                              "'2026-09%'\" | wc -l — шаблоном по началу строки",)),
+                              "'2726-09%'\" | wc -l — шаблоном по началу строки",)),
     )
     hints = variants[0].hints
     solution = variants[0].solution
     explain = ("BETWEEN берёт обе границы, > и < — нет. Время-строку база сравнивает по буквам: "
-               "'2026-09-30 10:00' больше '2026-09-30'. Вот и ставь конец периода как «< начала "
+               "'2726-09-30 10:00' больше '2726-09-30'. Вот и ставь конец периода как «< начала "
                "следующего».")
     spell = ("к IN ('a', 'b') — из списка; к BETWEEN a AND b — с границами; ts >= 'начало' AND "
              "ts < 'начало следующего'")
     trap_messages = {
         "strict": "Границы потерялись: > и < их не включают, а BETWEEN — включает обе.",
-        "lastday": "Потерялось 30-е после полуночи: '2026-09-30 10:00' больше '2026-09-30'. "
-                   "Конец — ts < '2026-10-01'.",
+        "lastday": "Потерялось 30-е после полуночи: '2726-09-30 10:00' больше '2726-09-30'. "
+                   "Конец — ts < '2726-10-01'.",
         "nocity": "Это люди из всех городов — забыто условие city IN (…).",
     }
 
@@ -1087,8 +1087,8 @@ class InBetween(_DbAnswer):
                         traps=[["strict", sum(1 for a in am if lo < a < hi)]])
         if variant == 2:
             ts = [t["ts"] for t in recs.tables["transfers"]]
-            n = sum(1 for x in ts if "2026-09-01" <= x < "2026-10-01")
-            late = sum(1 for x in ts if dbkit.between(x, "2026-09-01", "2026-09-30"))
+            n = sum(1 for x in ts if "2726-09-01" <= x < "2726-10-01")
+            late = sum(1 for x in ts if dbkit.between(x, "2726-09-01", "2726-09-30"))
             return dict(st, answer=n, traps=[["lastday", late]])
         lo, hi = dbkit.BORN_LO, dbkit.BORN_HI
         ppl = recs.tables["people"]
@@ -1854,7 +1854,7 @@ def _idle_senders_state(rng, recs) -> dict:
         idle = rng.choice(sorted(a["id"] for a in accs if a["id"] not in used))
         src = rng.choice(sorted(senders))       # у отправителя исходящие уже были
         trs.append({"id": max(t["id"] for t in trs) + 1, "from_acc": src, "to_acc": idle,
-                    "amount": rng.randrange(10, 20000), "ts": "2026-08-20 12:00:00",
+                    "amount": rng.randrange(10, 20000), "ts": "2726-08-20 12:00:00",
                     "note": ""})
         no_out, no_in = counts()
     used = {t["from_acc"] for t in trs} | {t["to_acc"] for t in trs}
@@ -2309,7 +2309,7 @@ def _visits(rng, ppl, cols, n):
     так и останется числом)."""
     out = []
     for _ in range(n):
-        day = f"2026-09-{rng.randint(1, 28):02d}"
+        day = f"2726-09-{rng.randint(1, 28):02d}"
         r = {"person_id": rng.choice(ppl)["id"], "ts": dbkit._ts(rng, day),
              "place": f"{rng.choice(dbkit.STREETS)} {rng.randint(1, 90)}",
              "minutes": rng.randint(1, 59)}
@@ -3249,7 +3249,7 @@ def _sales(rng) -> List[dict]:
     cities = rng.sample(dbkit.CITIES, rng.randint(6, 8))
     out = []
     for i in range(1, rng.randint(90, 140) + 1):
-        out.append({"id": i, "date": dbkit._date(rng, "2026-04-01", "2026-09-30"),
+        out.append({"id": i, "date": dbkit._date(rng, "2726-04-01", "2726-09-30"),
                     "city": rng.choice(cities), "customer": f"c-{rng.randint(100, 399)}",
                     "amount": rng.randint(100, 9000),
                     "status": rng.choices(SALES_STATUSES, (70, 20, 10))[0]})

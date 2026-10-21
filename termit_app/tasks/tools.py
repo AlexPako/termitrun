@@ -190,7 +190,7 @@ class FlagUse(AnswerTask):
         if variant == 2:
             names = sorted(f"{w}.txt" for w in rng.sample(kit.LATIN, 5))
             for name in names:
-                kit.write(box / "queue" / name, "в очереди\n")
+                kit.write(box / "queue" / name, "queued\n")
             return {"answer": names[-1], "traps": [["first", names[0]]]}
         kinds = ["INFO", "INFO", "WARN", "ERROR"]
         levels = [rng.choice(kinds) for _ in range(rng.randint(9, 14))]
@@ -437,21 +437,21 @@ def check_edit(f, state) -> Verdict:
 
 
 COMMIT_SH = """#!/bin/sh
-# Открывает сообщение в vim — так же делает git commit.
+# Opens the message in vim, just like git commit does.
 cd "$(dirname "$0")" || exit 1
 cat > message.txt <<'EOT'
 __BODY__
 EOT
 __NOEOL__before=$(md5 -q message.txt)
 if [ -n "$TERMIT_VIM_EX" ]; then
-  vim -Es -u NONE __VIMARGS__ -c "$TERMIT_VIM_EX" -c wq message.txt   # для эталонных тестов
+  vim -Es -u NONE __VIMARGS__ -c "$TERMIT_VIM_EX" -c wq message.txt   # for reference tests
 else
   vim __VIMARGS__ message.txt
 fi
 after=$(md5 -q message.txt)
 grep -v '^#' message.txt | sed '/^[[:space:]]*$/d' > result.txt
 echo "$before $after" > .msg_hash
-echo "vim закрыт."
+echo "vim closed."
 """
 
 VIM_SCROLL = ("vim — редактор, в который тебя закидывают другие программы и серверы. Он стартует в "
@@ -461,7 +461,7 @@ VIM_SCROLL = ("vim — редактор, в который тебя закиды
               "Команды vim набирай в английской раскладке: в русской :wq превратится в :цй.")
 
 
-NO_EOL = 'printf \'%s\' "$(cat message.txt)" > message.txt   # без финального перевода строки\n'
+NO_EOL = 'printf \'%s\' "$(cat message.txt)" > message.txt   # no trailing newline\n'
 
 
 def _commit_sh(box, body: str, no_eol: bool = False, vim_args: str = ""):
@@ -482,7 +482,7 @@ class VimTrap(Task):
     variants = (
         Variant("Как только нажмёшь Enter, откроется vim — так же его сами открывают и другие "
                 "программы, когда ждут от тебя текст. "
-                "Впиши на первой строке «Подписано: {name}» и выйди С сохранением. "
+                "Впиши на первой строке «Signed: {name}» (подписано) и выйди С сохранением. "
                 "Не вышло — запусти ./commit.sh снова.",
                 wrong=("TERMIT_VIM_EX='q!' ./commit.sh",),
                 alternatives=("ZZ — то же, что :wq, без двоеточия",)),
@@ -495,52 +495,52 @@ class VimTrap(Task):
                        "в конце строки, потом Backspace четыре раза.",
                        "./commit.sh, S, свой текст, Esc, :wq, Enter"),
                 solution="S, свой текст, Esc, :wq",
-                solution_script="TERMIT_VIM_EX='1s/^TODO$/Поправил вход/' ./commit.sh",
+                solution_script="TERMIT_VIM_EX='1s/^TODO$/Fix login/' ./commit.sh",
                 wrong=("TERMIT_VIM_EX='q!' ./commit.sh",
-                       "TERMIT_VIM_EX='1s/^/Готово /' ./commit.sh"),
+                       "TERMIT_VIM_EX='1s/^/Done /' ./commit.sh"),
                 alternatives=("cc — то же, что S: стереть строку и печатать заново",)),
         Variant("Нажми Enter — откроется vim с готовым сообщением. Допиши в самый конец, "
-                "последней строкой, «Проверил: {name}» и выйди с сохранением. В vim: G — на "
-                "последнюю строку, o — новая строка под ней и сразу печать. "
+                "последней строкой, «Checked: {name}» (проверено) и выйди с сохранением. "
+                "В vim: G — на последнюю строку, o — новая строка под ней и сразу печать. "
                 "Не вышло — запусти ./commit.sh снова.",
                 hints=("Ты в vim. Чтобы писать в конце, сначала прыгни на последнюю строку.",
                        "Без G и o тоже можно: стрелками вниз до последней строки, A — печатать "
                        "в её конце, Enter — новая строка.",
-                       "./commit.sh, G, o, «Проверил: {name}», Esc, :wq, Enter"),
-                solution="G, o, «Проверил: {name}», Esc, :wq",
-                solution_script="TERMIT_VIM_EX='normal GoПроверил: {name}' ./commit.sh",
+                       "./commit.sh, G, o, «Checked: {name}», Esc, :wq, Enter"),
+                solution="G, o, «Checked: {name}», Esc, :wq",
+                solution_script="TERMIT_VIM_EX='normal GoChecked: {name}' ./commit.sh",
                 wrong=("TERMIT_VIM_EX='q!' ./commit.sh",
-                       "TERMIT_VIM_EX='normal ggOПроверил: {name}' ./commit.sh"),
+                       "TERMIT_VIM_EX='normal ggOChecked: {name}' ./commit.sh"),
                 alternatives=(":$ и Enter — тоже прыжок на последнюю строку",)),
     )
     par = 60
     hints = ("Ты в vim. Сначала i — тогда буквы станут текстом.",
              "Напечатай строку, потом Esc, переключи раскладку на английскую и набери :wq",
-             "./commit.sh, i, «Подписано: {name}», Esc, :wq, Enter")
-    solution = "i, «Подписано: {name}», Esc, :wq"
-    solution_script = "TERMIT_VIM_EX='1s/^$/Подписано: {name}/' ./commit.sh"
+             "./commit.sh, i, «Signed: {name}», Esc, :wq, Enter")
+    solution = "i, «Signed: {name}», Esc, :wq"
+    solution_script = "TERMIT_VIM_EX='1s/^$/Signed: {name}/' ./commit.sh"
     explain = "i — вставка, Esc — назад в команды, :wq — записать и выйти. Хватит, чтобы не застрять."
     spell = "vim: i — печатать, Esc — стоп, :wq — сохранить и выйти"
 
-    SAVE = "\n# Строки с # будут отброшены. Esc, потом :wq и Enter — сохранить и выйти."
+    SAVE = "\n# Lines starting with # will be ignored. Esc, then :wq and Enter to save and quit."
 
     def setup_variant(self, box, rng, variant):
         name = kit.latin(rng).capitalize()
         if variant == 1:
-            _commit_sh(box, "TODO\n# Замени строку TODO одной строкой своего текста."
-                            "\n# S (Shift+s) — стереть строку под курсором и сразу печатать." +
+            _commit_sh(box, "TODO\n# Replace the TODO line with one line of your own text."
+                            "\n# S (Shift+s) clears the line under the cursor and starts typing." +
                        self.SAVE)
             return {"name": name}
         if variant == 2:
-            body = [f"Обновил {kit.latin(rng)}", f"Поправил {kit.word(rng)}"]
-            line = f"Проверил: {name}"
-            _commit_sh(box, "\n".join(body) + f"\n# Допиши последней строкой: {line}"
-                       "\n# G — на последнюю строку, o — новая строка под ней и сразу печать." +
+            body = [f"Update {kit.latin(rng)}", f"Fix {kit.word(rng)}"]
+            line = f"Checked: {name}"
+            _commit_sh(box, "\n".join(body) + f"\n# Add as the last line: {line}"
+                       "\n# G jumps to the last line, o opens a new line below and starts typing." +
                        self.SAVE)
             return {"name": name, "body": body, "line": line}
-        _commit_sh(box, "\n# Впиши на первой строке: Подписано: " + name +
-                   "\n# i — печатать, Esc — закончить, :wq и Enter — сохранить и выйти."
-                   "\n# Строки с # будут отброшены.")
+        _commit_sh(box, "\n# Type on the first line: Signed: " + name +
+                   "\n# i to type, Esc to stop, :wq and Enter to save and quit."
+                   "\n# Lines starting with # will be ignored.")
         return {"name": name}
 
     def check(self, ctx):
@@ -559,7 +559,7 @@ class VimTrap(Task):
                 return Verdict(True)
             return Verdict(False, "Строка не та, не в конце или не сохранилась. Запусти "
                                   "./commit.sh ещё раз.")
-        if lines == [f"Подписано: {ctx.state['name']}"]:
+        if lines == [f"Signed: {ctx.state['name']}"]:
             return Verdict(True)
         return Verdict(False, "Строка не та или не сохранилась. Запусти ./commit.sh ещё раз.")
 
@@ -610,12 +610,12 @@ class VimEscape(Task):
     spell = "vim: :q! — выйти без сохранения; застрял — Esc, :q!"
 
     # стартовые -c под вариант: B — буфер уже изменён (:q откажет), C — сразу режим вставки
-    VIM_ARGS = ("", "-c 'normal GoWIP: не отправлять'", "-c startinsert")
+    VIM_ARGS = ("", "-c 'normal GoWIP: do not send'", "-c startinsert")
 
     def setup_variant(self, box, rng, variant):
         # без финального перевода строки: :wq допишет его, и даже «пустой» :wq виден в хэше
-        _commit_sh(box, "Это сообщение не должно уйти"
-                        "\n# Выйди БЕЗ сохранения: Esc, потом :q! и Enter.", no_eol=True,
+        _commit_sh(box, "This message must not be sent"
+                        "\n# Quit WITHOUT saving: Esc, then :q! and Enter.", no_eol=True,
                    vim_args=self.VIM_ARGS[variant])
         return {}
 
@@ -640,7 +640,7 @@ class VimPurge(Task):
               "только строки, которые начинаются с #. Пробел в поиске — тоже символ.")
     variants = (
         Variant("В rules.txt завёлся спам: строки, начинающиеся с «SPAM » (с пробелом). "
-                "Вычисти их в vim. Строку «SPAM: фильтр включён» не трогать — "
+                "Вычисти их в vim. Строку «SPAM: filter enabled» (фильтр включён) не трогать — "
                 "удалил по ошибке, верни через u.",
                 wrong=("vim -Es -u NONE '+g/SPAM/d' +wq rules.txt",),
                 alternatives=(":g/^SPAM /d — vim сам удалит все строки по образцу, одной "
@@ -694,12 +694,12 @@ class VimPurge(Task):
         for i in range(n):
             if i in bad:
                 out.append(f"SPAM {kit.latin(rng)}{rng.randint(10, 99)}")
-            rule = f"Правило {i + 1}: {kit.word(rng)} и {kit.word(rng)}"
+            rule = f"Rule {i + 1}: {kit.word(rng)} and {kit.word(rng)}"
             out.append(rule)
             want.append(rule)
             if i == special:
-                out.append("SPAM: фильтр включён")
-                want.append("SPAM: фильтр включён")
+                out.append("SPAM: filter enabled")
+                want.append("SPAM: filter enabled")
         return self._write(box, "rules.txt", out, want)
 
     def _write(self, box, name, out, want):
@@ -724,12 +724,12 @@ class VimPurge(Task):
         return self._write(box, "list.txt", out, want)
 
     def _script(self, box, rng):
-        cmds = [f'echo "шаг {i + 1}: {kit.latin(rng)}"' for i in range(rng.randint(8, 12))]
+        cmds = [f'echo "step {i + 1}: {kit.latin(rng)}"' for i in range(rng.randint(8, 12))]
         cmds += ["set -e", f"mkdir -p out/{kit.latin(rng)}", "date",
-                 f'echo "Задача #{rng.randint(2, 99)}"']           # решётка внутри строки
+                 f'echo "Task #{rng.randint(2, 99)}"']           # решётка внутри строки
         rng.shuffle(cmds)
-        notes = ["# Сборка отчёта", "#--------", "# TODO: убрать отладку",
-                 f"# автор: {kit.latin(rng)}", "#  старый вариант: rm -rf out", "# конец"]
+        notes = ["# Build the report", "#--------", "# TODO: remove debug output",
+                 f"# author: {kit.latin(rng)}", "#  old version: rm -rf out", "# end"]
         out, want = ["#!/bin/sh"], ["#!/bin/sh"]
         for c in cmds:
             if notes and rng.random() < 0.5:
@@ -810,15 +810,15 @@ class BrewLesson(AnswerTask):
                 alternatives=("brew search --desc '{desc}' — поиск по описаниям: {answer} "
                               "найдётся по тому, что делает",)),
         Variant("Поставь (учебно) {formula} так, чтобы brew не полез обновлять список формул: сети "
-                "тут нет. Установка выдаст квитанцию — её номер и сдай: ans НОМЕР",
+                "тут нет. Установка выдаст квитанцию (строка Receipt) — её номер и сдай: ans НОМЕР",
                 hints=("Попробуй просто brew install {formula} и прочти, на чём он обрывается.",
                        "Переменная перед командой действует только на неё: "
                        "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА",
                        "HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula}, номер из строки "
-                       "«Квитанция», ans НОМЕР"),
+                       "«Receipt», ans НОМЕР"),
                 solution="HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula}, ans НОМЕР",
                 solution_script=("HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula} "
-                                 "| sed -n 's/^Квитанция: //p'"),
+                                 "| sed -n 's/^Receipt: //p'"),
                 wrong=("brew install {formula} >/dev/null 2>&1; print -r -- {receipt}",
                        "HOMEBREW_NO_AUTO_UPDATE=1 brew install {decoy} >/dev/null; "
                        "print -r -- {receipt}"),
@@ -932,7 +932,7 @@ class TldrTar(Task):
     def _files(self, rng, folder, names):
         shas = {}
         for name in names:
-            shas[name] = kit.sha(kit.write(folder / name, f"файл {name} {rng.random()}\n"))
+            shas[name] = kit.sha(kit.write(folder / name, f"file {name} {rng.random()}\n"))
         return shas
 
     def _pack(self, box, archive, src, shas):
@@ -1108,7 +1108,7 @@ class BatLines(AnswerTask):
                     "answer": names[odd], "traps": [["other", names[other]]]}
         blocks = rng.sample(self.BLOCKS, rng.randint(3, 5))
         target = rng.choice(blocks[1:])
-        lines, answer, first = ["# настройки сервиса"], 0, 0
+        lines, answer, first = ["# service settings"], 0, 0
         for b in blocks:
             lines += ["", f"{b}:"]
             for k in rng.sample(self.KEYS, len(self.KEYS)):
@@ -1405,8 +1405,8 @@ class BossTools(Task):
                       '  "replicas": [1, 2],\n'
                       '  "readonly": false,\n'
                       '}\n')
-            note = (f"База должна слушать порт {port}. Режим только для чтения (readonly) — "
-                    "включить.\n")
+            note = (f"The database must listen on port {port}. Read-only mode (readonly) "
+                    "must be on.\n")
             good = {"name": name, "host": "127.0.0.1", "port": port, "replicas": [1, 2],
                     "readonly": True}
             half = dict(good, port=5432)
@@ -1421,7 +1421,7 @@ class BossTools(Task):
                       '  "paths": ["/v1", "/v2",],\n'
                       '  "port": 8080\n'
                       '}\n')
-            note = f"Добавь в api.json таймаут: поле timeout, {timeout} секунд, числом.\n"
+            note = f"Add a timeout to api.json: field timeout, {timeout} seconds, as a number.\n"
             good = {"name": name, "retry": True, "paths": ["/v1", "/v2"], "port": 8080,
                     "timeout": timeout}
             half = dict(good, timeout=str(timeout))
@@ -1437,7 +1437,8 @@ class BossTools(Task):
                   '  "host": "0.0.0.0",\n'
                   '  "workers": [1, 2, 3,],\n'
                   '}\n')
-        note = f"Сервис должен слушать порт {port} на хосте 127.0.0.1. Отладку — выключить.\n"
+        note = (f"The service must listen on port {port} on host 127.0.0.1. Debug must be "
+                "off.\n")
         good = {"name": name, "host": "127.0.0.1", "port": port, "debug": False,
                 "workers": [1, 2, 3]}
         half = dict(good, port=str(port))
@@ -1497,8 +1498,8 @@ class BossTools(Task):
 # --- FB10 (лайфхаки): задачи в фоне — Ctrl+Z, fg, bg, &, jobs, kill %N -----------------------
 
 _JOB_HEAD = ('#!/bin/sh\n'
-             '# Учебный скрипт задачи «Задачи в фоне». Живёт, пока есть .termit, но не дольше '
-             'LIFE секунд.\n'
+             '# Training script for the background jobs task. Lives while .termit exists, '
+             'but no longer than LIFE seconds.\n'
              'cd "$(dirname "$0")" || exit 1\n')
 
 
@@ -1578,12 +1579,12 @@ class JobControl(Task):
         if variant == 1:
             _job_script(box, "pack.sh", (
                 'if [ -d notes ]; then\n'
-                '  echo "Папка notes уже есть — удали её (rmdir notes) и запусти меня снова: '
-                'создай её, пока я пакую."\n'
+                '  echo "Folder notes already exists. Remove it (rmdir notes) and run me '
+                'again: create it while I pack."\n'
                 '  exit 1\n'
                 'fi\n'
-                f'echo "Пакую… секунд {self.PACK_TIME}. Не жди: Ctrl+Z, потом bg — или сразу '
-                './pack.sh &"\n'
+                f'echo "Packing... {self.PACK_TIME} seconds. Do not wait: Ctrl+Z, then bg, '
+                'or start with ./pack.sh &"\n'
                 'i=0\n'
                 f'while [ $i -lt {self.PACK_TIME} ]; do\n'
                 '  [ -d .termit ] || exit 1\n'
@@ -1592,10 +1593,10 @@ class JobControl(Task):
                 'done\n'
                 'if [ -d notes ]; then\n'
                 '  echo "packed with notes" > pack.log\n'
-                '  echo "pack.sh: упаковано, и notes на месте — ты не ждал."\n'
+                '  echo "pack.sh: packed, and notes is there: you did not wait."\n'
                 'else\n'
-                '  echo "pack.sh: упаковано, но notes нет — ты просто ждал. Снова: ./pack.sh &, '
-                'и пока он пакует — mkdir notes"\n'
+                '  echo "pack.sh: packed, but notes is missing: you just waited. Again: '
+                './pack.sh &, and while it packs, mkdir notes"\n'
                 'fi\n'))
             return {"dur": self.PACK_TIME, "log": "pack.log", "want": "packed with notes"}
         if variant == 2:
@@ -1604,12 +1605,12 @@ class JobControl(Task):
                 f'sleep {self.FETCH_TIME}\n'
                 '[ -d .termit ] || exit 1\n'
                 'echo "fetched ok" > fetched.txt\n'
-                'echo "fetch.sh: скачано, смотри fetched.txt"\n'))
+                'echo "fetch.sh: downloaded, see fetched.txt"\n'))
             _job_script(box, "spam.sh", (
                 'echo $$ > spam.pid\n'
                 f'end=$(( $(date +%s) + {life} ))\n'
                 'while [ "$(date +%s)" -lt "$end" ] && [ -d .termit ]; do\n'
-                '  echo "spam.sh: РЕКЛАМА! РЕКЛАМА! (останови меня: jobs, kill %N)"\n'
+                '  echo "spam.sh: AD! AD! BUY NOW! (stop me: jobs, kill %N)"\n'
                 '  sleep 5\n'
                 'done\n'))
             return {"dur": self.FETCH_TIME, "spam": True}
@@ -1617,21 +1618,21 @@ class JobControl(Task):
         kit.write(box / "config.example", f"{mode}\n")
         _job_script(box, "build.sh", (
             'if [ -e config.txt ]; then\n'
-            '  echo "config.txt уже лежит — так неинтересно. Удали его (rm config.txt) и '
-            'запусти меня снова: создай его, пока я жду."\n'
+            '  echo "config.txt is already here, no fun. Remove it (rm config.txt) and run '
+            'me again: create it while I wait."\n'
             '  exit 1\n'
             'fi\n'
-            'echo "build.sh: жду config.txt… (приостановить меня — Ctrl+Z)"\n'
+            'echo "build.sh: waiting for config.txt... (pause me with Ctrl+Z)"\n'
             f'end=$(( $(date +%s) + {life} ))\n'
             'while [ ! -e config.txt ]; do\n'
             '  if [ "$(date +%s)" -ge "$end" ] || [ ! -d .termit ]; then\n'
-            '    echo "build.sh: не дождался config.txt"\n'
+            '    echo "build.sh: gave up waiting for config.txt"\n'
             '    exit 1\n'
             '  fi\n'
             '  sleep 0.2\n'
             'done\n'
             'echo "build $(head -n 1 config.txt) ok" > build.log\n'
-            'echo "build.sh: собрано, смотри build.log"\n'))
+            'echo "build.sh: built, see build.log"\n'))
         return {"mode": mode, "log": "build.log", "want": f"build {mode} ok"}
 
     def check(self, ctx):

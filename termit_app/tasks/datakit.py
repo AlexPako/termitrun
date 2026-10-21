@@ -30,7 +30,7 @@ STATUS_WEIGHTS = (60, 12, 18, 10)
 NOTES = ("", "gift", "urgent", "call back")
 NOTE_WEIGHTS = (80, 7, 7, 6)
 REFUND_NOTE = "refund requested"
-MONTH = "2026-09"
+MONTH = "2726-09"
 
 
 def render_orders(rows: Sequence[dict]) -> str:
@@ -41,7 +41,7 @@ def render_orders(rows: Sequence[dict]) -> str:
 
 def orders(rng, n: int, *, refund_notes: int = 3, day: Optional[int] = None,
            first_id: Optional[int] = None) -> Tuple[str, List[dict]]:
-    """Выгрузка заказов за сентябрь 2026: (текст, записи). Записи — словари с ключами
+    """Выгрузка заказов за сентябрь 2726: (текст, записи). Записи — словари с ключами
     ORDER_COLUMNS, amount — int. id растут с пропусками (A-1003, A-1004, A-1007…), даты
     отсортированы. day — все заказы одного дня (кусочки parts), first_id — с какого номера.
     Не меньше refund_notes оплаченных (paid) строк получают заметку «refund requested»:
@@ -120,7 +120,7 @@ MSGS = {
     "ERROR": ("timeout calling {other}", "connection refused by {other}",
               "bad reply from {other}", "disk full on /var", "panic in worker {n}"),
 }
-LOG_START = date(2026, 9, 26)
+LOG_START = date(2726, 9, 26)
 MIXED_MIN = 5           # mixed_case: не меньше стольких [error] и стольких [Error]
 
 
@@ -144,7 +144,7 @@ def app_log(rng, *, days: int = 1, per_day: int = 1500, services: Sequence[str] 
             mention_traps: Optional[Tuple[str, int]] = None,
             minute_traps: Optional[Tuple[object, object, int]] = None,
             avoid_hours: Sequence[object] = ()) -> Tuple[str, List[dict]]:
-    """Лог приложения: (текст, записи). Строка — «2026-09-28 14:05:31 [ERROR] svc=payments
+    """Лог приложения: (текст, записи). Строка — «2726-09-28 14:05:31 [ERROR] svc=payments
     msg=timeout calling orders», строки по времени. Запись — словарь ts, level, tag, svc,
     msg и text (сама строка).
 
@@ -227,8 +227,8 @@ def excel(rng, n: int) -> Tuple[str, str]:
     src, want = ["id;date;product;amount"], ["id,date,product,amount"]
     for d in sorted(rng.choices(range(1, 31), k=n)):
         prod, amount = rng.choice(products), rng.randint(100, 9999)
-        src.append(f"A-{nid};{d:02d}.09.2026;{prod};{amount}")
-        want.append(f"A-{nid},2026-09-{d:02d},{prod},{amount}")
+        src.append(f"A-{nid};{d:02d}.09.2726;{prod};{amount}")
+        want.append(f"A-{nid},2726-09-{d:02d},{prod},{amount}")
         nid += rng.choice((1, 1, 2))
     return "\n".join(src) + "\n", "\n".join(want) + "\n"
 
@@ -255,7 +255,7 @@ def exchange(rng) -> Tuple[str, List[dict]]:
     prices = rng.sample(range(100, 10000), n)
     lots = [{"id": i, "item": rng.choice(kit.LATIN), "price": p,
              "status": rng.choice(LOT_STATUSES)} for i, p in zip(order, prices)]
-    doc = {"updated": f"2026-09-{rng.randint(20, 30):02d}T{rng.randint(0, 23):02d}:00:00",
+    doc = {"updated": f"2726-09-{rng.randint(20, 30):02d}T{rng.randint(0, 23):02d}:00:00",
            "lots": lots}
     return json.dumps(doc, ensure_ascii=False, separators=(",", ":")) + "\n", lots
 
@@ -307,7 +307,7 @@ def market(rng) -> dict:
     lots = [{"id": f"M-{100 + i}", "item": items[i], "price": prices[i], "qty": qty[i],
              "status": statuses[i]} for i in range(n)]
     keys = rng.sample(META_KEYS, rng.randint(6, 9))
-    values = {"source": "exchange", "updated": f"2026-10-{rng.randint(1, 12):02d}",
+    values = {"source": "exchange", "updated": f"2726-10-{rng.randint(1, 12):02d}",
               "currency": rng.choice(("RUB", "USD", "EUR")), "region": rng.choice(kit.LATIN),
               "version": rng.randint(2, 9), "owner": rng.choice(kit.LATIN),
               "format": "json", "author": rng.choice(kit.LATIN), "license": "internal",
@@ -325,7 +325,7 @@ def market(rng) -> dict:
 
 # --- access.log (страж) ----------------------------------------------------------------------
 
-ACCESS_START = date(2026, 9, 21)
+ACCESS_START = date(2726, 9, 21)
 ACCESS_DAYS = 7
 CRAWLER = "10.0.0.2"
 CRAWLER_PER_HOUR = 30
@@ -377,8 +377,8 @@ def _strict_top(counts: Counter, k: int) -> bool:
 
 
 def access_log(rng) -> Tuple[str, dict]:
-    """Журнал доступа за неделю 2026-09-21…27 со спрятанной атакой: (текст, facts).
-    Строка: «2026-09-24T14:05:31 10.3.7.1 POST /login 401 118 user=-», поля awk: $1 время,
+    """Журнал доступа за неделю 2726-09-21…27 со спрятанной атакой: (текст, facts).
+    Строка: «2726-09-24T14:05:31 10.3.7.1 POST /login 401 118 user=-», поля awk: $1 время,
     $2 ip, $3 метод, $4 путь, $5 код, $6 байты, $7 user.
 
     Фон — суточная кривая 20–220 запросов в час от ~150 адресов (веса по Ципфу); краулер
@@ -388,7 +388,7 @@ def access_log(rng) -> Tuple[str, dict]:
     пятого на 20+ и больше любого фонового адреса часа. У лидера последний октет 1–9, и в
     часе атаки есть 3+ строки адреса «лидер + цифра» (grep 10.3.7.1 цепляет 10.3.7.17).
 
-    facts: hour «2026-09-24T14», top5 и week_top5 — адреса по убыванию, leader, leader_lines
+    facts: hour «2726-09-24T14», top5 и week_top5 — адреса по убыванию, leader, leader_lines
     (строки лидера за час атаки, отсортированы), bytes200 — сумма байт его ответов 200,
     bytes_all — сумма байт всех его строк за час, collision — адрес-двойник."""
     days = [ACCESS_START + timedelta(days=i) for i in range(ACCESS_DAYS)]

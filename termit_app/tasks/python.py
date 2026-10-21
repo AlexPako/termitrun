@@ -200,7 +200,7 @@ class NumberOut(pykit.PyEditTask):
         return Verdict(False, self.MSG_WRONG)
 
 
-VARS_TODO2 = "# TODO 2: напечатай f-строкой: total: …"
+VARS_TODO2 = "# TODO 2: print with an f-string: total: ..."
 VARS_PRINT = 'print(f"total: {total}")'
 
 
@@ -269,25 +269,25 @@ class PyVars(NumberOut):
     def skeleton(self, state: dict) -> str:
         v = _v(self, state)
         if v == 0:
-            head = ["# price.py — сколько стоит покупка на развес",
-                    f"price = {state['price']}    # цена за кг",
-                    f"weight = {state['weight']}    # вес, кг",
+            head = ["# price.py: how much a purchase by weight costs",
+                    f"price = {state['price']}    # price per kg",
+                    f"weight = {state['weight']}    # weight, kg",
                     "",
-                    "# TODO 1: total — цена × вес, до 2 знаков"]
+                    "# TODO 1: total = price × weight, 2 decimals"]
         elif v == 1:
-            head = ["# price.py — цена партии со скидкой",
-                    f"price = {state['price']}    # цена за штуку",
-                    f"qty = {state['qty']}    # штук",
-                    f"discount = {state['discount']}    # скидка, %",
+            head = ["# price.py: price of a batch with a discount",
+                    f"price = {state['price']}    # price per item",
+                    f"qty = {state['qty']}    # items",
+                    f"discount = {state['discount']}    # discount, %",
                     "",
-                    "# TODO 1: total — цена × штуки минус скидка, до 2 знаков"]
+                    "# TODO 1: total = price × qty minus discount, 2 decimals"]
         else:
-            head = ["# price.py — сколько продано за два дня",
+            head = ["# price.py: how much was sold in two days",
                     'lines = open("input.txt").read().split()',
-                    "monday = lines[0]    # это текст (str), а не число",
+                    "monday = lines[0]    # this is text (str), not a number",
                     "tuesday = lines[1]",
                     "",
-                    "# TODO 1: total — сумма двух дней, числом"]
+                    "# TODO 1: total = sum of the two days, as a number"]
         return "\n".join(head + [VARS_TODO2]) + "\n"
 
     def edits(self, state: dict) -> List[Tuple[str, str]]:
@@ -367,21 +367,21 @@ class PyLoop(NumberOut):
         v = _v(self, state)
         nums = ", ".join(str(a) for a in state["amounts"])
         if v == 0:
-            lines = ["# loop.py — сумма крупных заказов", f"amounts = [{nums}]",
+            lines = ["# loop.py: total of the large orders", f"amounts = [{nums}]",
                      f"limit = {state['limit']}", "total = 0",
-                     "# TODO 1: цикл по amounts — каждое число в a",
-                     "    # TODO 2: условие: a больше limit", "        total += a",
+                     "# TODO 1: loop over amounts, each number in a",
+                     "    # TODO 2: condition: a is greater than limit", "        total += a",
                      "print(total)"]
         elif v == 1:
-            lines = ["# loop.py — сколько дней без продаж", f"sales = [{nums}]", "zeros = 0",
-                     "# TODO 1: цикл по sales — каждое число в s",
-                     "    # TODO 2: условие: s равно нулю", "        zeros += 1",
+            lines = ["# loop.py: how many days without sales", f"sales = [{nums}]", "zeros = 0",
+                     "# TODO 1: loop over sales, each number in s",
+                     "    # TODO 2: condition: s equals zero", "        zeros += 1",
                      "print(zeros)"]
         else:
-            lines = ["# loop.py — самый крупный заказ (без max)", f"amounts = [{nums}]",
+            lines = ["# loop.py: the largest order (without max)", f"amounts = [{nums}]",
                      "best = amounts[0]",
-                     "# TODO 1: цикл по amounts — каждое число в a",
-                     "    # TODO 2: условие: a больше best", "        best = a",
+                     "# TODO 1: loop over amounts, each number in a",
+                     "    # TODO 2: condition: a is greater than best", "        best = a",
                      "print(best)"]
         return "\n".join(lines) + "\n"
 
@@ -467,24 +467,24 @@ class PyDict(pykit.PyEditTask):
         v = _v(self, state)
         if v == 0:
             buys = ", ".join(_q(x) for x in state["buys"])
-            lines = ["# tally.py — сколько штук каждого товара", f"buys = [{buys}]",
+            lines = ["# tally.py: how many of each item", f"buys = [{buys}]",
                      "counts = {}", "for item in buys:",
-                     "    # TODO 1: counts[item] — на 1 больше, чем было (сначала 0)",
+                     "    # TODO 1: counts[item] = one more than before (start at 0)",
                      "for name in sorted(counts):", '    print(f"{name}={counts[name]}")']
         elif v == 1:
             rows = ", ".join(f"({_q(c)}, {a})" for c, a in state["rows"])
-            lines = ["# tally.py — сумма продаж по категориям",
+            lines = ["# tally.py: sales total per category",
                      f"sales = [{rows}]", "sums = {}", "for cat, amount in sales:",
-                     "    # TODO 1: sums[cat] — прибавь amount (сначала 0)",
+                     "    # TODO 1: sums[cat]: add amount (start at 0)",
                      "for name in sorted(sums):", '    print(f"{name}={sums[name]}")']
         else:
             prices = ", ".join(f"{_q(k)}: {p}" for k, p in state["prices"].items())
             buys = ", ".join(_q(x) for x in state["buys"])
-            lines = ["# tally.py — во что обошёлся каждый товар",
-                     f"prices = {{{prices}}}    # справочник цен",
-                     f"buys = [{buys}]    # есть и товары не из справочника", "cost = {}",
+            lines = ["# tally.py: what each item cost",
+                     f"prices = {{{prices}}}    # price list",
+                     f"buys = [{buys}]    # some items are not in the price list", "cost = {}",
                      "for item in buys:",
-                     "    # TODO 1: cost[item] — прибавь цену из prices (нет в справочнике — 0)",
+                     "    # TODO 1: cost[item]: add the price from prices (0 if not in the list)",
                      "for name in sorted(cost):", '    print(f"{name}={cost[name]}")']
         return "\n".join(lines) + "\n"
 
@@ -522,8 +522,8 @@ class PyDict(pykit.PyEditTask):
 
 # --- 5. py_func -----------------------------------------------------------------------------
 
-MYLIB_HEAD = '"""mylib — общие расчёты для отчётов: report.py зовёт их через import mylib."""'
-MYLIB_TAIL = ["", "", "# дальше — другие функции отчётов"]
+MYLIB_HEAD = '"""mylib: shared report calculations, report.py calls them via import mylib."""'
+MYLIB_TAIL = ["", "", "# other report functions go below"]
 
 
 class PyFunc(pykit.PyEditTask):
@@ -611,29 +611,29 @@ class PyFunc(pykit.PyEditTask):
     def report(st: dict, v: int) -> str:
         if v == 1:
             rows = ", ".join(f"({a}, {r})" for a, r in st["orders"])
-            body = [f"orders = [{rows}]    # (сумма, ставка %)", "for a, r in orders:",
+            body = [f"orders = [{rows}]    # (amount, rate %)", "for a, r in orders:",
                     '    print(f"{a}={mylib.fee(a, r)}")']
         else:
             body = [f"amounts = {st['amounts']}"]
             body += (['print(f"total={mylib.total_fee(amounts)}")'] if v == 2 else
                      ["for a in amounts:", '    print(f"{a}={mylib.fee(a)}")'])
-        head = ["# report.py — комиссия по заказам (не правь: функции — в mylib.py)",
+        head = ["# report.py: fee per order (do not edit: the functions live in mylib.py)",
                 "import mylib", ""]
         return "\n".join(head + body) + "\n"
 
     def skeleton(self, state: dict) -> str:
         v = _v(self, state)
-        rate = [f"RATE = {state.get('rate')}    # комиссия, %"] if v != 1 else []
+        rate = [f"RATE = {state.get('rate')}    # fee, %"] if v != 1 else []
         if v == 0:
-            mid = ["", "", "# TODO 1: функция fee(amount) — комиссия RATE % с суммы, до 2 "
-                   "знаков"]
+            mid = ["", "", "# TODO 1: function fee(amount): RATE % fee of the amount, "
+                   "2 decimals"]
         elif v == 1:
-            mid = ["", "", "# TODO 1: функция fee(amount, rate) — комиссия rate % с суммы, "
-                   "до 2 знаков"]
+            mid = ["", "", "# TODO 1: function fee(amount, rate): rate % fee of the amount, "
+                   "2 decimals"]
         else:
             mid = ["", "", "def fee(amount):", "    return round(amount * RATE / 100, 2)",
-                   "", "", "# TODO 1: функция total_fee(amounts) — сумма fee(a) по всем, до 2 "
-                   "знаков"]
+                   "", "", "# TODO 1: function total_fee(amounts): sum of fee(a) for all, "
+                   "2 decimals"]
         return "\n".join([MYLIB_HEAD] + rate + mid + MYLIB_TAIL) + "\n"
 
     def edits(self, state: dict) -> List[Tuple[str, str]]:
@@ -799,10 +799,10 @@ class PyJson(pykit.PyEditTask):
               "словари и списки.\n"
               "Вглубь — по шагам: shelf[\"books\"][0][\"title\"] — ключ, номер в списке, ключ.\n"
               "Записать: with open(\"b.json\", \"w\") as f: — и в нём json.dump(x, f, indent=2, "
-              "ensure_ascii=False) — с отступами, кириллица буквами.")
+              "ensure_ascii=False) — с отступами, буквы вроде ü — буквами.")
     variants = (
         Variant("В orders.json — заказы магазина; допиши orders.py: только оплаченные, со "
-                "статусом paid, — списком в paid.json, с отступом 2 и кириллицей как есть; "
+                "статусом paid, — списком в paid.json, с отступом 2 и буквами вроде ü как есть; "
                 "запуск — python3 orders.py",
                 hints=("Открой orders.py: nano orders.py — две строки # TODO.",
                        "Условие — if и сравнение ==, как в цикле по списку; запись — json.dump "
@@ -821,7 +821,7 @@ class PyJson(pykit.PyEditTask):
                               "сумма одной строкой",),
                 key="nested"),
         Variant("В каждом заказе orders.json ключ cust надо переименовать в customer — весь "
-                "документ сохрани в renamed.json (отступ 2, кириллица как есть). del d[k] "
+                "документ сохрани в renamed.json (отступ 2, буквы вроде ü как есть). del d[k] "
                 "убирает ключ из словаря.",
                 hints=("Открой orders.py: nano orders.py — три строки # TODO.",
                        "Новый ключ — то же значение, что у старого; старый — del; запись — "
@@ -834,7 +834,7 @@ class PyJson(pykit.PyEditTask):
     hints = variants[0].hints
     explain = ("JSON в Python — это словари и списки: json.load читает, а вглубь идёшь по "
                "шагам [ключ][номер][ключ]. json.dump пишет обратно; indent=2 — чтобы читалось "
-               "глазами, ensure_ascii=False — кириллица буквами, а не кодами.")
+               "глазами, ensure_ascii=False — буквы вроде ü и я остаются буквами, а не кодами.")
     spell = "json.load(f); d[\"a\"][0][\"b\"]; json.dump(x, f, indent=2, ensure_ascii=False)"
     trap_messages = {
         "all": "Здесь все заказы, а нужны только оплаченные: условие status == \"paid\".",
@@ -863,26 +863,26 @@ class PyJson(pykit.PyEditTask):
         v = _v(self, state)
         head = ["import json", "", 'with open("orders.json") as f:', "    data = json.load(f)"]
         if v == 0:
-            lines = (["# orders.py — оплаченные заказы из orders.json в paid.json"] + head +
+            lines = (["# orders.py: paid orders from orders.json into paid.json"] + head +
                      ["paid = []", 'for order in data["orders"]:',
-                      '    # TODO 1: условие — status заказа равен "paid"',
+                      '    # TODO 1: condition: the order status equals "paid"',
                       "        paid.append(order)", 'with open("paid.json", "w") as f:',
-                      "    # TODO 2: запиши paid — с отступом 2 и кириллицей как есть"])
+                      "    # TODO 2: write paid with indent 2 and letters like ü kept as is"])
         elif v == 1:
-            lines = (["# orders.py — сумма каждого заказа в totals.json"] + head +
+            lines = (["# orders.py: total of each order into totals.json"] + head +
                      ["totals = {}", 'for order in data["orders"]:', "    s = 0",
                       '    for item in order["items"]:',
-                      "        # TODO 1: s — прибавь цену × количество этой позиции",
+                      "        # TODO 1: s: add price × qty of this item",
                       '    totals[order["id"]] = s', 'with open("totals.json", "w") as f:',
-                      "    # TODO 2: запиши totals — с отступом 2"])
+                      "    # TODO 2: write totals with indent 2"])
         else:
-            lines = (["# orders.py — в каждом заказе ключ cust → customer, итог в renamed.json"]
+            lines = (["# orders.py: cust → customer in every order, into renamed.json"]
                      + head +
                      ['for order in data["orders"]:',
-                      '    # TODO 1: order["customer"] — то же значение, что у order["cust"]',
-                      "    # TODO 2: старый ключ cust — убрать (del)",
+                      '    # TODO 1: order["customer"] = the same value as order["cust"]',
+                      "    # TODO 2: remove the old key cust (del)",
                       'with open("renamed.json", "w") as f:',
-                      "    # TODO 3: запиши data — с отступом 2 и кириллицей как есть"])
+                      "    # TODO 3: write data with indent 2 and letters like ü kept as is"])
         return "\n".join(lines) + "\n"
 
     def edits(self, state: dict) -> List[Tuple[str, str]]:
@@ -905,7 +905,7 @@ class PyJson(pykit.PyEditTask):
             return Verdict(False, msg)
         want = st["expect"]
         if doc == want:
-            form = pykit.json_form(text, out, cyrillic=_v(self, st) != 1)
+            form = pykit.json_form(text, out, non_ascii=_v(self, st) != 1)
             return Verdict(form is None, form)
         for key, trap in st.get("traps") or ():
             if doc == trap and key in self.trap_messages:
@@ -1041,30 +1041,30 @@ class PyCsvJson(pykit.PyEditTask):
     def skeleton(self, state: dict) -> str:
         v = _v(self, state)
         if v == 0:
-            lines = ["# convert.py — продажи из sales.csv в sales.json", "import csv",
+            lines = ["# convert.py: sales from sales.csv into sales.json", "import csv",
                      "import json", "", "rows = []",
                      'with open("sales.csv", newline="") as f:',
-                     "    # TODO 1: reader — читатель csv.DictReader для f",
+                     "    # TODO 1: reader = a csv.DictReader for f",
                      "    for row in reader:", "        rows.append(row)",
                      'with open("sales.json", "w") as f:',
                      "    json.dump(rows, f, indent=2, ensure_ascii=False)"]
         elif v == 1:
-            lines = ["# convert.py — остатки из stock.json в stock.csv, с шапкой", "import csv",
+            lines = ["# convert.py: stock.json into stock.csv, with a header", "import csv",
                      "import json", "", 'with open("stock.json") as f:',
                      "    rows = json.load(f)",
                      'with open("stock.csv", "w", newline="") as f:',
                      '    w = csv.DictWriter(f, fieldnames=["name", "city", "qty"])',
-                     "    # TODO 1: сначала шапка", "    # TODO 2: потом все строки rows"]
+                     "    # TODO 1: the header first", "    # TODO 2: then all the rows"]
         else:
-            lines = ["# convert.py — sales.csv с новой колонкой total — в sales2.csv",
+            lines = ["# convert.py: sales.csv with a new column total, into sales2.csv",
                      "import csv", "", 'with open("sales.csv", newline="") as f:',
                      "    rows = list(csv.DictReader(f))",
                      'with open("sales2.csv", "w", newline="") as f:',
                      '    w = csv.DictWriter(f, fieldnames=["id", "item", "price", "qty", '
                      '"total"])',
                      "    w.writeheader()", "    for row in rows:",
-                     "        # TODO 1: row[\"total\"] — цена × количество (они текстом: "
-                     "сначала int)",
+                     "        # TODO 1: row[\"total\"] = price × qty (they are text: "
+                     "int first)",
                      "        w.writerow(row)"]
         return "\n".join(lines) + "\n"
 
@@ -1085,7 +1085,7 @@ class PyCsvJson(pykit.PyEditTask):
                 return Verdict(False, msg)
             want = st["expect"]
             if _same_records(doc, want):
-                form = pykit.json_form(text, out, cyrillic=False)
+                form = pykit.json_form(text, out, non_ascii=False)
                 return Verdict(form is None, form)
             for key, trap in st.get("traps") or ():
                 if key in self.trap_messages and _same_records(doc, trap):
@@ -1200,21 +1200,21 @@ class PyFiles(pykit.PyEditTask):
     def skeleton(self, state: dict) -> str:
         v = _v(self, state)
         if v == 0:
-            lines = ["# files.py — сколько байт во всех *.log в logs, вместе с подпапками",
+            lines = ["# files.py: how many bytes in all *.log in logs, subfolders included",
                      "from pathlib import Path", "", "total = 0",
-                     "# TODO 1: цикл по всем *.log в logs и в подпапках — каждый в p",
-                     "    # TODO 2: total — прибавь размер файла p в байтах", "print(total)"]
+                     "# TODO 1: loop over every *.log in logs and its subfolders, each in p",
+                     "    # TODO 2: total: add the size of file p in bytes", "print(total)"]
         elif v == 1:
-            lines = ["# files.py — сколько строк app.log с кодом ошибки: E и три цифры (E404)",
+            lines = ["# files.py: app.log lines with an error code: E and 3 digits (E404)",
                      "import re", "", "count = 0", 'for line in open("app.log"):',
-                     "    # TODO 1: если в строке где угодно есть код — re.search",
+                     "    # TODO 1: if the line has the code anywhere: re.search",
                      "        count += 1", "print(count)"]
         else:
-            lines = ["# files.py — отчёты reports/report-ДАТА.txt старше cutoff",
+            lines = ["# files.py: reports reports/report-DATE.txt older than cutoff",
                      "from pathlib import Path", "", f'cutoff = "{state["cutoff"]}"',
-                     "# TODO 1: цикл по report-*.txt в reports, по алфавиту — каждый в p",
+                     "# TODO 1: loop over report-*.txt in reports, sorted, each in p",
                      "    day = p.stem[-10:]    # report-2026-03-14 → 2026-03-14",
-                     "    # TODO 2: если day раньше cutoff (даты ГГГГ-ММ-ДД — как строки)",
+                     "    # TODO 2: if day is before cutoff (YYYY-MM-DD dates compare as strings)",
                      "        print(p.name)"]
         return "\n".join(lines) + "\n"
 
@@ -1352,25 +1352,25 @@ class PyStats(pykit.PyEditTask):
         v = _v(self, state)
         if v == 0:
             sales = ", ".join(_q(x) for x in state["sales"])
-            lines = ["# stats.py — три самых частых товара в sales",
+            lines = ["# stats.py: the three most common items in sales",
                      "from collections import Counter", "", f"sales = [{sales}]",
-                     "# TODO 1: counts — Counter по sales",
-                     "# TODO 2: цикл по трём самым частым — пары name, n",
+                     "# TODO 1: counts = a Counter over sales",
+                     "# TODO 2: loop over the three most common: pairs name, n",
                      '    print(f"{name}={n}")']
         elif v == 1:
-            lines = ["# stats.py — медиана и среднее чеков", "import statistics", "",
+            lines = ["# stats.py: median and mean of the checks", "import statistics", "",
                      f"checks = {state['checks']}",
-                     "# TODO 1: median — середина checks (модуль statistics)",
-                     "# TODO 2: mean — среднее checks, до 2 знаков",
+                     "# TODO 1: median = the middle of checks (statistics module)",
+                     "# TODO 2: mean = average of checks, 2 decimals",
                      'print(f"median={median}")', 'print(f"mean={mean}")']
         else:
             days = ", ".join(_q(x) for x in state["days"])
-            lines = ["# stats.py — сколько дней от самой ранней даты до самой поздней",
+            lines = ["# stats.py: how many days from the earliest date to the latest",
                      "from datetime import date", "", f"days = [{days}]",
-                     "first = min(days)    # даты ГГГГ-ММ-ДД сравнивают как строки",
+                     "first = min(days)    # YYYY-MM-DD dates compare as strings",
                      "last = max(days)",
-                     "# TODO 1: d1 и d2 — даты из first и last (date.fromisoformat)",
-                     "# TODO 2: напечатай, сколько дней между d1 и d2"]
+                     "# TODO 1: d1 and d2 = dates from first and last (date.fromisoformat)",
+                     "# TODO 2: print how many days are between d1 and d2"]
         return "\n".join(lines) + "\n"
 
     def edits(self, state: dict) -> List[Tuple[str, str]]:
@@ -1450,7 +1450,7 @@ class PyStats(pykit.PyEditTask):
 # --- 11. py_urllib --------------------------------------------------------------------------
 
 URLLIB_HEAD = ["import json", "import urllib.request", "", "import sockhttp", "",
-               "sockhttp.install()    # только для учебного сервера: дальше — обычный urllib"]
+               "sockhttp.install()    # only for the training server: plain urllib after this"]
 
 
 class PyUrllib(pykit.PyEditTask):
@@ -1539,18 +1539,19 @@ class PyUrllib(pykit.PyEditTask):
         v = _v(self, state)
         if v == 2:
             body = ["items = []",
-                    "# TODO 1: цикл по номерам страниц — сколько их, скажет поле next",
-                    "    # TODO 2: r — ответ на http://api/stock?page=… (номер — из page)",
+                    "# TODO 1: loop over page numbers, the next field tells how many",
+                    "    # TODO 2: r = response for http://api/stock?page=... (number from page)",
                     '    items += json.load(r)["items"]', 'with open("stock.json", "w") as f:',
                     "    json.dump(items, f, indent=2)"]
-            head = "# fetch.py — все страницы остатков учебного API в stock.json"
+            head = "# fetch.py: all stock pages of the training API into stock.json"
         else:
-            what = ("на http://api/stock" if v == 0 else
-                    f"на http://api/stock только по городу {state['city']} (параметр city)")
-            body = [f"# TODO 1: r — ответ urllib.request.urlopen {what}", "data = json.load(r)",
+            what = ("for http://api/stock" if v == 0 else
+                    f"for http://api/stock, only city {state['city']} (parameter city)")
+            body = [f"# TODO 1: r = urllib.request.urlopen response {what}",
+                    "data = json.load(r)",
                     'with open("stock.json", "w") as f:',
                     '    json.dump(data["items"], f, indent=2)']
-            head = "# fetch.py — остатки учебного API в stock.json"
+            head = "# fetch.py: stock of the training API into stock.json"
         return "\n".join([head] + URLLIB_HEAD + body) + "\n"
 
     def edits(self, state: dict) -> List[Tuple[str, str]]:
@@ -1634,7 +1635,7 @@ _BOSS_H1 = ("Запусти и прочти: source .venv/bin/activate && python
        "строка traceback скажет, что сломалось; править — nano report.py.")
 _BOSS_H2 = ("Сколько страниц у /stock, спроси сам API: curl --unix-socket api.sock "
        "http://api/stock | python3 -c 'import json, sys; "
-       "print(json.load(sys.stdin)[\"next\"])'. И проверь отступы, кириллицу и шапку CSV.")
+       "print(json.load(sys.stdin)[\"next\"])'. И проверь отступы, буквы вроде ü и шапку CSV.")
 _BOSS_H3 = ("Лишний import requests — отчёту он не нужен: убери строку. ",
        "csv.py рядом — двойник: import csv берёт его, а не модуль Python. rm csv.py. ",
        "KeyError: 'town' — в orders.json ключ city: order[\"city\"]. ")
@@ -1643,7 +1644,7 @@ _BOSS_H3 = ("Лишний import requests — отчёту он не нужен:
 class BossPy(Task):
     """Страж трека: report.py выдаёт себя за правильный, а врёт в четырёх местах — подмена (A:
     лишний import, B: двойник csv.py рядом, C: чужой ключ), одна страница API, json.dump без
-    отступов и кириллицы, CSV без шапки. Каждый приём — из варианта 0 задач трека (П3.1):
+    отступов и ensure_ascii, CSV без шапки. Каждый приём — из варианта 0 задач трека (П3.1):
     traceback — py_run, ключи словаря — py_dict, свой файл рядом — py_func, страницы API —
     py_urllib, json.dump — py_json, writeheader — py_csv_json. Проверка — по файлам у родителя
     (разбор json/csv), журналу учебного API и тексту report.py (как текст, без исполнения):
@@ -1666,7 +1667,7 @@ class BossPy(Task):
               "w.writerow(d).")
     steps = ("report.py больше не падает: подмена найдена и убрана, orders.json не тронут",
              "stock.json скачан с API скриптом — строки всех страниц",
-             "paid.json — только оплаченные заказы, с отступами и кириллицей буквами",
+             "paid.json — только оплаченные заказы, с отступами и буквами вроде ü как есть",
              "summary.csv — шапка и по строке на каждый город")
     variants = tuple(
         Variant(text, hints=(_BOSS_H1, _BOSS_H2, py(_BOSS_H3[i] + "Дальше: " + _BOSS_LATER + ".")),
@@ -1686,7 +1687,7 @@ class BossPy(Task):
     hints = variants[0].hints
     solution = variants[0].solution
     explain = ("Скрипт-подменыш врёт тихо: падает на чужом модуле или ключе, берёт одну "
-               "страницу из двух, пишет JSON без отступов и кириллицы, а CSV — без шапки. "
+               "страницу из двух, пишет JSON без отступов и ü кодами \\u, а CSV — без шапки. "
                "Лечится по traceback и по файлам: запустил, поправил, снова запустил.")
     spell = ("traceback снизу → лишний import / двойник модуля / ключ → next у API → "
              "indent=2, ensure_ascii=False → writeheader")
@@ -1782,7 +1783,7 @@ class BossPy(Task):
         if msg:
             return False, msg
         if doc == st["paid"]:
-            form = pykit.json_form(text, "paid.json", cyrillic=True)
+            form = pykit.json_form(text, "paid.json", non_ascii=True)
             return form is None, form
         traps = dict((k, t) for k, t in st.get("traps") or ())
         if doc == traps.get("all"):

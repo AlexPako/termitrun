@@ -148,8 +148,8 @@ LESSONS = {
         "JSON — словари и списки: `with open(\"shelf.json\") as f:` и `shelf = json.load(f)`, with "
         "as сам закроет файл. Вглубь — `shelf[\"books\"][0][\"title\"]`. Запись — `with "
         "open(\"out.json\", \"w\") as f:` и `json.dump(x, f, indent=2, ensure_ascii=False)`: "
-        "indent — отступы, без ensure_ascii кириллица станет \\u0410 — такое ни один покупатель не "
-        "прочтёт."),
+        "indent — отступы, без ensure_ascii ü станет \\u00fc, а кириллица — \\u0410: такое ни "
+        "один покупатель не прочтёт."),
     "py_csv_json": (
         "CSV словарями: `with open(\"books.csv\", newline=\"\") as f:` и `for row in "
         "csv.DictReader(f):` — row[\"title\"] по шапке; newline=\"\" — концы строк решает csv. "

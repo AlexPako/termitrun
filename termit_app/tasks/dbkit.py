@@ -150,12 +150,12 @@ TRANSFER_NOTES = ("", "", "", "rent", "gift", "loan", "salary", "fee", "refund")
 TEST_NOTE, DECOY_NOTE = "test", "contest"       # tx_delete: = 'test' против LIKE '%test%'
 ACTORS = ("clerk_a", "clerk_b", "clerk_c", "night_desk")
 
-MONTH = "2026-09"                  # «переводы за месяц»
-MONTH_LAST = "2026-09-30"          # последний день: BETWEEN '…-01' AND '…-30' его теряет
-NEXT_MONTH = "2026-10-01"
-TRANSFER_SPAN = ("2026-08-10", "2026-10-12")
+MONTH = "2726-09"                  # «переводы за месяц»
+MONTH_LAST = "2726-09-30"          # последний день: BETWEEN '…-01' AND '…-30' его теряет
+NEXT_MONTH = "2726-10-01"
+TRANSFER_SPAN = ("2726-08-10", "2726-10-12")
 AMOUNT_LO, AMOUNT_HI = 500, 1500   # концы BETWEEN по сумме: на каждом — строки ровно на нём
-BORN_LO, BORN_HI = "1980-01-01", "1989-12-31"   # концы BETWEEN по дате рождения
+BORN_LO, BORN_HI = "2680-01-01", "2689-12-31"   # концы BETWEEN по дате рождения
 
 # гарантии постройки (tests/test_dbkit.py проверяет каждую на 50 зёрнах)
 MIN_NAMESAKES = 3        # пар одинаковых name в разных городах
@@ -273,8 +273,8 @@ def _people(rng, n: int) -> List[dict]:
     for i, (name, city) in enumerate(plan, start=1):
         first, last = name.lower().split()
         email = f"{first}.{last}{rng.randrange(10, 99)}@{rng.choice(DOMAINS)}"
-        out.append({"id": i, "name": name, "city": city, "born": _date(rng, "1955-01-01",
-                                                                         "2006-12-31"),
+        out.append({"id": i, "name": name, "city": city, "born": _date(rng, "2655-01-01",
+                                                                         "2706-12-31"),
                     "email": email, "phone": _phone(rng, used_phones),
                     "status": rng.choices(PEOPLE_STATUSES, PEOPLE_STATUS_WEIGHTS)[0]})
     # почты нет: NULL и пустая строка — у не-тёзок (цель задач среди тёзок)
@@ -297,7 +297,7 @@ def _accounts(rng, people: List[dict]) -> List[dict]:
             continue
         for _ in range(rng.choices((1, 2, 3, 4), (45, 30, 17, 8))[0]):
             out.append({"id": aid, "person_id": p["id"],
-                        "opened": _date(rng, "2015-01-01", "2026-08-31"),
+                        "opened": _date(rng, "2715-01-01", "2726-08-31"),
                         "balance": rng.randrange(0, 90000),
                         "status": rng.choices(ACCOUNT_STATUSES, ACCOUNT_STATUS_WEIGHTS)[0],
                         "note": rng.choice(ACCOUNT_NOTES)})
@@ -321,7 +321,7 @@ def _audit(rng, people: List[dict]) -> List[dict]:
     for _ in range(rng.randint(18, 26)):
         p = rng.choice(people)
         col = rng.choice(("status", "phone", "city"))
-        day = _date(rng, "2025-01-01", "2026-08-31")
+        day = _date(rng, "2725-01-01", "2726-08-31")
         ts, actor = _ts(rng, day), rng.choice(ACTORS)
         # было > стало — словами, как пишет триггер (аудит новичка A7); два числа из rng — как
         # и раньше, чтобы остальные данные зерна не сдвинулись
@@ -406,8 +406,8 @@ def _ensure_traps(rng, recs: Records) -> None:
             break
         p = rng.choice(hosts)
         nid = max(a["id"] for a in accounts) + rng.choice((1, 2))
-        accounts.append({"id": nid, "person_id": p["id"], "opened": _date(rng, "2015-01-01",
-                                                                         "2026-08-31"),
+        accounts.append({"id": nid, "person_id": p["id"], "opened": _date(rng, "2715-01-01",
+                                                                         "2726-08-31"),
                          "balance": rng.randrange(0, 90000), "status": "active", "note": ""})
         by_city[lead_city] += 1
         # новый счёт без переводов портит MIN_IDLE только в плюс — гарантии целы
@@ -421,7 +421,7 @@ def _ensure_traps(rng, recs: Records) -> None:
         bal -= rng.randint(LEAD_MARGIN + 5, 900)
     newest = max(a["opened"] for a in accounts)
     for a in [a for a in accounts if a["opened"] == newest][1:]:
-        a["opened"] = _date(rng, "2015-01-01", "2026-01-31")
+        a["opened"] = _date(rng, "2715-01-01", "2726-01-31")
     # суммы переводов: три самых мелких и самый крупный — без ничьих (метки ловушек целы)
     marked = {id(t) for t in special}
     plain = [t for t in transfers if id(t) not in marked]
@@ -488,10 +488,10 @@ def having_threshold(rng, counts: Counter) -> int:
 
 def add_account(rng, recs: Records, pid: int, balance: int, status: str = "active") -> dict:
     """Ещё один счёт человеку (задачи A3 доводят данные своего варианта): id — после
-    последнего, открыт до 2026-02 (самый свежий счёт остаётся одним)."""
+    последнего, открыт до 2726-02 (самый свежий счёт остаётся одним)."""
     accs = recs.tables["accounts"]
     acc = {"id": max(a["id"] for a in accs) + rng.choice((1, 2)), "person_id": pid,
-           "opened": _date(rng, "2015-01-01", "2026-01-31"), "balance": balance,
+           "opened": _date(rng, "2715-01-01", "2726-01-31"), "balance": balance,
            "status": status, "note": ""}
     accs.append(acc)
     return acc
@@ -562,7 +562,7 @@ def _extra_rows(rng, table: str) -> List[tuple]:
                 for i in range(1, n + 1)]
     if table == "offices":
         return [(i, rng.randint(1, 9), f"{rng.choice(STREETS)} {rng.randint(1, 90)}",
-                 _date(rng, "2001-01-01", "2026-01-01")) for i in range(1, n + 1)]
+                 _date(rng, "2701-01-01", "2726-01-01")) for i in range(1, n + 1)]
     return [(f"F-{k}", f"form {k}", rng.randint(1, 12))
             for k in rng.sample(range(10, 99), n)]
 
@@ -588,7 +588,7 @@ def extra_people(rng, recs: Records, n: int, dups: int = 2) -> List[dict]:
     for i in range(n):
         first, last = rng.choice(FIRST), rng.choice(LAST)
         out.append({"id": start + i, "name": f"{first} {last}", "city": rng.choice(CITIES),
-                    "born": _date(rng, "1955-01-01", "2006-12-31"),
+                    "born": _date(rng, "2655-01-01", "2706-12-31"),
                     "email": f"{first.lower()}.{last.lower()}{rng.randrange(10, 99)}@"
                              f"{rng.choice(DOMAINS)}",
                     "phone": _phone(rng, used), "status": "active"})
@@ -657,7 +657,7 @@ LEDGER_KINDS = ("charge", "payment", "write_off")
 DEPTS = ("risk", "audit", "ops", "sales")
 EVENT_TYPES = ("login", "transfer", "alert", "export")
 EVENT_TAGS = ("x", "vip", "night", "manual", "api")
-VAULT_SPAN = ("2026-06-01", "2026-09-30")
+VAULT_SPAN = ("2726-06-01", "2726-09-30")
 ACTORS_VAULT = ("teller_a", "teller_b", "night_desk", "audit_bot")
 
 VAULT_COLUMNS: Dict[str, Tuple[str, ...]] = {
@@ -805,7 +805,7 @@ def vault(rng, *, customers: int = 60, invoices: int = 200, payments: int = 180)
         first, last = name.lower().split()
         cust.append({"id": i, "name": name, "district": district,
                      "email": f"{first}.{last}@{rng.choice(DOMAINS)}",
-                     "created_at": _ts(rng, _date(rng, "2024-01-01", "2026-05-31"))})
+                     "created_at": _ts(rng, _date(rng, "2724-01-01", "2726-05-31"))})
     for k, c in enumerate(rng.sample(cust, MIN_NULL_EMAIL + MIN_EMPTY_EMAIL)):
         c["email"] = "" if k < MIN_EMPTY_EMAIL else None
     idle = {c["id"] for c in rng.sample(cust, MIN_NO_INVOICES + rng.randint(0, 2))}
@@ -848,7 +848,7 @@ def vault(rng, *, customers: int = 60, invoices: int = 200, payments: int = 180)
     for i in range(1, rng.randint(15, 22)):
         x = rng.choice(inv)
         was, now = rng.sample(INVOICE_STATUSES, 2)
-        audit.append({"id": i, "ts": _ts(rng, _date(rng, "2026-01-01", "2026-05-31")),
+        audit.append({"id": i, "ts": _ts(rng, _date(rng, "2726-01-01", "2726-05-31")),
                       "actor": rng.choice(ACTORS_VAULT), "action": "update", "tbl": "invoices",
                       "row_id": x["id"], "detail": f"status:{was}>{now}"})
     audit.sort(key=lambda e: (e["ts"], e["id"]))

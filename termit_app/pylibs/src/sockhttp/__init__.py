@@ -1,21 +1,21 @@
-"""sockhttp — HTTP через unix-сокет: тот же разговор, что с сайтом, только без сети.
+"""sockhttp: HTTP over a unix socket, the same talk as with a website, only without a network.
 
-Сервер слушает файл-сокет (api.sock), а не порт. Так устроены, например, Docker API и
-многие локальные службы. Три способа поговорить с ним:
+The server listens on a socket file (api.sock), not on a port. The Docker API and many local
+services work like this. Three ways to talk to it:
 
     >>> import sockhttp
-    >>> r = sockhttp.get("/items", params={"status": "open"})     # свой маленький клиент
+    >>> r = sockhttp.get("/items", params={"status": "open"})     # a small client of its own
     >>> r.status_code, r.json()
 
-    >>> sockhttp.install()                     # дальше работает обычный urllib
+    >>> sockhttp.install()                     # plain urllib works after this
     >>> import urllib.request, json
     >>> json.load(urllib.request.urlopen("http://api/items"))
 
-    >>> s = sockhttp.session()                 # настоящий requests.Session (если он стоит)
+    >>> s = sockhttp.session()                 # a real requests.Session (if installed)
     >>> s.get("http://api/items").json()
 
-В жизни будет requests.get("https://…") или urlopen("https://…") — остальное один в один.
-Без зависимостей; requests нужен только для session()."""
+In real life it is requests.get("https://...") or urlopen("https://..."), the rest is the same.
+No dependencies; requests is needed only for session()."""
 import http.client
 import json as _json
 import os
@@ -34,7 +34,7 @@ USER_AGENT = "sockhttp/" + __version__
 
 
 class HTTPError(OSError):
-    """Ответ с кодом 4xx или 5xx (raise_for_status)."""
+    """A response with a 4xx or 5xx code (raise_for_status)."""
 
     def __init__(self, message, response=None):
         super().__init__(message)
@@ -42,7 +42,7 @@ class HTTPError(OSError):
 
 
 class Headers(dict):
-    """Заголовки ответа: имена без учёта регистра (r.headers["Content-Type"])."""
+    """Response headers: names are case-insensitive (r.headers["Content-Type"])."""
 
     def __init__(self, pairs=()):
         super().__init__((str(k).lower(), v) for k, v in pairs)
@@ -58,7 +58,7 @@ class Headers(dict):
 
 
 class Response:
-    """Ответ сервера — поля как у requests.Response."""
+    """Server response with the same fields as requests.Response."""
 
     def __init__(self, status_code, headers, content, url=""):
         self.status_code = int(status_code)
@@ -68,34 +68,34 @@ class Response:
 
     @property
     def ok(self) -> bool:
-        """True, если код меньше 400."""
+        """True if the code is below 400."""
         return self.status_code < 400
 
     @property
     def text(self) -> str:
-        """Тело ответа строкой (UTF-8)."""
+        """Response body as a string (UTF-8)."""
         return self.content.decode("utf-8", errors="replace")
 
     def json(self):
-        """Тело ответа, разобранное как JSON."""
+        """Response body parsed as JSON."""
         return _json.loads(self.text)
 
     def raise_for_status(self) -> None:
-        """Код 4xx или 5xx — исключение HTTPError; иначе ничего."""
+        """Raise HTTPError on a 4xx or 5xx code; otherwise do nothing."""
         if not self.ok:
-            raise HTTPError(f"{self.status_code} для {self.url or 'запроса'}", self)
+            raise HTTPError(f"{self.status_code} for {self.url or 'the request'}", self)
 
     def __repr__(self):
         return f"<Response [{self.status_code}]>"
 
 
 def _seconds(timeout) -> float:
-    """urllib передаёт socket._GLOBAL_DEFAULT_TIMEOUT (объект-метку), а не число."""
+    """urllib passes socket._GLOBAL_DEFAULT_TIMEOUT (a marker object), not a number."""
     return float(timeout) if isinstance(timeout, (int, float)) else TIMEOUT
 
 
 class UnixConnection(http.client.HTTPConnection):
-    """http.client.HTTPConnection, который соединяется с файлом-сокетом, а не с портом."""
+    """http.client.HTTPConnection that connects to a socket file, not to a port."""
 
     def __init__(self, sock_path, host=DEFAULT_HOST, timeout=TIMEOUT):
         super().__init__(host, timeout=_seconds(timeout))
@@ -113,7 +113,7 @@ class UnixConnection(http.client.HTTPConnection):
 
 
 def _target(path, params=None) -> str:
-    """Путь запроса: "/items" или "http://api/items"; params — словарь для ?ключ=значение."""
+    """Request path: "/items" or "http://api/items"; params is a dict for ?key=value."""
     parts = urllib.parse.urlsplit(str(path))
     target = parts.path or "/"
     if not target.startswith("/"):
@@ -143,21 +143,21 @@ def _request(method, path, sock, params=None, headers=None, json=None, timeout=T
 
 
 def get(path, sock=DEFAULT_SOCK, params=None, headers=None, timeout=TIMEOUT) -> Response:
-    """GET-запрос к серверу на сокете sock.
+    """GET request to the server on socket sock.
 
-    path — "/items" (или "http://api/items"); params — {"status": "open"} даст
-    ?status=open; headers — свои заголовки, например {"X-Api-Key": "…"}."""
+    path is "/items" (or "http://api/items"); params {"status": "open"} gives
+    ?status=open; headers are your own headers, for example {"X-Api-Key": "..."}."""
     return _request("GET", path, sock, params=params, headers=headers, timeout=timeout)
 
 
 def post(path, json=None, headers=None, sock=DEFAULT_SOCK, timeout=TIMEOUT) -> Response:
-    """POST-запрос: json — данные (словарь или список), уходят телом в формате JSON с
-    заголовками Content-Type: application/json и Content-Length."""
+    """POST request: json is the data (a dict or a list), sent as a JSON body with the
+    headers Content-Type: application/json and Content-Length."""
     return _request("POST", path, sock, headers=headers, json=json, timeout=timeout)
 
 
 class UnixHandler(urllib.request.HTTPHandler):
-    """Обработчик urllib: адреса http://<host>/… идут в сокет, другие хосты — отказ."""
+    """urllib handler: http://<host>/... addresses go to the socket, other hosts are refused."""
 
     def __init__(self, sock, host=DEFAULT_HOST):
         super().__init__()
@@ -166,7 +166,8 @@ class UnixHandler(urllib.request.HTTPHandler):
 
     def http_open(self, req):
         if req.host != self.host:
-            raise urllib.error.URLError(f"sockhttp: через сокет — только http://{self.host}/")
+            raise urllib.error.URLError(
+                f"sockhttp: only http://{self.host}/ goes through the socket")
 
         def connect(host, timeout=TIMEOUT, **_kw):
             return UnixConnection(self.sock, host, timeout)
@@ -174,25 +175,26 @@ class UnixHandler(urllib.request.HTTPHandler):
 
 
 def install(sock=DEFAULT_SOCK, host=DEFAULT_HOST) -> None:
-    """Подключить сокет к urllib: после этого urllib.request.urlopen("http://api/…") идёт
-    в sock. Путь к сокету запоминается полным — можно потом сменить папку (cd)."""
+    """Plug the socket into urllib: after this urllib.request.urlopen("http://api/...") goes
+    to sock. The socket path is stored in full, so you can change folders (cd) later."""
     handler = UnixHandler(os.path.abspath(sock), host)
     urllib.request.install_opener(urllib.request.build_opener(handler))
 
 
 def session(sock=DEFAULT_SOCK, host=DEFAULT_HOST):
-    """Настоящий requests.Session, у которого адреса http://<host>/… идут в сокет.
+    """A real requests.Session whose http://<host>/... addresses go to the socket.
 
-    Нужен пакет requests: pip install requests (в игре — из склада, без сети)."""
+    Needs the requests package: pip install requests (in the game, from the warehouse,
+    without a network)."""
     try:
         import requests
         from requests.adapters import HTTPAdapter
         import urllib3
     except ImportError:
-        raise ImportError("нужен requests: pip install --no-index --find-links ~/wheels "
+        raise ImportError("requests is required: pip install --no-index --find-links ~/wheels "
                           "requests") from None
     from sockhttp import _adapter
     s = requests.Session()
-    s.trust_env = False                 # без прокси из окружения и без .netrc
+    s.trust_env = False                 # no proxy from the environment and no .netrc
     s.mount(f"http://{host}/", _adapter.make(HTTPAdapter, urllib3, os.path.abspath(sock)))
     return s

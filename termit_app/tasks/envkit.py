@@ -545,8 +545,8 @@ SYNC_MARK = MARKS[0]
 # строка перед охраной (ревью P3, M5): понятно новичку и другу, скопировавшему файл
 # E24a (аудит, мелкие): 5 строк охраны с TERMIT_BOX в head -n 10 сами выглядят подозрительно —
 # строка-пояснение называет их прямо
-HONEST_NOTE = ("# учебный образец termit: 5 строк с TERMIT_BOX ниже — его защита, вне игры он "
-               "сразу выходит")
+HONEST_NOTE = ("# termit training sample: the 5 lines with TERMIT_BOX below are its guard, "
+               "outside the game it exits right away")
 
 _GUARD = (
     '[ -n "$TERMIT_BOX" ] || exit 0',
@@ -556,13 +556,13 @@ _GUARD = (
     '[ -f "$box/.termit/task.json" ] || exit 0',
 )
 _DIRTY_FILLER = (       # по порядку; каждый пункт — строки, которые идут вместе
-    ('echo "{stem}: чищу кэш…"',),
-    ('n=$(ls | wc -l)', 'echo "{stem}: файлов в папке: $n"'),
-    ('echo "{stem}: проверяю настройки"',),
+    ('echo "{stem}: clearing cache..."',),
+    ('n=$(ls | wc -l)', 'echo "{stem}: files in folder: $n"'),
+    ('echo "{stem}: checking settings"',),
     ('sleep 0',),
-    ('echo "{stem}: ускоряю запуск"',),
+    ('echo "{stem}: speeding up startup"',),
     ('date +%H:%M',),
-    ('echo "{stem}: почти всё"',),
+    ('echo "{stem}: almost done"',),
 )
 DIRTY_NAMES = ("speedup.sh", "fix_wifi.sh", "cleaner_pro.sh", "turbo_boot.sh", "mac_tuner.sh",
                "battery_saver.sh", "disk_doctor.sh")
@@ -573,8 +573,8 @@ def dirty_script(rng, name: str, mark: str = SYNC_MARK) -> Tuple[str, Dict[str, 
     скачивания}). Обе строки — после десятой и не в самом конце: без grep или less их не
     видно. Номера строк зависят от зерна."""
     stem = name.rsplit(".", 1)[0]
-    head = ["#!/bin/sh", f"# {name} — ускоряет терминал: чистит кэш и включает быстрый старт.",
-            f"# Запуск: ./{name}"]
+    head = ["#!/bin/sh", f"# {name}: speeds up your terminal, clears cache, turns on fast start.",
+            f"# Usage: ./{name}"]
     picked = sorted(rng.sample(range(len(_DIRTY_FILLER)), 6))
     items = [[x.format(stem=stem) for x in _DIRTY_FILLER[i]] for i in picked]
     k1 = rng.randint(2, 3)                  # до первой подозрительной строки
@@ -592,30 +592,30 @@ def dirty_script(rng, name: str, mark: str = SYNC_MARK) -> Tuple[str, Dict[str, 
         body += fetch + mid + payload
     else:
         body += payload + mid + fetch
-    body += post + [f'echo "{stem}: готово, открой новое окно терминала"']
+    body += post + [f'echo "{stem}: done, open a new terminal window"']
     lines = {"zshrc": body.index(payload[1]) + 1, "curl": body.index(fetch[1]) + 1}
     return "\n".join(body) + "\n", lines
 
 
 # полезные скрипты: шаблон с параметром {n} — подменённая копия отличается им
 USEFUL = {
-    "resize.sh": ("#!/bin/sh\n# Уменьшает фото в папке до {n} точек по длинной стороне.\n"
-                  "# Запуск: ./resize.sh ПАПКА\n"
-                  "[ -d \"$1\" ] || {{ echo \"нужна папка\" >&2; exit 1; }}\n"
+    "resize.sh": ("#!/bin/sh\n# Shrinks photos in a folder to {n} pixels on the long side.\n"
+                  "# Usage: ./resize.sh FOLDER\n"
+                  "[ -d \"$1\" ] || {{ echo \"folder required\" >&2; exit 1; }}\n"
                   "for f in \"$1\"/*.jpg; do\n  sips -Z {n} \"$f\" >/dev/null && echo \"$f\"\n"
                   "done\n"),
-    "clean_tmp.sh": ("#!/bin/sh\n# Показывает временные файлы старше {n} дней — удалять решаешь "
-                     "сам.\n# Запуск: ./clean_tmp.sh ПАПКА\n"
+    "clean_tmp.sh": ("#!/bin/sh\n# Lists temp files older than {n} days, you decide what to "
+                     "delete.\n# Usage: ./clean_tmp.sh FOLDER\n"
                      "find \"${{1:-.}}\" -name '*.tmp' -type f -mtime +{n} -print\n"),
-    "rename.sh": ("#!/bin/sh\n# Переименовывает фото по номеру: photo_001.jpg, photo_002.jpg…\n"
-                  "# Запуск: ./rename.sh ПАПКА\ni={n}\n"
+    "rename.sh": ("#!/bin/sh\n# Renames photos by number: photo_001.jpg, photo_002.jpg...\n"
+                  "# Usage: ./rename.sh FOLDER\ni={n}\n"
                   "for f in \"$1\"/*.jpg; do\n  i=$((i + 1))\n"
                   "  mv -n \"$f\" \"$1/photo_$(printf %03d $i).jpg\"\ndone\n"),
-    "count_lines.sh": ("#!/bin/sh\n# Считает строки во всех .txt папки, показывает первые {n}.\n"
-                       "# Запуск: ./count_lines.sh ПАПКА\n"
+    "count_lines.sh": ("#!/bin/sh\n# Counts lines in every .txt of a folder, shows the top {n}.\n"
+                       "# Usage: ./count_lines.sh FOLDER\n"
                        "wc -l \"${{1:-.}}\"/*.txt | sort -rn | head -n {n}\n"),
-    "backup_notes.sh": ("#!/bin/sh\n# Копирует заметки в backup/ и хранит {n} последних копий.\n"
-                        "# Запуск: ./backup_notes.sh\nmkdir -p backup\n"
+    "backup_notes.sh": ("#!/bin/sh\n# Copies notes into backup/ and keeps the last {n} copies.\n"
+                        "# Usage: ./backup_notes.sh\nmkdir -p backup\n"
                         "cp notes.txt \"backup/notes-$(date +%Y%m%d%H%M).txt\"\n"
                         "ls -t backup | tail -n +$(({n} + 1))\n"),
 }
@@ -661,12 +661,12 @@ INBOX_DIRS = ("mail", "usb", "chat", "share", "old")
 NOTE_NAMES = ("notes.txt", "todo.txt", "invoice.txt", "readme.txt", "plan.txt")
 PHOTO_NAMES = ("cat.jpg", "beach.jpg", "receipt.jpg", "scan.jpg")
 # чистый, хоть и с curl: качает файл, а не исполняет его — «чистое не трогай»
-FETCH_SH = ("#!/bin/sh\n# Забирает свежие курсы в rates.json — только скачать, ничего не "
-            "запускает.\ncurl -s https://api.example.invalid/rates -o rates.json && "
-            "echo \"курсы обновлены\"\n")
+FETCH_SH = ("#!/bin/sh\n# Fetches fresh rates into rates.json: download only, runs "
+            "nothing.\ncurl -s https://api.example.invalid/rates -o rates.json && "
+            "echo \"rates updated\"\n")
 SIG_NAMES = ("Demo.ShellRc.A", "Demo.ShellRc.B", "Demo.ShellRc.C")
 NEW_SIG = "Demo.New"
-LOCAL_HSB = "# свои сигнатуры — по строке: sha256:размер:Имя\n"
+LOCAL_HSB = "# own signatures, one per line: sha256:size:Name\n"
 
 
 def inbox(rng, variant: int) -> dict:
@@ -719,9 +719,9 @@ def inbox(rng, variant: int) -> dict:
         data = files[rel][0]
         sample = {"sha": hashlib.sha256(data).hexdigest(), "sha1": hashlib.sha1(data).hexdigest(),
                   "size": len(data)}
-        report = ("Новый образец — база его ещё не знает.\n"
-                  f"sha256: {sample['sha']}\nразмер: {sample['size']} байт\n"
-                  "Лежит где-то в inbox/. Не запускай.\n")
+        report = ("New sample: the database does not know it yet.\n"
+                  f"sha256: {sample['sha']}\nsize: {sample['size']} bytes\n"
+                  "It is somewhere in inbox/. Do not run it.\n")
     return {"files": files, "dirty": dirty, "clean": clean,
             "main_hsb": "\n".join(lines) + "\n", "report": report, "sample": sample}
 
@@ -1055,7 +1055,7 @@ BOSS_REAL = {"ls": "/bin/ls", "grep": "/usr/bin/grep",
 # лишний пакет, что поставил источник: нейтральные имена, внутри только __version__
 EXTRA_PKGS = ("speedkit", "fastshell", "turbocache")
 EXTRA_VERSION = "0.3.1"
-RC_HEAD = ("# мои настройки", "alias ll='ls -la'")
+RC_HEAD = ("# my settings", "alias ll='ls -la'")
 RC_POOL = ("export EDITOR=nano", "setopt autocd", "alias gs='git status'", "export LESS=-R",
            "HISTSIZE=5000", "alias ..='cd ..'")
 FAKE_DIR = ".cache/bin"                         # в ~ песочницы
@@ -1073,7 +1073,7 @@ def infected_line(line: str) -> bool:
 def fake_cmd(cmd: str) -> str:
     """Учебная подмена команды: та же шапка и охрана A8, метка ~/.cache/.sync, потом настоящая
     команда со всеми аргументами — вывод тот же. Вне игры — exit 0 без вывода."""
-    return "\n".join(["#!/bin/sh", f"# {cmd} — быстрый запуск с кэшем", HONEST_NOTE] +
+    return "\n".join(["#!/bin/sh", f"# {cmd}: fast start with a cache", HONEST_NOTE] +
                      list(_GUARD) +
                      ['mkdir -p "$HOME/.cache" && : > "$HOME/.cache/.sync"',
                       f'exec {BOSS_REAL[cmd]} "$@"']) + "\n"
@@ -1084,8 +1084,8 @@ def boss_source(rng, name: str, extra: str) -> str:
     метка (как у E13), а в функции agent_setup, которую никто не зовёт, — что он «сделал»:
     скачивание, pip install лишнего пакета, строка PATH в ~/.zshrc, chmod 644 для .env."""
     stem = name.rsplit(".", 1)[0]
-    head = ["#!/bin/sh", f"# {name} — ускоряет терминал: чистит кэш и включает быстрый старт.",
-            f"# Запуск: ./{name}"]
+    head = ["#!/bin/sh", f"# {name}: speeds up your terminal, clears cache, turns on fast start.",
+            f"# Usage: ./{name}"]
     picked = sorted(rng.sample(range(len(_DIRTY_FILLER)), 5))
     items = [[x.format(stem=stem) for x in _DIRTY_FILLER[i]] for i in picked]
     k = rng.randint(2, 3)
@@ -1101,7 +1101,7 @@ def boss_source(rng, name: str, extra: str) -> str:
     payload = ['mkdir -p "$HOME/.cache" && : > "$HOME/.cache/.sync"',
                f"echo '{SYNC_MARK}' >> \"$HOME/.zshrc\""]
     body = head + [HONEST_NOTE] + list(_GUARD) + pre + agent + payload + post
-    body += [f'echo "{stem}: готово, открой новое окно терминала"']
+    body += [f'echo "{stem}: done, open a new terminal window"']
     return "\n".join(body) + "\n"
 
 

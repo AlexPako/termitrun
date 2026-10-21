@@ -1,12 +1,12 @@
-"""tabprint — печать таблиц в терминале.
+"""tabprint: print tables in the terminal.
 
     >>> import tabprint
-    >>> print(tabprint.table([["city", "n"], ["Kazan", 3]]))
-    city   n
-    Kazan  3
+    >>> print(tabprint.table([["city", "n"], ["Oakland", 3]]))
+    city     n
+    Oakland  3
 
-Строки — списки (первая строка — шапка) или словари (шапка — ключи первого словаря или
-cols). Числа выравниваются вправо, текст — влево. Без зависимостей, только Python 3.9+."""
+Rows are lists (the first row is the header) or dicts (the header is the keys of the first
+dict, or cols). Numbers are aligned right, text left. No dependencies, Python 3.9+ only."""
 import csv
 
 __version__ = "1.0.0"
@@ -26,7 +26,7 @@ def _is_number(text: str) -> bool:
 
 
 def _grid(rows, cols=None):
-    """Шапка и строки таблицы как списки строк."""
+    """Table header and rows as lists of strings."""
     rows = list(rows)
     if rows and isinstance(rows[0], dict):
         head = list(cols) if cols is not None else list(rows[0])
@@ -41,11 +41,11 @@ def _grid(rows, cols=None):
 
 
 def table(rows, cols=None) -> str:
-    """Таблица текстом.
+    """The table as text.
 
-    rows — список списков (первый — шапка, если cols не задан) или список словарей.
-    cols — имена колонок: для словарей — какие ключи и в каком порядке.
-    Возвращает строку без перевода строки в конце; пустой rows — пустая строка."""
+    rows: a list of lists (the first one is the header unless cols is given) or a list of dicts.
+    cols: column names; for dicts, which keys and in what order.
+    Returns a string without a trailing newline; empty rows give an empty string."""
     head, body = _grid(rows, cols)
     if not head and not body:
         return ""
@@ -63,11 +63,11 @@ def table(rows, cols=None) -> str:
 
 
 def show(rows, cols=None) -> None:
-    """Напечатать table(rows, cols)."""
+    """Print table(rows, cols)."""
     print(table(rows, cols))
 
 
 def from_csv(path, delimiter=",") -> list:
-    """Прочитать CSV в список словарей (шапка — первая строка файла)."""
+    """Read a CSV file into a list of dicts (the header is the first line)."""
     with open(path, newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f, delimiter=delimiter))

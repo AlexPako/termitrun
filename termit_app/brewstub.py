@@ -22,7 +22,7 @@ from typing import List, Optional
 
 from termit_app import implants
 
-NOTE = "(учебный brew: песочница без сети)"
+NOTE = "(training brew: the sandbox has no network)"
 LOG = "brew.log"
 
 
@@ -199,13 +199,13 @@ def _install_note() -> str:
     return implants.text("stub_install")
 
 
-USAGE = """Учебный brew умеет (как настоящий, на маленьком каталоге):
-  brew search ТЕКСТ           формулы, в имени которых есть ТЕКСТ (/…/ — регулярка)
-  brew search --desc ТЕКСТ    формулы, в описании которых есть ТЕКСТ
-  brew info ФОРМУЛА           карточка: описание; у отключённой — чем заменить
-  brew which-formula КОМАНДА  какая формула ставит команду
-  brew list                   что уже стоит
-  brew install ФОРМУЛА        учебная установка (с HOMEBREW_NO_AUTO_UPDATE=1)"""
+USAGE = """Training brew can do (like the real one, on a small catalog):
+  brew search TEXT            formulae with TEXT in the name (/.../ is a regex)
+  brew search --desc TEXT     formulae with TEXT in the description
+  brew info FORMULA           the card: description; for a disabled one, its replacement
+  brew which-formula COMMAND  which formula installs the command
+  brew list                   what is installed
+  brew install FORMULA        training install (with HOMEBREW_NO_AUTO_UPDATE=1)"""
 
 
 def _out(*lines: str) -> None:
@@ -260,7 +260,7 @@ def _search(args: List[str], word: str) -> int:
 def cmd_info(args: List[str]) -> int:
     names = _names(args)
     if not names:
-        _out(f"{len(formulas())} formulae (учебный каталог)")
+        _out(f"{len(formulas())} formulae (training catalog)")
         return 0
     code = 0
     for i, name in enumerate(names):
@@ -310,8 +310,8 @@ def cmd_install(args: List[str], no_update: bool) -> int:
         return 1
     if not no_update:
         _out("==> Auto-updating Homebrew...")
-        _err("Сначала обновлю каталог формул… в песочнице сети нет — прервано.",
-             "Без обновления: HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА")
+        _err("Updating the formula catalog first... the sandbox has no network, aborted.",
+             "Without the update: HOMEBREW_NO_AUTO_UPDATE=1 brew install FORMULA")
         return 1
     code = 0
     for name in names:
@@ -325,10 +325,11 @@ def cmd_install(args: List[str], no_update: bool) -> int:
             code = 1
             continue
         _out(f"==> Installing {f.name}")
-        _err(f"Учебная установка {f.name}: ничего не качаю и не ставлю.", _install_note())
+        _err(f"Training install of {f.name}: nothing is downloaded or installed.",
+             _install_note())
         receipt = _state().get("receipt") or _judge_receipt()
         if receipt:
-            _out(f"Квитанция: {receipt}")
+            _out(f"Receipt: {receipt}")
     return code
 
 
@@ -345,16 +346,16 @@ def main(argv: List[str]) -> int:
         return 0 if argv else 1
     cmd, args = argv[0], argv[1:]
     if cmd in ("--version", "-v"):
-        _out("Homebrew 4 (учебный)")
+        _out("Homebrew 4 (training)")
         return 0
     if cmd in COMMANDS:
         return COMMANDS[cmd](args)
     if cmd == "install":
         return cmd_install(args, no_update)
     if cmd in ("update", "upgrade"):
-        _err("Нужна сеть, а в песочнице сети нет — прервано.")
+        _err("This needs the network, and the sandbox has none: aborted.")
         return 1
-    _err(f"Учебный brew не знает команду {cmd!r}.", USAGE)
+    _err(f"Training brew does not know the command {cmd!r}.", USAGE)
     return 1
 
 

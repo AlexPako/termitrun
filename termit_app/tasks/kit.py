@@ -15,9 +15,11 @@ from pathlib import Path
 from typing import Dict, Optional
 
 # Слова для случайных данных — бытовые, без сеттинга: файлы одинаковы во всех темах.
-WORDS = ["апельсин", "маяк", "кофе", "лимон", "гитара", "ракета", "компас", "фонарь",
-         "самовар", "кактус", "пингвин", "велосипед", "радуга", "тюльпан", "вулкан",
-         "глобус", "барабан", "якорь", "клевер", "шахматы"]
+# По-английски (FB12-data, п. 42: в терминале всё как в настоящем) и НЕ из LATIN: LATIN идёт
+# в имена файлов и папок, а слово-ответ внутри файла не должно совпадать с именем рядом.
+WORDS = ["maple", "falcon", "harbor", "pepper", "violin", "comet", "magnet", "candle",
+         "teapot", "walnut", "otter", "scooter", "thunder", "lily", "glacier",
+         "marble", "trumpet", "pebble", "acorn", "domino"]
 # Латинские имена — понятные английские слова (не транслит: имя должно читаться на любом языке)
 LATIN = ["orange", "lighthouse", "coffee", "lemon", "guitar", "rocket", "compass", "lantern",
          "kettle", "cactus", "penguin", "bicycle", "rainbow", "tulip", "volcano",

@@ -1,4 +1,3 @@
-"""Учебный пакет-пустышка termit (страж трека «Окружение и скрипты»): «лишний» пакет, который
-поставил найденный скрипт. Кода нет — только номер версии; имя пакету даёт сборка
-(wheelmake.stub)."""
+"""termit training placeholder package: the "extra" package a downloaded script installed.
+No code, only a version number; the build gives it its name (wheelmake.stub)."""
 __version__ = "0.0.0"
