@@ -242,7 +242,7 @@ def key_group_rows(index: int, width: int = 78, one_line: bool = False) -> list:
 def task_card(n, total, track, task, state, first_time: bool, mode: str = "train",
               unsolved: bool = False, par: float = None, rehearsal: bool = False,
               urgent: bool = False, owl: bool = False, master: str = None,
-              key_turn: int = 0, fresh: bool = True) -> None:
+              key_turn: int = 0, fresh: bool = True, timed: bool = False) -> None:
     """Карточка приёмов — при первой встрече, в тренировке и пока задача ни разу не решена.
     master — строка режима круга мастера (рекорд вместо таймера), вместо метки тренировки.
     FB5 п. 43: карточка выше CARD_ROWS строк (длинный урок) — подвал одной строкой, а задание
@@ -296,8 +296,9 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         say("\n".join(tui.style(r, "bold", c=cp)
                       for r in tui.fill(f"{i}. {step}", tw, "   ", "      ")))
     job = mode == "job"
+    timed = job or timed        # экзамен отработки: таймер есть, подсказки даром
     par = task.par_for(state) if par is None else par         # с модулем «охладитель» — длиннее
-    timer = f"   {theme.word('timer')} {fmt_time(par)}" if job else ""
+    timer = f"   {theme.word('timer')} {fmt_time(par)}" if timed else ""
     hint = (f"hint — {theme.word('soft_label')} за {theme.word('money')}" if job
             else "hint — бесплатно")
     tall = card_rows(task, state, shown_lesson) + CARD_TAIL > CARD_ROWS
@@ -321,7 +322,7 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     for row in key_group_rows(group, wide, one_line=tall):
         say(c("2", row) if cp.level == "plain" else tui.style(row, "dim", c=cp))
     notes = [answer_form(task, state)]
-    if job:             # отсчёт — с открытия задания (FB5)
+    if timed:           # отсчёт — с открытия задания (FB5)
         notes.append(TIMER_RUNS)
     elif first_time:
         notes.append(TIMER_OFF)
@@ -694,20 +695,18 @@ _INTRO_KEYS_HEAD = (
     "Ещё: reset — собрать задачу заново · skip — отложить на завтра · giveup — "
     "сдаться и посмотреть разбор.\n"
     "Клавиши терминала — стрелки, история команд, прокрутка — в задаче набери keys.\n"
-    "Решил — песочница остаётся: пробуй другие способы. Дальше — next. ")
+    "Решил — песочница остаётся: пробуй другие способы. Дальше — next. "
+    "Ещё урок — new в убежище. Что-то не так — bug, игра спросит текст.\n")
 INTRO_KEYS = (
     _INTRO_KEYS_HEAD
-    + "Когда ран окончен, игра предложит ещё урок — more. Что-то не так — bug, игра "
-    "спросит текст.\n"
     # FB5: общее правило про ./termit СЛОВО — один раз и рано
-    "Команды вида ./termit слово (./termit shop, ./termit home …) — команды самой "
+    + "Команды вида ./termit слово (./termit shop, ./termit home …) — команды самой "
     "игры: их набирают не в задаче, а в обычном терминале — после рана или вместо "
     "него. Список всех — ./termit help.")
 # в убежище хвост памятки другой: слова игры набирают там, без ./termit
 INTRO_KEYS_HUB = (
     _INTRO_KEYS_HEAD
-    + "Ещё урок — слово lesson в убежище. Что-то не так — bug, игра спросит текст.\n"
-    "Слова игры (shop, home, stats …) набирают в убежище — оно открывается, когда "
+    + "Слова игры (shop, home, stats …) набирают в убежище — оно открывается, когда "
     "запускаешь игру, и после каждого рана. Все слова — help.")
 
 
@@ -814,7 +813,7 @@ KEYS_SHEET = """\
   hint            подсказка;  skip — отложить;  quit — выйти
   bug             замечание: игра спросит текст — пиши как есть, любые символы
   next            после решения — дальше; до того пробуй другие способы
-  more            после итога рана — ещё урок (новая команда)
+  new (в убежище) ещё урок: новая команда сверх нормы
   ext             копилка расширений файлов: что значит хвост после точки
   book [слово]    книга выученных команд (с поиском)
 

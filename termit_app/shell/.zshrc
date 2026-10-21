@@ -218,7 +218,7 @@ lesson() { _tr lesson }
 alias bug='noglob bug' book='noglob book' ans='noglob ans' loot='noglob loot' memory='noglob memory' ask='noglob ask'
 
 # FB3 (3): песочница после решения — дальше командой next. more здесь только напоминает, что
-# ещё урок предлагается после итога рана. Только в этом режиме: more с аргументами — пейджер.
+# ещё урок — слово new в убежище. Только в этом режиме: more с аргументами — пейджер.
 if [[ -n $TERMIT_LINGER ]]; then
   unalias next more 2>/dev/null
   next() { _tr next }
@@ -332,7 +332,7 @@ if [[ -n $TERMIT_HUB ]]; then
   command_not_found_handler() {
     _termit_layout_hint "$1" && return 127
     case $1 in
-      board|callsign|clear|deck|diary|dossier|feedback|fence|help|home|hub|implants|inbox|intro|list|look|map|master|music|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|update|wheels)
+      board|callsign|clear|deck|diary|dossier|feedback|fence|help|home|hub|implants|inbox|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|train|update|wheels)
         print -r -- "$1 — слово убежища. quit — и ты в убежище, там набери $1."
         return 127 ;;
     esac

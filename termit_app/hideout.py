@@ -110,7 +110,7 @@ def _trophy_look(boss: str) -> Callable[[dict], List[str]]:
         from termit_app.tasks import registry
         tasks = registry.all_tasks()
         title = theme.title(tasks[boss]) if boss in tasks else boss
-        return [f"Взломан: {title}. Повторить схватку без экзамена: `./termit play {boss}`."]
+        return [f"Взломан: {title}. Повторить схватку без экзамена: `./termit rehearse {boss}`."]
     return look
 
 
@@ -409,8 +409,8 @@ USE: Dict[str, tuple] = {
 USE_GROUPS = ("prompt", "palette", "glyph_pack", "callsign")
 for _track in shop.TROPHY_TRACKS:
     USE[f"trophy_{_track}"] = (
-        f"⚙ ./termit play boss_{_track} — реванш без экзамена",
-        f"Висит в честь победы. Хочешь размяться ещё раз — ./termit play boss_{_track}: та "
+        f"⚙ ./termit rehearse boss_{_track} — реванш без экзамена",
+        f"Висит в честь победы. Хочешь размяться ещё раз — ./termit rehearse boss_{_track}: та "
         "же схватка, но без экзамена и без риска.")
 for _iid in shop.SHNYR_ITEMS:
     USE[_iid] = ("просто лежит: вещь из прошлого",

@@ -14,8 +14,8 @@ from termit_app import book as book_mod
 from termit_app import (contracts, cosmetics, edition, extensions, field, freezes, goal,
                         hideout, hook, implants, inbox, judge, lifehacks,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
-                        remarks, repute, sound, story, syserrors, theme, ui, warehouse,
-                        weekly)
+                        remarks, repute, sound, story, syserrors, textnorm, theme, ui,
+                        warehouse, weekly)
 from termit_app.tasks import dbkit, registry
 from termit_app.tasks.base import variant_index
 
@@ -33,7 +33,7 @@ class Options:
     runner: Callable = shell_run.run
     ask: Callable = input
     today: Optional[date] = None
-    practice: bool = False          # ./termit play ID — тренировка без денег; непобеждённый босс — дело
+    practice: bool = False          # круг мастера и тренировки: без денег, серии и дня
     real_home: Path = dfield(default_factory=Path.home)
     rehearsal: bool = False         # репетиция стража: тренировка, прогресс не записывается
     #                                 (кроме памяти сказанных реплик heard — FB12-voices)
@@ -47,9 +47,13 @@ class Options:
     # FB3 (3): после решения — остаться в песочнице до next/more/quit (./termit ставит True;
     # тесты с подставным runner по умолчанию — прежний поток с Enter и [y/N])
     linger: bool = False
-    # убежище (хаб): ран зовут из командной строки игры — после итога вопроса MORE_PROMPT
-    # нет, следующий шаг подсказывает пульт; quit из задачи — назад в убежище
+    # убежище (хаб): ран зовут из командной строки игры — следующий шаг подсказывает пульт;
+    # quit из задачи — назад в убежище
     hub: bool = False
+    # отработка (train, спека 2.6): без кармы и денег, рекорд только без подсказок, день не
+    # закрывается; результаты задач — в tally["drill"] для итога отработки
+    drill: bool = False
+    exam: bool = False          # train exam: таймер дела, подсказки даром, без денег
 
 
 def _ask(opts: Options, prompt: str) -> str:
@@ -126,7 +130,7 @@ def today_reviews(p: dict, today: date, short: bool = False) -> List[str]:
     train их не трогает, ран остаётся полным (спека 2.6)."""
     tasks = registry.all_tasks()
     # замок after — одно правило для всех путей, и для повторений по сроку тоже: пара,
-    # решённая до стража в старом сохранении, ждёт замка, как в play ID и разминке
+    # решённая до стража в старом сохранении, ждёт замка, как в train ID и разминке
     reviews = [i for i in progress.due(p, today)
                if i in tasks and available(tasks[i]) and after_done(p, tasks[i])]
     # проваленный страж — вне лимита повторений: иначе долг старых дел (срок раньше)
@@ -153,6 +157,10 @@ def build_queue(p: dict, today: date, short: bool = False, rng=None) -> List[str
 COMBAT_WARNING = ("⚔ Дальше — боевые задания. Таймер стартует сразу, как откроется задание: "
                   "читай и делай, вафлить нельзя. Запас времени большой — успеешь.")
 COMBAT_PROMPT = "Готов? Enter — в бой. "
+# экзамен отработки (train exam): таймер тот же, но денег нет — слова не про бой (М-8)
+EXAM_WARNING = ("⏱ Экзамен на время: таймер стартует сразу, как откроется задание. Подсказки "
+                "даром, денег и серии нет — просто проверяешь себя.")
+EXAM_PROMPT = "Готов? Enter — начать. "
 BOSS_PAUSE = "\n   Enter — дальше "      # FB12 (B6): после первой победы над стражем
 
 
@@ -597,7 +605,7 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
         if free_hint:
             sandbox.write_box_file(box, ".termit/free_hint", "1")
         par = progress.novice_par(task.track, task.par_for(state))
-        par = progress.job_par(p, par) if mode == "job" else par
+        par = progress.job_par(p, par) if mode == "job" or opts.exam else par
         clip = _clip_save() if task.uses_clipboard else None
         bridge = _start_owl(task, state, p, mode, box, tally, opts, free_hint)
         if referee is not None:
@@ -628,7 +636,7 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
                      rehearsal=opts.rehearsal, urgent=urgent,
                      owl=bridge is not None and (not task.boss or opts.rehearsal),
                      master=_master_label(best_before) if in_master else None,
-                     key_turn=key_turn(p))
+                     key_turn=key_turn(p), timed=opts.exam)
         # пара «до/после» без утилиты: одна строка на карточке — только в тренировке
         nudged = None if mode != "train" or opts.rehearsal else implants.nudge(task, p)
         if nudged:
@@ -748,11 +756,16 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
                  if job else 0)
         money_before = p["money"]
         ok_cmds = _ok_cmds(box, solved)
+        was_retrain = bool((p["tasks"].get(task.id) or {}).get("retrain"))
         progress.record(p, task.id, outcome, stars, elapsed, today, spell=task.spell,
                         boss=task.boss, mode=mode, practice=practice,
                         pay_per_star=progress.MONEY_PER_STAR * opts.pay_mult,
                         variant=variant, tools=_first_tools(box),
-                        hints=hints + owl_asked)
+                        hints=hints + owl_asked, drill=opts.drill)
+        if opts.drill:
+            tally.setdefault("drill", []).append(
+                {"id": task.id, "outcome": outcome, "elapsed": elapsed,
+                 "hints": hints + owl_asked, "par": par, "was_retrain": was_retrain})
         if opts.comeback and solved:    # выгодный ран: тренировка, но звезда платится ×2
             stars = contracts.comeback_stars(True, hints + owl_asked)
             p["money"] += stars * progress.MONEY_PER_STAR * opts.pay_mult
@@ -771,6 +784,8 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
         shown = progress.shown_best(prev_best)      # FB12 B2: «было 99:55» — не рекорд
         record = (shown if solved and shown is not None and progress.BEST_MIN <= elapsed < shown
                   else None)
+        if opts.drill and hints + owl_asked:    # отработка: с подсказкой рекорд не ставится
+            record = None
         if solved:
             tally["solved" if job else ("warm" if practice else "mastered")] += 1
         if record is not None:
@@ -836,7 +851,7 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
                     gifted_boss = give_gifts(p, task.id)
                 if gifted_boss:
                     progress.save(opts.progress_path, p)
-        if solved:          # FB5 (8): первое решённое задание — доска; новые карточки — на неё
+        if solved and not opts.drill:   # FB5 (8): первое решённое — доска; не в отработке
             with inbox.collect(p, "gift", shop.gift_from("first_solve"), "gift:first_solve",
                                today, on=opts.hub):
                 gifted = give_gifts(p, "first_solve")
@@ -876,8 +891,8 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
 
 
 # FB3 (3): после решения игрок остаётся в той же песочнице и пробует другие способы; дальше —
-# только по команде: next — следующее задание (или конец рана), more — ещё новая команда в
-# конце рана (вместо вопроса [y/N]), quit — выход. Время, звёзды и деньги уже посчитаны по
+# только по команде: next — следующее задание (или конец рана), quit — выход; ещё новая
+# команда — слово new в убежище. Время, звёзды и деньги уже посчитаны по
 # моменту решения: эксперименты их не трогают. После giveup — так же: разбор показан, можно
 # повторить решение руками.
 LINGER_AFTER = ("solved", "giveup")
@@ -895,10 +910,26 @@ def task_tips_on(p: dict) -> bool:
     return hideout.basics_on(p)
 
 
-def linger_tips(last: bool, hub: bool = False) -> str:
-    """Строка над приглашением после решения: что набрать дальше. Ещё урок (more) — только
-    после итога рана (FB3 правка владельца 17.10: more посреди рана путал счёт задач)."""
-    go = "next — итог рана" if last else "next — следующее задание"
+LINGER_NOTE_FREE = ("🧪 Песочница осталась как после твоего решения — пробуй другие способы, "
+                    "смотри, что вышло. Результат уже записан, эксперименты его не тронут.")
+
+
+def linger_note(opts: Options) -> str:
+    """Отработка, экзамен и репетиция не платят: про деньги в них не говорим (М-6)."""
+    return LINGER_NOTE_FREE if opts.drill or opts.rehearsal else LINGER_NOTE
+
+
+def end_word(opts: Options) -> str:
+    """Чем кончится цепочка после последней задачи: итог рана, отработки или экзамена."""
+    if opts.exam:
+        return "итог экзамена"
+    return "итог отработки" if opts.drill else "итог рана"
+
+
+def linger_tips(last: bool, hub: bool = False, end: str = "итог рана") -> str:
+    """Строка над приглашением после решения: что набрать дальше. Ещё урок — слово new в
+    убежище, не отсюда (FB3 правка владельца 17.10: урок посреди рана путал счёт задач)."""
+    go = f"next — {end}" if last else "next — следующее задание"
     out = "quit — в убежище" if hub else "quit — выйти"
     return f"✓ засчитано · {go} · {out} · book · keys · bug"
 
@@ -909,13 +940,14 @@ def _linger(task, box, state, outcome: str, opts: Options, tally: dict, prompt, 
     .termit/linger. Вернуть выбор игрока: next или quit (exit/Ctrl+D — как next)."""
     plan = tally.get("linger") or {}
     last = plan.get("last", True)
-    lines = [LINGER_NOTE]
+    lines = [linger_note(opts)]
     if getattr(task, "needs_judge", False) or state.get(dbkit.ENGINE_KEY) == "pg":
         lines.append(LINGER_NO_SERVICE)
     ui.say()
     for line in lines:
         ui.say(ui.story_fill(line, "", "   "))
-    ui.say(ui.story_fill(linger_tips(last, opts.hub), "   ", "   "))
+    tips = linger_tips(last, opts.hub, end_word(opts))
+    ui.say(ui.story_fill(tips, "   ", "   "))
     sandbox.set_result(box, "")
     sandbox.write_box_file(box, ".termit/feedback", "")     # уже перенесены в отзывы
     sandbox.write_box_file(box, ".termit/linger", "next")
@@ -923,7 +955,7 @@ def _linger(task, box, state, outcome: str, opts: Options, tally: dict, prompt, 
                               prompt=prompt, rprompt=rprompt, task=task,
                               db_engine=state.get(dbkit.ENGINE_KEY))
     env["TERMIT_LINGER"] = "1"
-    env["TERMIT_TIPS"] = "\n".join(list(tally.get("board") or []) + [linger_tips(last, opts.hub)])
+    env["TERMIT_TIPS"] = "\n".join(list(tally.get("board") or []) + [tips])
     pwd = sandbox.read_pwd(box)
     cwd = pwd if pwd is not None and sandbox.inside(pwd, box) and pwd.is_dir() else \
         sandbox.start_dir(box)
@@ -1048,21 +1080,18 @@ def _summary(p: dict, today: date, tally: dict, streak_before: int, book_before:
 
 
 def _yes(answer: str) -> bool:
-    return answer.strip().lower() in ("y", "yes", "д", "да")
+    return answer.strip().lower() in textnorm.YES
 
 
 def _more_prompt(nxt) -> str:
-    """Вопрос «ещё одну?»; про стража — абзацем, «[y/N]» всегда отдельной последней строкой."""
-    if nxt.boss:
-        return "\n" + ui.story_fill(theme.msg("more_boss", title=theme.title(nxt))) + "\n[y/N] "
-    return "\nХочешь ещё одну новую команду? [y/N] "
+    """Урок упёрся в стража: предупреждение абзацем, «[y/N]» отдельной последней строкой."""
+    return "\n" + ui.story_fill(theme.msg("more_boss", title=theme.title(nxt))) + "\n[y/N] "
 
 
 def run_queue(queue: List[str], p: dict, opts: Options, today: date,
-              offer_more: bool = False, paydata: bool = True, ritual: bool = True) -> None:
-    """offer_more — после итога рана (если игрок не вышел сам) предложить ещё урок: more.
-    paydata=False — без хабара (разминка пустого дня). ritual=False — запуск вне рана дня
-    (круг мастера на заказ, play ID): ритуал закрытия дня он не тратит (FB12 A3)."""
+              paydata: bool = True) -> None:
+    """paydata=False — без хабара (разминка пустого дня). Ещё урок после рана — слово new
+    в убежище (вопроса после итога больше нет)."""
     tally = new_tally()
     # хабар данных: раз в день, по жребию даты; не в разминке, тренировке play и репетиции
     if paydata and not opts.practice and not opts.rehearsal:
@@ -1075,11 +1104,10 @@ def run_queue(queue: List[str], p: dict, opts: Options, today: date,
         "streak": progress.current_streak(p, today),
         "book": len(p["grimoire"]),
         "karma": progress.karma(p),
-        "ritual": ritual,
         # хаб: что уже лежало на деке — подарки за решение кладутся туда ещё внутри задачи
         "inbox": {m["id"] for m in p["inbox"]},
     }
-    solved_any, stopped = _play_tasks(queue, p, opts, tally)
+    solved_any = _play_tasks(queue, p, opts, tally)
     if solved_any:
         _close_run(p, opts, today, tally, before)
     progress.save(opts.progress_path, p)
@@ -1087,8 +1115,6 @@ def run_queue(queue: List[str], p: dict, opts: Options, today: date,
         _edition_finish(p, opts)
     if opts.hub:
         _deck_summary(p, before["inbox"])
-    if offer_more and solved_any and not stopped and not opts.hub:
-        _offer_more(p, opts, today)
 
 
 def _deck_summary(p: dict, posted_before: set) -> None:
@@ -1099,13 +1125,12 @@ def _deck_summary(p: dict, posted_before: set) -> None:
         ui.say(inbox.summary_line(len(new)))
 
 
-def _play_tasks(queue: List[str], p: dict, opts: Options, tally: dict) -> Tuple[bool, bool]:
+def _play_tasks(queue: List[str], p: dict, opts: Options, tally: dict) -> bool:
     """Цикл заданий рана: next/quit из песочницы, Ctrl+C, «дальше» между заданиями. День не
-    закрывает — это _close_run (отработка зовёт только цикл, спека 2.4). Вернуть (решено ли
-    хоть одно, вышел ли игрок сам)."""
+    закрывает — это _close_run (отработка зовёт только цикл, спека 2.4). Вернуть, решено ли
+    хоть одно."""
     tasks = registry.all_tasks()
     solved_any = False
-    stopped = False         # игрок вышел сам (quit, Ctrl+C) — ещё урок не предлагаем
     for i, tid in enumerate(queue, 1):
         last = i == len(queue)
         tally["linger"] = {"last": last}
@@ -1113,36 +1138,30 @@ def _play_tasks(queue: List[str], p: dict, opts: Options, tally: dict) -> Tuple[
             outcome = run_task(tasks[tid], p, i, len(queue), opts, tally)
         except KeyboardInterrupt:      # песочницу уже убрал finally в run_task
             ui.say("\n" + theme.msg("quit"))
-            stopped = True
             break
         if outcome == "quit":
-            stopped = True
             break
         solved_any = solved_any or outcome == "solved"
         choice = tally.pop("after", None)       # FB3 (3): next/quit из песочницы
         if choice == "quit":
-            stopped = True
             break
         if i < len(queue) and choice is None:
             try:
                 opts.ask("\n" + theme.msg("next"))
             except (EOFError, KeyboardInterrupt):
                 print()
-                stopped = True
                 break
-    return solved_any, stopped
+    return solved_any
 
 
 def _close_run(p: dict, opts: Options, today: date, tally: dict, before: dict) -> None:
     """Конец рана, в котором что-то решено: день засчитан, заморозки, неделя, репутация,
     премия выгодного рана, затем ритуал закрытия дня или короткий итог урока.
-    before — снимок до рана: streak, book, karma; ritual (по умолчанию True) — False у
-    запуска вне рана дня, ритуал он не тратит."""
+    before — снимок до рана: streak, book, karma."""
     # FB12 (A3): ритуал «ран закрыт» — раз в день, своя отметка ritual_day (не days: день
-    # закрывает и play, и круг мастера, а ритуал им не положен); урок после него (more,
+    # может быть закрыт и без ритуала, например кругом пустого дня); урок после него (more,
     # второй ран за день) кончается итогом в две строки; счётчик ранов — по дням
-    ritual = before.get("ritual", True)
-    day_closed = not ritual or p.get("ritual_day") == today.isoformat()
+    day_closed = p.get("ritual_day") == today.isoformat()
     tally["froze"] = progress.close_day(p, today)    # тут и тратятся заморозки
     tally["froze_split"] = freezes.split_spent(p, len(tally["froze"]["bought"]))
     earned_freeze = freezes.earn(p, today)          # 3 рана за 7 дней — в запас (М4)
@@ -1236,11 +1255,16 @@ def _close_day_ritual(p: dict, opts: Options, today: date, tally: dict, streak_b
     # склад pandas/requests (часть 10, A3): трек «Python» открыт, склада нет — один
     # вопрос в день, качает только родитель и только по y. Вопрос в конце рана — один на
     # всех (M1 ревью Q4): склад или имплант, другой ждёт следующего рана
-    if warehouse.goes_first(p, today):
-        warehouse.offer(p, lambda q: _ask(opts, q), today, opts.wheels_getter)
+    # В убежище вопрос не задаётся тут же, а ложится на деку: отвечают, когда откроют.
+    # Ключи без даты (F9): новый вопрос о том же деле закрывает старый непрочитанный.
+    if opts.hub:
+        _questions_to_inbox(p, today)
     else:
-        implants.offer(p, lambda q: _ask(opts, q), today, opts.installer)   # ≤ 1 за ран
-    field.give(p, today)
+        if warehouse.goes_first(p, today):
+            warehouse.offer(p, lambda q: _ask(opts, q), today, opts.wheels_getter)
+        else:
+            implants.offer(p, lambda q: _ask(opts, q), today, opts.installer)   # ≤ 1 за ран
+        field.give(p, today)
     offered = None
     if not opts.practice:       # не в разминке и не в play
         contracts.expire(p, today)
@@ -1255,6 +1279,27 @@ def _close_day_ritual(p: dict, opts: Options, today: date, tally: dict, streak_b
             ui.say(ui.story_fill(contracts.urgent_line(p, today, "urgent_offer"), "", "   "))
 
 
+def _questions_to_inbox(p: dict, today: date) -> None:
+    """Конец рана в убежище: карточка склада или утилиты и задание в реале — сообщениями
+    на деке с вопросом y/n (inbox.ANSWERS отвечает на них под замком игры)."""
+    if warehouse.goes_first(p, today):
+        with inbox.collect(p, "warehouse", "system", "warehouse", today) as box:
+            if warehouse.post_offer(p, today):
+                box["ask"] = {"kind": "warehouse", "id": "wheels"}
+    else:
+        with inbox.collect(p, "implant", "system", "implant", today) as box:
+            imp_id = implants.post_offer(p, today)
+            if imp_id:
+                box["key"] = f"implant:{imp_id}"
+                box["ask"] = {"kind": "implant", "id": imp_id}
+    with inbox.collect(p, "field", "raven", "field", today) as box:
+        field.give(p, today)
+        pend = p["field"].get("pending")
+        if pend:
+            box["key"] = f"field:{pend}"
+            box["ask"] = {"kind": "field", "id": pend}
+
+
 def _edition_finish(p: dict, opts: Options) -> None:
     """Публичное издание: первый модуль пройден — тёплое сообщение один раз (в убежище —
     на деку)."""
@@ -1267,8 +1312,6 @@ def _edition_finish(p: dict, opts: Options) -> None:
         progress.save(opts.progress_path, p)
 
 
-MORE_PROMPT = ("\nРан окончен. Ещё урок — пара-тройка новых команд сверх нормы: набери more "
-               "и Enter. Выйти — просто Enter.\n> ")
 # FB12 (A3) + FB5 п. 28: урок — пачка новых задач, не одна (больше дела за вечер)
 MORE_BATCH = 3
 
@@ -1284,21 +1327,6 @@ def more_batch(p: dict) -> List[str]:
     return new[:cut]
 
 
-def _offer_more(p: dict, opts: Options, today: date) -> None:
-    """После итога рана — ещё урок по команде more (правка владельца 17.10: more — когда
-    день закончен, а не посреди рана). Урок — пачка новых задач (more_batch) с коротким итогом
-    (FB12), после него вопрос снова. Стража спрашиваем отдельно: это экзамен (more_boss)."""
-    new = more_batch(p)
-    if not new:
-        return
-    if _ask(opts, MORE_PROMPT).strip().lower() not in ("more", "m", "y", "yes", "д", "да"):
-        return
-    nxt = registry.get(new[0])
-    if nxt.boss and not _yes(_ask(opts, _more_prompt(nxt))):
-        return
-    run_queue(new, p, opts, today, offer_more=True)
-
-
 @_rooted
 def dozor(opts: Options, short: bool = False) -> None:
     """Ран. С music run on — своя кассета на время рана; стоп в finally (и по Ctrl+C)."""
@@ -1311,7 +1339,8 @@ def _dozor(opts: Options, short: bool = False) -> None:
     today = opts.today or date.today()
     first_run = _intro_once(p, opts)
     sandbox.cleanup_stale(opts.sandbox_root)
-    field.ask_pending(p, opts.ask, today)
+    if not opts.hub:        # в убежище «Сделал?» ждёт на деке
+        field.ask_pending(p, opts.ask, today)
     back = contracts.comeback(p, today)
     queue = contracts.comeback_queue(p) if back else []
     if queue:       # выгодный ран: сильные знакомые дела + одно новое, тренировкой, ×2 (М1)
@@ -1368,7 +1397,7 @@ def _dozor(opts: Options, short: bool = False) -> None:
         said = remarks.pick(p, "~warmup", [theme.msg("warmup")] + master.lines("warmup"),
                             today.toordinal(), lead=True)
         ui.say(ui.story_fill(said or master.text("start"), "", ""))
-    run_queue(queue, p, opts, today, offer_more=not warmup and not back, paydata=not warmup)
+    run_queue(queue, p, opts, today, paydata=not warmup)
 
 
 def warmup_queue(p: dict, rng=None) -> List[str]:
@@ -1385,9 +1414,13 @@ def _master_label(best) -> str:
     return f"{master.text('mode')} · {tail}"
 
 
+MASTER_DONE = "Круг закрыт. Рекорды записаны; день серии засчитывает ран дня."
+
+
 @_rooted
 def master_run(opts: Options) -> None:
-    """./termit master — круг мастера на заказ: знакомые дела на время, без расписания."""
+    """./termit master — круг мастера на заказ: знакомые дела на время, без расписания.
+    День не закрывает (спека 2.6): серию держит ран дня, в нём же круг на пустой день."""
     p = progress.load(opts.progress_path)
     today = opts.today or date.today()
     sandbox.cleanup_stale(opts.sandbox_root)
@@ -1397,7 +1430,21 @@ def master_run(opts: Options) -> None:
         return
     ui.say(ui.story_fill(master.text("start"), "", ""))
     opts = dataclasses.replace(opts, practice=True, master=frozenset(queue))
-    run_queue(queue, p, opts, today, paydata=False, ritual=False)
+    tally = new_tally()
+    posted = {m["id"] for m in p["inbox"]}
+    solved_any = _play_tasks(queue, p, opts, tally)
+    progress.save(opts.progress_path, p)
+    _edition_finish(p, opts)
+    if opts.hub:
+        _deck_summary(p, posted)
+    if solved_any:
+        # F34: _close_run нет, но молчать нельзя — что решено и сколько рекордов
+        done = tally["solved"] + tally["mastered"] + tally["warm"]
+        parts = [f"решено {done}"]
+        if tally["records"]:
+            parts.append(f"рекордов {len(tally['records'])}")
+        ui.say()
+        ui.ok(ui.story_fill(MASTER_DONE + " (" + ", ".join(parts) + ")", "  ", "    "))
 
 
 def _intro_once(p: dict, opts: Options) -> bool:
@@ -1424,12 +1471,13 @@ def _intro_once(p: dict, opts: Options) -> bool:
 
 @_rooted
 def more(opts: Options) -> None:
-    """./termit more — урок: пачка новых задач вне нормы рана (FB12: до MORE_BATCH)."""
+    """./termit new (и more) — урок: пачка новых задач вне нормы рана (FB12: до MORE_BATCH)."""
     p = progress.load(opts.progress_path)
     today = opts.today or date.today()
     first_run = _intro_once(p, opts)
     sandbox.cleanup_stale(opts.sandbox_root)
-    field.ask_pending(p, opts.ask, today)
+    if not opts.hub:        # в убежище «Сделал?» ждёт на деке
+        field.ask_pending(p, opts.ask, today)
     new = more_batch(p)
     if not new:
         ui.say(ui.story_fill(edition.FINISH, "", "") if edition.module_done(p) else
@@ -1444,7 +1492,7 @@ def more(opts: Options) -> None:
     if nxt.boss and not _yes(_ask(opts, _more_prompt(nxt))):
         progress.save(opts.progress_path, p)         # от стража отказались — выходим спокойно
         return
-    run_queue(new, p, opts, today, offer_more=True)
+    run_queue(new, p, opts, today)
 
 
 @_rooted
@@ -1484,12 +1532,13 @@ def run_track(key: str, opts: Options) -> None:
 
 @_rooted
 def rehearse(boss_id: str, opts: Options) -> None:
-    """./termit rehearse BOSS — страж в режиме тренировки; первая после провала даром."""
+    """./termit rehearse BOSS — страж в режиме тренировки; первая после провала даром,
+    реванш со взломанным стражем — всегда даром и без наград."""
     p = progress.load(opts.progress_path)
     code = contracts.can_rehearse(p, boss_id)
-    if code != "ok":
+    if code not in ("ok", "beaten"):      # взятого стража можно сыграть заново — даром, без наград
         kw = {"id": boss_id}
-        if code in ("beaten", "locked"):
+        if code == "locked":
             kw["title"] = theme.title(registry.get(boss_id))
         ui.say(contracts.text("rehearse_" + code, **kw))
         return
@@ -1498,7 +1547,8 @@ def rehearse(boss_id: str, opts: Options) -> None:
         ui.bad(f"Задача {boss_id} пока закрыта: " +
                (task.missing() or "нужен " + ", ".join(task.needs)))
         return
-    price = contracts.rehearsal_price(p, boss_id)
+    rematch = code == "beaten"
+    price = 0 if rematch else contracts.rehearsal_price(p, boss_id)
     cash = theme.word("money")
     if price:
         if p["money"] < price:
@@ -1509,7 +1559,8 @@ def rehearse(boss_id: str, opts: Options) -> None:
         if not _yes(_ask(opts, "\n" + ui.story_fill(q) + "\n[y/N] ")):
             return
     else:
-        ui.say(ui.story_fill(contracts.text("rehearse_free_go", title=theme.title(task))))
+        go = "rehearse_rematch_go" if rematch else "rehearse_free_go"
+        ui.say(ui.story_fill(contracts.text(go, title=theme.title(task))))
     progress.save(opts.progress_path, p)
     sandbox.cleanup_stale(opts.sandbox_root)
     opts = dataclasses.replace(opts, rehearsal=True, practice=False)
@@ -1523,7 +1574,7 @@ def rehearse(boss_id: str, opts: Options) -> None:
     if outcome not in (None, "quit", "broken", "skip"):
         if price:
             p["money"] -= price
-        else:
+        elif not rematch:
             p["rehearsal_free_used"].append(boss_id)
     progress.save(opts.progress_path, p)
 
@@ -1545,39 +1596,104 @@ def boss_waiting(p: dict, task) -> List[str]:
             if not t.boss and available(t) and not progress.seen(p, t.id) and after_done(p, t)]
 
 
+def _drill_queue(p: dict, today: date, arg: Optional[str]) -> Tuple[List[str], List[str]]:
+    """Очередь отработки и строки перед ней; пустая очередь — строки объясняют почему.
+    Новый вид отработки — ещё одна ветка здесь со своей выборкой в train.py."""
+    from termit_app import train
+    if arg is None:
+        ids = train.weak_ids(p, today)[:train.DRILL_SIZE]
+        if not ids:
+            return [], train.empty_lines(p, today)
+        return ids, train.list_lines(p, ids, today, train.TITLE_WEAK)
+    if arg in registry.all_tasks():
+        why = train.single_problem(p, arg, today)
+        if why:
+            return [], [why]
+        return [arg], train.list_lines(p, [arg], today, train.TITLE_ONE)
+    ids = train.topic_ids(p, today, arg)
+    if ids is None:
+        return [], [train.unknown_topic(p, arg)]
+    if not ids:
+        return [], [train.TOPIC_EMPTY.format(topic=arg)]
+    return ids, train.list_lines(p, ids, today, train.TITLE_TOPIC.format(topic=arg))
+
+
 @_rooted
-def play_one(task_id: str, opts: Options) -> None:
+def train_run(opts: Options, arg: Optional[str] = None, place: Optional[str] = None) -> bool:
+    """Отработка (спека 2.6): train — слабые места; train ТЕМА; train ID; train exam [МЕСТО].
+    Только цикл заданий (_play_tasks), без конца рана: день не закрывается, ритуал дня не
+    тратится, ни денег, ни кармы, ни серии. Вернуть, дошло ли до заданий: отказ (нечего,
+    Ctrl+C на старте) — False, и убежище не просит Enter, как после рана (М-11)."""
+    from termit_app import train
+    p = progress.load(opts.progress_path)
+    today = opts.today or date.today()
+    if arg == "exam":
+        return _exam_run(p, opts, today, place)
+    queue, lines = _drill_queue(p, today, arg)
+    if not queue:
+        for line in lines:      # строки меню (с отступом) — как есть, абзацы — по ширине
+            ui.say(line if line.startswith("   ") else ui.story_fill(line, "  ", "  "))
+        return False
+    for line in lines:
+        ui.say(line)
+    try:
+        opts.ask(train.START)
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    sandbox.cleanup_stale(opts.sandbox_root)
+    opts = dataclasses.replace(opts, practice=True, drill=True)
+    tally = new_tally()
+    _play_tasks(queue, p, opts, tally)
+    progress.save(opts.progress_path, p)
+    results = tally.get("drill", [])
+    ui.say()
+    if not results:             # вышел на первой задаче — одна строка, а не пустота
+        ui.say(train.STOPPED)
+        return True
+    for line in train.summary_lines(p, today, results):
+        ui.say(line)
+    return True
+
+
+def _exam_run(p: dict, opts: Options, today: date, place: Optional[str]) -> bool:
+    """train exam [МЕСТО]: пять знакомых заданий, таймер дела, подсказки даром. День не
+    закрывается, денег и серии нет; пишется только лучший экзамен."""
+    from termit_app import train
+    if place is not None and place not in train.places(p):
+        ui.say(ui.story_fill(train.unknown_topic(p, place), "  ", "  "))
+        return False
+    queue = train.exam_ids(p, today, place)
+    if not queue:
+        ui.say(ui.story_fill(train.FEW_FOR_EXAM, "  ", "  "))
+        return False
+    ui.say(ui.story_fill(train.TITLE_EXAM, "  ", "     "))
+    ui.say("\n" + ui.story_fill(EXAM_WARNING, "", "   "))
+    try:
+        opts.ask(EXAM_PROMPT)
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    sandbox.cleanup_stale(opts.sandbox_root)
+    opts = dataclasses.replace(opts, practice=True, drill=True, exam=True)
+    tally = new_tally()
+    tally["warned"] = True
+    _play_tasks(queue, p, opts, tally)
+    results = tally.get("drill", [])
+    ui.say()
+    if results:
+        for line in train.exam_summary(p, results, place, len(queue)):
+            ui.say(line)
+    else:
+        ui.say(train.STOPPED)
+    progress.save(opts.progress_path, p)
+    return True
+
+
+@_rooted
+def play_one(task_id: str, opts: Options) -> bool:
+    """./termit play ID — то же, что train ID (спека 2.2): отработка одной задачи."""
     if task_id not in registry.all_tasks():
         ui.bad(f"Нет задачи {task_id}. Список: ./termit list")
-        return
-    task = registry.get(task_id)
-    if not available(task):
-        ui.bad(f"Задача {task_id} пока закрыта: " +
-               (task.missing() or "нужен " + ", ".join(task.needs)))
-        return
-    p = progress.load(opts.progress_path)
-    # play ID не обходит замок трека и порядок: страж — экзамен и ступень звания
-    tr = registry.track(task.track)
-    if not edition.track_open(tr.key):
-        ui.say(ui.story_fill(edition.LOCKED.format(place=theme.place(tr.key)), "", ""))
-        return
-    if tr not in registry.unlocked(p["bosses"]):
-        need = ", ".join(theme.title(registry.get(b)) for b in tr.requires
-                         if b not in p["bosses"])
-        ui.say(theme.msg("locked", place=theme.place(tr.key), need=need))
-        return
-    waiting = boss_waiting(p, task)
-    if waiting:
-        names = [theme.title(registry.get(t)) for t in waiting[:3]]
-        more = f" и ещё {len(waiting) - 3}" if len(waiting) > 3 else ""
-        ui.say(theme.msg("after_locked", title=theme.title(task),
-                         need=", ".join(names) + more))
-        return
-    need = registry.missing_after(p, task)
-    if need:
-        ui.say(theme.msg("after_locked", title=theme.title(task),
-                         need=", ".join(theme.title(registry.get(t)) for t in need)))
-        return
-    sandbox.cleanup_stale(opts.sandbox_root)
-    opts = dataclasses.replace(opts, practice=True)
-    run_queue([task_id], p, opts, opts.today or date.today(), ritual=False)
+        return False
+    return train_run(opts, task_id)

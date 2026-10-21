@@ -10,7 +10,7 @@ from termit_app import (citymap, contracts, cosmetics, diary, hideout, implants,
 from termit_app import book as book_mod
 from termit_app import inbox as inbox_mod
 from termit_app import goal
-from termit_app import commands, edition, extensions, icons, theme, tui, ui
+from termit_app import commands, edition, extensions, icons, textnorm, theme, tui, ui
 from termit_app import owl as owl_mod
 from termit_app import shop as shop_mod
 from termit_app import sound as sound_mod
@@ -35,9 +35,8 @@ def _opened(p) -> dict:
         # модули в витрине — после первого стража; дека нужна, когда есть что ставить
         "deck": bool(bosses) or any(m in owned for m in shop_mod.MODULES),
         "fence": "boss_basics" in bosses or bool(p.get("paydata")),
-        # репетиция — когда непобеждённый страж уже встречался
-        "rehearse": any(t.boss and tid in p.get("tasks", {}) and tid not in bosses
-                        for tid, t in tasks.items()),
+        # репетиция — когда страж уже встречался; взятого можно сыграть заново, бесплатно
+        "rehearse": any(t.boss and tid in p.get("tasks", {}) for tid, t in tasks.items()),
         "owl": p.get("dozors", 0) >= 1 or "owl" in (p.get("settings") or {}),
         "case": bool(bosses),                         # первая улика — после первого стража
         "dossier": any(shop_mod.get(i) is not None and shop_mod.get(i).kind == "dossier"
@@ -59,7 +58,6 @@ def _opened(p) -> dict:
 def usage(p: dict = None) -> str:
     """Справка. С прогрессом p — по фазам: команды поздних фаз появляются, когда к месту.
     Описания команд — из commands.ABOUT: те же слова, что в строке первой встречи."""
-    w = theme.word
     on = _opened(p)
     has_story = story.has_story()
     cmd = commands.line
@@ -72,6 +70,7 @@ def usage(p: dict = None) -> str:
                    line("dossier", cmd("dossier", "[ИМЯ]"), has_story))
     fence_line = line("fence", cmd("fence", "[sell N]"), loot.enabled())
     master_line = line("master", cmd("master"))
+    train_line = cmd("train", "[ТЕМА|ID|exam]")
     rehearse_line = line("rehearse", cmd("rehearse", "ID"))
     deck_line = line("deck", cmd("deck", "[on|off ID]"))
     implants_line = line("implants", cmd("implants", "", "\n" + " " * 27 + "shell — подключить fzf и zoxide к своему zsh"))
@@ -88,12 +87,13 @@ def usage(p: dict = None) -> str:
     places = "basics" if edition.closed() else "basics, tools, finder"
     themes = f": {', '.join(theme.available())} (сейчас: {theme.current()})"
     later = LATER if any(not v and exists.get(k, True) for k, v in on.items()) else ""
+    play_lines = (cmd("run", "", " — разово, без убежища") + cmd("short") + cmd("new")
+                  + master_line + train_line + cmd("track", "МЕСТО", f" ({places})"))
     return f"""TermitRun — тренажёр терминала ({theme.tagline()})
 
-  ./termit                 {w('session')} на ~10 минут — каждый день
-{cmd("run")}{cmd("short")}{cmd("more")}{master_line}{cmd("track", "МЕСТО", f" ({places})")}\
-{cmd("play", "ID")}{cmd("stats")}{cmd("intro")}{cmd("keys")}\
-                           в задаче: next — дальше после решения; после итога рана — more, ещё урок
+  ./termit                 убежище: всё внутри, слова — help там же
+{play_lines}{cmd("play", "ID")}{cmd("stats")}{cmd("intro")}{cmd("keys")}\
+                           в задаче: next — дальше после решения; ещё урок — new в убежище
 {cmd("ext")}{cmd("shop", "[all]")}\
   ./termit shop ID         купить (например, ./termit shop freeze)
 {style_line}{rehearse_line}{cmd("list")}{cmd("map")}{cmd("home", "[look ID]")}\
@@ -159,13 +159,18 @@ def show_stats() -> None:
         seen = sum(1 for t in ts if progress.seen(p, t.id))
         name = theme.place(tr.key) + ("" if edition.track_open(tr.key) else " (скоро)")
         places.append((name, seen, len(ts)))
-    weak = [theme.title(tasks[i]) for i, r in p["tasks"].items()
-            if i in tasks and progress.weak(r)]
+    # «Подтянуть» — та же выборка, что у пульта и train (F13): без стражей, закрытых мест и
+    # сегодняшнего рана; доступность — по кэшу, как на пульте, чтобы числа сходились
+    from termit_app import pyenvs, train
+    solid_line = train.stats_line(p)
+    with pyenvs.cache_only():
+        weak = [theme.title(tasks[i]) for i in train.weak_ids(p, today)]
     if cp.level == "plain":                       # как до графики: строки без рамки
         for row in rows:
             ui.say(row)
         for place, seen, total in places:
             ui.say(f"  {place}: {seen}/{total}")
+        ui.say(solid_line)
         if weak:
             ui.say("Подтянуть: " + ", ".join(weak[:8]))
         return
@@ -179,8 +184,9 @@ def show_stats() -> None:
     for place, seen, total in places:
         body.append(tui.Raw(f"{place}:{' ' * (room - tui.vlen(place) - 1)}"
                             f"{tui.bar(seen, total, 10, cp)} {seen}/{total}"))
+    body += [tui.SEP, solid_line]
     if weak:
-        body += [tui.SEP, tui.style("Подтянуть: " + ", ".join(weak[:8]), "dim", c=cp)]
+        body += [tui.style("Подтянуть: " + ", ".join(weak[:8]), "dim", c=cp)]
     for row in tui.box(body, title=rows[0].upper().replace("ЗВАНИЕ: ", "ЗВАНИЕ · "),
                        right=f"серия {streak} дн." if streak else "", c=cp):
         ui.say(row)
@@ -504,10 +510,6 @@ def home(args) -> int:
                 _print_lines(rest)
         ui.say()                # витрина видна из дома всегда (FB5 п. 16)
         ui.say(ui.story_fill(hideout.shop_line(), "  ", "  "))
-        ui.say()                # дом — хаб: куда отсюда (FB5 п. 18)
-        with ui.glossary_off():     # у каждой строки панели своё «что там» — ⓘ не нужны
-            for line in home_hub(p):
-                ui.say(line)
         ui.say()                # репутация (М6) и контракт недели (М5) — в убежище на виду
         if repute.grant(p):     # порог взят раньше, чем появилась награда, — рамка на месте
             progress.save(paths.PROGRESS_FILE, p)
@@ -544,14 +546,8 @@ def home(args) -> int:
     return 2
 
 
-# FB5 п. 18 (владелец: «нужны напоминалки дома — что как смотреть, где досье, где что»):
-# панель «Куда отсюда» под комнатой — только то, что игроку уже открыто (как в cli.usage);
-# слова — первая часть описания из commands.ABOUT / HOME_ABOUT, один источник
-HUB = ("dossier", "case", "memory", "diary", "book", "keys", "map", "stats", "deck", "style",
-       "music", "fence", "home board", "home prompt")
-
-
 def _hub_open(p: dict) -> dict:
+    """Что из дома и сюжета открыто — для слов убежища (hub.open_map)."""
     on = _opened(p)
     has_story = story.has_story()
     parts = bool(hideout.prompt_parts(p)) or any(
@@ -564,30 +560,8 @@ def _hub_open(p: dict) -> dict:
             "home board": hideout.has_board(p), "home prompt": parts}
 
 
-def _hub_about(name: str) -> str:
-    if name.startswith("home "):
-        text = commands.HOME_ABOUT[name[5:]][1]
-    else:
-        text = commands.about(name)
-    return text.split(";")[0]
-
-
-def home_hub(p: dict) -> list:
-    """Панель «Куда отсюда»: команды, открытые игроку сейчас, по строке на каждую."""
-    is_open = _hub_open(p)
-    head = ("  Куда отсюда:" if commands.hub_on()
-            else "  Куда отсюда (набирай после рана, не в задаче):")
-    out = [head]
-    for name in HUB:
-        if is_open[name]:
-            if name.startswith("home "):
-                cmd = commands.home_cmd(name[5:])
-            else:
-                cmd = f"{commands.prefix()}{name}"
-            out += ui.story_fill(f"{cmd:<21} {_hub_about(name)}", "    ",
-                                 " " * 26).splitlines()
-    out.append(f"  Подробно о доме — {commands.prefix()}home help")
-    return out
+HOME_HELP_TAIL = "Все слова игры — help (в убежище) или ./termit help."
+HOME_HELP_HUB = "Все слова игры — help."
 
 
 def home_help(p: dict) -> list:
@@ -600,8 +574,7 @@ def home_help(p: dict) -> list:
               for row in [commands.line("home")] + [commands.home_line(sub)
                                                     for sub in commands.HOME_ABOUT]],
             "",
-            "Внизу экрана дома — «Куда отсюда»: досье, дело, дневник, карта и прочее, что "
-            "уже открыто. Все команды игры — ./termit help."]
+            HOME_HELP_HUB if commands.hub_on() else HOME_HELP_TAIL]
 
 
 def diary_cmd(args) -> int:
@@ -1238,7 +1211,7 @@ def implants_shell(args) -> int:
     except (EOFError, KeyboardInterrupt):
         print()
         answer = ""
-    if answer not in implants.YES:
+    if answer not in textnorm.YES:
         ui.say(implants.text("not_now"))
         return 0
     if not implants.write_shell(path):
@@ -1357,7 +1330,8 @@ def remember_seen(seen) -> None:
     progress.save(paths.PROGRESS_FILE, q)
 
 
-GAME_CMDS = {"dozor", "run", "short", "track", "play", "more", "rehearse", "master"}
+GAME_CMDS = {"dozor", "run", "short", "track", "play", "more", "new", "rehearse", "master",
+             "train"}
 BUSY = "TermitRun уже запущен в другом окне. Доиграй там или закрой то окно — и запусти снова."
 
 
@@ -1435,8 +1409,13 @@ def _dispatch(cmd, args, opts) -> int:
     elif cmd == "track" and len(args) > 1:
         session.run_track(args[1], opts)
     elif cmd == "play" and len(args) > 1:
-        session.play_one(args[1], opts)
-    elif cmd == "more":
+        return 0 if session.play_one(args[1], opts) else 1
+    elif cmd == "train":
+        # отказ (нечего отрабатывать, Ctrl+C на старте) — код 1: убежище не ждёт Enter (М-11)
+        ran = session.train_run(opts, args[1] if len(args) > 1 else None,
+                                args[2] if len(args) > 2 else None)
+        return 0 if ran else 1
+    elif cmd in ("more", "new"):     # new — то же слово, что в убежище
         session.more(opts)
     elif cmd == "master":
         session.master_run(opts)

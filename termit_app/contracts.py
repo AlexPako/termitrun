@@ -23,12 +23,13 @@ COMEBACK_MAX = 100
 TEXTS = {
     "rehearse_free": "Первая репетиция — бесплатно: ./termit rehearse {id}",
     "rehearse_free_go": "Репетиция «{title}» — бесплатно: первая после провала.",
+    "rehearse_rematch_go": "Реванш «{title}» — даром: без наград и без экзамена, просто "
+                           "размяться.",
     "rehearse_ask": "Репетиция «{title}»: {price} {cash}. Тренировка — подсказки даром, "
                     "без таймера; ни денег, ни расписания она не меняет, и день в серию не идёт. Начать?",
     "rehearse_money": "Репетиция стоит {price} {cash}, а у тебя {money}.",
-    "rehearse_beaten": "«{title}» уже побеждён — повторить можно тренировкой: ./termit play {id}",
     "rehearse_locked": "«{title}» пока за закрытой дверью — сначала открой его место.",
-    "rehearse_not_boss": "Репетируют только боссов. Обычную задачу — ./termit play {id}",
+    "rehearse_not_boss": "Репетируют только боссов. Обычную задачу — ./termit train {id}",
     "rehearse_unknown": "Нет такой задачи: {id}. Список: ./termit list",
     "rehearse_shop": "🎭 Репетиция «{title}» — {price}: ./termit rehearse {id}",
     "rehearse_shop_free": "бесплатно",

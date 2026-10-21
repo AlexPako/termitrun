@@ -1,6 +1,8 @@
 """Сообщения на деке (inbox, спека 2.5): то, что раньше вываливалось в итог рана, —
 «Завтра», подарки, витрина, охота, срочный заказ, вопросы утилит, склада и «Сделал?».
-Храним готовый текст на момент события, последние KEEP штук; открыл — прочитал.
+Храним готовый текст на момент события, последние KEEP штук; открыл — прочитал. Вопрос
+без ответа («решу потом») тоже прочитан, но ask остаётся: в списке он «ждёт ответа», Enter
+и inbox next его не открывают (финальное ревью В-1).
 При загрузке модуль ничего из игры не импортирует: его зовёт progress._normalize."""
 import contextlib
 import io
@@ -55,11 +57,12 @@ def _iso(d) -> bool:
 
 
 def _trim(msgs: List[dict]) -> List[dict]:
-    """Больше KEEP — уходят старые прочитанные, потом старые без вопроса; непрочитанный
-    вопрос молча не выкидывается никогда."""
+    """Больше KEEP — уходят старые прочитанные, потом старые непрочитанные; вопрос, который
+    ждёт ответа (прочитанный или нет), молча не выкидывается никогда."""
     out = list(msgs)
     extra = len(out) - KEEP
-    for gone in (lambda m: m["read"], lambda m: m.get("ask") is None):
+    for gone in (lambda m: m["read"] and m.get("ask") is None,
+                 lambda m: m.get("ask") is None):
         i = 0
         while extra > 0 and i < len(out):
             if gone(out[i]):
@@ -109,9 +112,17 @@ def next_id(p: dict) -> int:
 
 def post(p: dict, kind: str, sender: str, text: str, key: str, day: date,
          ask: Optional[dict] = None) -> Optional[dict]:
-    """Новое сообщение; тот же key уже есть (повторный итог, перезапуск) — None."""
+    """Новое сообщение; тот же key уже есть (повторный итог, перезапуск) — None.
+    Вопрос (ask) ключом не сверяется: его ключ без даты, и отложенный вопрос через пару
+    дней приходит снова. Вместо этого старые с тем же ask (и отложенные, уже прочитанные)
+    закрываются — на деке всегда один свежий вопрос о деле, и «y» на старый дубль не платит."""
     box = p.setdefault("inbox", [])
-    if key and any(m.get("key") == key for m in box):
+    if ask:
+        for m in box:
+            if isinstance(m, dict) and m.get("ask") == ask:
+                m["read"] = True
+                m["ask"] = None
+    elif key and any(m.get("key") == key for m in box):
         return None
     mid = next_id(p)
     p["inbox_seq"] = mid
@@ -142,7 +153,8 @@ def collect(p: dict, kind: str, sender: str, key: str, day: date, on: bool = Tru
     """Всё, что блок напечатает, — одним сообщением на деку (а не в итог рана). on=False —
     печать как была (разовый ./termit). Блок может положить box["ask"] — вопрос y/n.
     by_text — к ключу дописывается отпечаток текста: источник с состоянием (флаг подсказки,
-    завоз) второй раз за день скажет другое — и это новое сообщение, а не дубль."""
+    завоз) второй раз за день скажет другое — и это новое сообщение, а не дубль.
+    box["key"] — ключ, который стал известен только внутри блока."""
     if not on:
         yield {}
         return
@@ -151,6 +163,7 @@ def collect(p: dict, kind: str, sender: str, key: str, day: date, on: bool = Tru
     with contextlib.redirect_stdout(buf):
         yield box
     text = ANSI.sub("", buf.getvalue()).strip("\n")
+    key = box.get("key") or key     # блок может уточнить ключ (id утилиты известен внутри)
     if text.strip():
         if by_text:
             key = f"{key}:{zlib.crc32(text.encode()):08x}"
@@ -173,13 +186,18 @@ def _fit(s: str, n: int) -> str:
     return s if len(s) <= n else s[:n - 1] + "…"
 
 
+def _pinned(m: dict) -> bool:
+    """В списке всегда: непрочитанное и вопрос, который ждёт ответа."""
+    return not m["read"] or m["ask"] is not None
+
+
 def _shown(box: List[dict]) -> List[dict]:
-    """Все непрочитанные и самые свежие прочитанные — до 10 всего (непрочитанных больше
+    """Все непрочитанные и ждущие ответа и самые свежие прочитанные — до 10 всего (тех больше
     десяти — показываются все); порядок как в деке."""
-    room = max(10 - sum(1 for m in box if not m["read"]), 0)
-    read = [m for m in box if m["read"]]
+    room = max(10 - sum(1 for m in box if _pinned(m)), 0)
+    read = [m for m in box if not _pinned(m)]
     keep = {id(m) for m in (read[-room:] if room else [])}
-    return [m for m in box if not m["read"] or id(m) in keep]
+    return [m for m in box if _pinned(m) or id(m) in keep]
 
 
 def list_lines(p: dict, today: date) -> List[str]:
@@ -217,16 +235,71 @@ def summary_line(n: int) -> str:
 
 
 # Обработчики вопросов: kind -> (p, ask_id, reply, day, opts) -> принят ли ответ.
-# Наполняются в Task 15 (implant, warehouse, field).
-ANSWERS: Dict[str, Callable] = {}
+# Импорты модулей игры — внутри функций: inbox грузится из progress.
+def _answer_implant(p, imp_id, reply, day, opts) -> bool:
+    if not reply or reply == "?":
+        return False
+    from termit_app import implants
+    implants.answer(p, imp_id, reply, day, getattr(opts, "installer", None))
+    return True
+
+
+def _answer_warehouse(p, ask_id, reply, day, opts) -> bool:
+    if not reply or reply == "?":
+        return False
+    from termit_app import warehouse
+    warehouse.answer(p, reply, day, getattr(opts, "wheels_getter", None))
+    return True
+
+
+def _answer_field(p, fid, reply, day, opts) -> bool:
+    from termit_app import field
+    if not reply:
+        return False
+    if fid not in field.CMD:
+        return reply != "?"     # задания уже нет в игре — ответ просто закрывает
+    if reply == "?":
+        field.show_command(fid)
+        return False
+    field.answer(p, fid, reply, day)
+    return True
+
+
+ANSWERS: Dict[str, Callable] = {
+    "implant": _answer_implant,
+    "warehouse": _answer_warehouse,
+    "field": _answer_field,
+}
+
+
 # Необязательная пара к обработчику: kind -> (p, ask_id) -> вопрос уже неактуален
-# (задание сделано, утилита куплена). Такое сообщение закрывается без выплаты.
-STALE: Dict[str, Callable] = {}
+# (задание сделано, утилита стоит, склад на месте). Такое сообщение закрывается без выплаты.
+def _stale_implant(p, imp_id) -> bool:
+    from termit_app import implants
+    imp = implants.find(imp_id) if isinstance(imp_id, str) else None
+    return imp is not None and implants.locate(imp) is not None
+
+
+def _stale_warehouse(p, ask_id) -> bool:
+    from termit_app import pyenvs
+    return pyenvs.warehouse_ready()
+
+
+def _stale_field(p, fid) -> bool:
+    done = (p.get("field") or {}).get("done")
+    return isinstance(done, list) and fid in done
+
+
+STALE: Dict[str, Callable] = {
+    "implant": _stale_implant,
+    "warehouse": _stale_warehouse,
+    "field": _stale_field,
+}
 
 
 def answer(p: dict, msg: dict, reply: str, day: date, opts) -> bool:
     """Ответ на вопрос прямо в сообщении. Принят - сообщение прочитано и закрыто; пусто
-    или «?» - ждёт дальше. Неизвестный вид вопроса (старая версия) - просто прочитано;
+    или «?» - прочитано, но вопрос ждёт дальше (Enter его больше не открывает). Неизвестный вид вопроса (старая версия) - просто прочитано;
     вопрос, который уже потерял смысл, закрывается без выплаты."""
     ask = msg.get("ask") or {}
     handler = ANSWERS.get(ask.get("kind"))
@@ -237,5 +310,5 @@ def answer(p: dict, msg: dict, reply: str, day: date, opts) -> bool:
         done = handler(p, ask.get("id"), reply.strip().lower(), day, opts)
     if done:
         msg["ask"] = None
-        msg["read"] = True
+    msg["read"] = True
     return done

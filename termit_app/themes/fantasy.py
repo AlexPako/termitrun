@@ -563,13 +563,14 @@ THEME["contracts"] = {
     "rehearse_free_go": "Всеволод вызвал тень «{title}». Первый бой с тенью — бесплатно: "
                         "подсказки даром, песочные часы не идут, золото и расписание не "
                         "меняются.",
+    "rehearse_rematch_go": "Всеволод снова вызвал тень «{title}». Реванш — даром: ни золота, "
+                           "ни испытания, просто размяться.",
     "rehearse_ask": "Бой с тенью «{title}» — {price} {cash}: свечи для призыва не дармовые. "
                     "Подсказки даром, часов нет; ни золота, ни расписания бой не меняет, "
                     "и в серию день не идёт. Начинаем?",
     "rehearse_money": "Бой с тенью стоит {price} {cash}, а у тебя {money}.",
-    "rehearse_beaten": "«{title}» уже повержено. Размяться можно и так: ./termit play {id}",
     "rehearse_locked": "До «{title}» дорога пока закрыта.",
-    "rehearse_not_boss": "Тени вызывают только для чудовищ. Обычное — ./termit play {id}",
+    "rehearse_not_boss": "Тени вызывают только для чудовищ. Обычное — ./termit train {id}",
     "rehearse_shop": "🎭 Бой с тенью «{title}» — {price}: ./termit rehearse {id}",
     "rehearse_shop_free": "первый бесплатно",
     "urgent_offer": "📜 Гонец в сером плаще: «{title}» — {until}, +{bonus} {cash}",

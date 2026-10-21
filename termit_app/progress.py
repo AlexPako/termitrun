@@ -62,6 +62,8 @@ def empty() -> dict:
             "shop_seen": [], "shard_tip": False,
             # последняя реплика персонажа по треку — подряд одна и та же не звучит (П3.6)
             "said": {},
+            # отработка: лучший экзамен по месту — {место|"all": [чисто, всего]} (train.py)
+            "train": {"exam_best": {}},
             # FB12-voices: сказанные строки персонажей — отпечатками по пулам (termit_app/remarks):
             # точная фраза не звучит дважды за всю игру
             "heard": {},
@@ -125,7 +127,7 @@ _NESTED = {"field": (("done", list), ("pending", (str, type(None))), ("later", d
                         ("seen_installed", list), ("compare", dict)),
            "hub": (("tour", bool), ("shown", list))}
 _DICTS = ("settings", "grimoire", "field", "deck", "implants", "said", "heard", "master",
-          "hub")
+          "hub", "train")
 
 
 def _iso_day(d) -> bool:
@@ -136,6 +138,19 @@ def _iso_day(d) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _clean_drill_fields(rec: dict) -> None:
+    """Поля отработки (хаб): lapses — целое ≥ 0 (строка из цифр — числом), drill_day —
+    ISO-дата; мусор удаляется — без поля задача читается как старая (.get(…, 0))."""
+    lapses = rec.get("lapses")
+    if isinstance(lapses, str) and lapses.isascii() and lapses.isdigit():
+        rec["lapses"] = int(lapses)
+    elif "lapses" in rec and (not isinstance(lapses, int) or isinstance(lapses, bool)
+                              or lapses < 0):
+        del rec["lapses"]
+    if "drill_day" in rec and not _iso_day(rec["drill_day"]):
+        del rec["drill_day"]
 
 
 def _normalize(p: dict) -> None:
@@ -176,8 +191,16 @@ def _normalize(p: dict) -> None:
     for rec in tasks.values():                   # FB12 (п. 34): выпавшие варианты — числа
         if isinstance(rec, dict) and "seen_variants" in rec:
             rec["seen_variants"] = seen_variants(rec)
+        if isinstance(rec, dict):
+            _clean_drill_fields(rec)
     errs = p.get("errors_seen")                  # FB12 (N6): переведённые ошибки — строки
     p["errors_seen"] = [x for x in errs if isinstance(x, str)] if isinstance(errs, list) else []
+    best = p["train"].get("exam_best")           # хаб: лучший экзамен — {место: [чисто, всего]}
+    p["train"] = {"exam_best": {
+        k: v for k, v in best.items()
+        if isinstance(k, str) and isinstance(v, list) and len(v) == 2
+        and all(isinstance(x, int) and not isinstance(x, bool) for x in v)
+    } if isinstance(best, dict) else {}}
     owned = p.get("owned")
     p["owned"] = [x for x in owned if isinstance(x, str)] if isinstance(owned, list) else []
     from termit_app import weekly                # C2 М5: испорченный контракт — пустой
@@ -408,10 +431,13 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
            spell: str = None, boss: bool = False, mode: str = "job",
            practice: bool = False, pay_per_star: int = MONEY_PER_STAR,
            variant: Optional[int] = None, tools: Optional[Iterable[str]] = None,
-           hints: Optional[int] = None) -> dict:
-    """practice — повтор через play: знакомую освоенную задачу расписание не трогает.
+           hints: Optional[int] = None, drill: bool = False) -> dict:
+    """practice — круг мастера и отработка (train): знакомую освоенную задачу расписание
+    не трогает.
     pay_per_star — оплата звезды дела (выше обычной в «выгодном ране»).
-    variant — выданный вариант (его выбрал родитель, а не task.json песочницы)."""
+    variant — выданный вариант (его выбрал родитель, а не task.json песочницы).
+    drill — отработка (train, спека 2.6): без кармы, рекорд только без подсказок, день
+    попытки — в drill_day (одна задача не повторяется дважды в день)."""
     known = task_id in p["tasks"]
     rec = p["tasks"].setdefault(task_id, {"attempts": 0, "solved": 0, "best": None,
                                           "level": 0, "due": None, "last_stars": 0,
@@ -433,10 +459,14 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         rec["last_solved"] = today.isoformat()
     if mode == "train":
         retrain = rec.get("retrain", False)
+        if drill:
+            rec["drill_day"] = today.isoformat()
         if outcome == "solved":
             rec["solved"] += 1
-            _note_best(rec, elapsed)
-            p["xp"] += TRAIN_XP
+            if not drill or not hints:
+                _note_best(rec, elapsed)
+            if not drill:
+                p["xp"] += TRAIN_XP
             if spell:
                 p["grimoire"][task_id] = spell
         if known and not retrain and (practice or outcome == "solved"):
@@ -469,6 +499,9 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         days = (INTERVALS[max(was, 1) - 1] + INTERVALS[rec["level"] - 1]) // 2
         rec["due"] = (today + timedelta(days=days)).isoformat()
     else:
+        if rec["level"] > 0 and outcome != "skip":
+            # «срыв»: уровень был, дело не вышло; отложить освоенное — не срыв
+            rec["lapses"] = rec.get("lapses", 0) + 1
         rec["level"] = 0
         rec["due"] = tomorrow
     if outcome == "giveup":

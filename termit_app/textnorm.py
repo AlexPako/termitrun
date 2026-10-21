@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Optional
 
 
+# ответы «да/нет» на вопросы игры — один список на всех (поле, утилиты, склад, ран)
+YES = ("y", "yes", "д", "да")
+NO = ("n", "no", "н", "нет")
+
+
 def norm(s: str) -> str:
     return re.sub(r"\s+", " ", str(s).strip())
 

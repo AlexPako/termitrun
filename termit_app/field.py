@@ -5,6 +5,7 @@
 from datetime import date, timedelta
 
 from termit_app import progress, theme, ui
+from termit_app.textnorm import YES
 
 # отказ или молчание на «Сделал?» — то же задание не раньше чем через столько дней, а пока
 # приходят следующие (P2 Б2: раньше первое повторялось каждый день и держало остальные)
@@ -143,6 +144,32 @@ def _later(p: dict) -> dict:
     return later
 
 
+
+
+def show_command(fid: str) -> None:
+    ui.say(f"   Команда: {progress.clean_text(CMD[fid])}")
+    if fid in NOTE:
+        ui.say(f"   ({progress.clean_text(NOTE[fid])})")
+
+
+def answer(p: dict, fid: str, reply: str, today: date = None) -> None:
+    """Ответ на «Сделал?»: y — награда (один раз на задание), иначе — отложить без упрёка."""
+    today = today or date.today()
+    if p["field"].get("pending") == fid:
+        p["field"]["pending"] = None
+    if fid in p["field"]["done"]:
+        return          # уже засчитано (старый дубль вопроса) — второй раз не платим
+    if reply.strip().lower() in YES:
+        p["xp"] += progress.FIELD_KARMA
+        p["money"] += progress.FIELD_MONEY
+        p["field"]["done"].append(fid)
+        ui.ok("   " + theme.msg("field_bonus", xp=progress.FIELD_KARMA))
+        ui.ok(f"   +{progress.FIELD_MONEY} {theme.word('money')}")
+        _later(p).pop(fid, None)
+    else:           # «нет» или молчание — отложить, без упрёка; придёт следующее
+        _later(p)[fid] = (today + timedelta(days=RETRY_DAYS)).isoformat()
+
+
 def ask_pending(p: dict, ask, today: date = None) -> None:
     today = today or date.today()
     pend = p["field"].get("pending")
@@ -163,19 +190,9 @@ def ask_pending(p: dict, ask, today: date = None) -> None:
             a = ""
         if a.strip() != "?":
             break
-        ui.say(f"   Команда: {progress.clean_text(CMD[pend])}")
-        if pend in NOTE:
-            ui.say(f"   ({progress.clean_text(NOTE[pend])})")
+        show_command(pend)
         prompt = "   Сделал? [y/n] "
-    if a.strip().lower() in ("y", "yes", "д", "да"):
-        p["xp"] += progress.FIELD_KARMA
-        p["money"] += progress.FIELD_MONEY
-        p["field"]["done"].append(pend)
-        ui.ok("   " + theme.msg("field_bonus", xp=progress.FIELD_KARMA))
-        ui.ok(f"   +{progress.FIELD_MONEY} {theme.word('money')}")
-        _later(p).pop(pend, None)
-    else:           # «нет» или молчание — отложить, без упрёка; придёт следующее
-        _later(p)[pend] = (today + timedelta(days=RETRY_DAYS)).isoformat()
+    answer(p, pend, a, today)
 
 
 def give(p: dict, today: date = None) -> None:

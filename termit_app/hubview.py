@@ -7,7 +7,7 @@ from termit_app import hideout, inbox, progress, pyenvs, session, theme, tui, ui
 from termit_app.tasks import registry
 
 LABELS = {"run": "ран дня", "inbox next": "читать деку", "train": "отработка",
-          "lesson": "ещё урок", "master": "круг мастера", "hub": "пульт"}
+          "new": "ещё урок", "master": "круг мастера", "hub": "пульт"}
 LABEL_FRESH = "подтянуть свежее"
 
 
@@ -25,8 +25,11 @@ def unread_count(p: dict) -> int:
 
 
 def drill_ids(p: dict, day: date) -> List[str]:
-    """Что реально даст отработка сейчас. До отработки (шаг 8 спеки) — ничего."""
-    return []
+    """Что реально даст train сейчас — та же выборка (спека 2.3: иначе новичок увидит
+    пустой экран по Enter). Без подпроцессов: доступность — по кэшу интерпретатора."""
+    from termit_app import train
+    with pyenvs.cache_only():
+        return train.weak_ids(p, day)
 
 
 def failed_today(p: dict, day: date, ids: List[str]) -> bool:
@@ -41,7 +44,7 @@ def failed_today(p: dict, day: date, ids: List[str]) -> bool:
 
 
 def next_lesson(p: dict) -> Optional[str]:
-    """Новый урок для lesson; страж — экзамен, его Enter не предлагает (спека 2.3)."""
+    """Новый урок для слова new; страж — экзамен, его Enter не предлагает (спека 2.3)."""
     new = session.next_new(p, 1)
     if new and not registry.get(new[0]).boss:
         return new[0]
@@ -72,7 +75,7 @@ def default_action(p: dict, day: date) -> Tuple[str, str]:
         if drills and failed_today(p, day, drills):
             return "train", LABEL_FRESH
         if next_lesson(p):
-            line = "lesson"
+            line = "new"
         elif drills:
             line = "train"
         elif progress.master_open(p):
@@ -147,7 +150,7 @@ def _board(p: dict, day: date, cp) -> List[str]:
     if drills:
         rows.append(_row("Отработка:", f"подтянуть: {len(drills)}", mark("train")))
     if ran_today(p, day) and next_lesson(p):
-        rows.append(_row("Ещё урок:", "новая команда сверх нормы", mark("lesson")))
+        rows.append(_row("Ещё урок:", "новая команда сверх нормы", mark("new")))
     if weekly.visible(p, day):
         rows.append(_row("Неделя:", weekly.short_line(p, day).strip(), ""))
     if hideout.has_board(p):

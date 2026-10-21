@@ -15,6 +15,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
+from termit_app.textnorm import NO, YES
+
 BREW_DIRS = ("/opt/homebrew/bin", "/usr/local/bin")
 # Имя обёртки учебного brew в .termit/bin песочницы (termit_app/brewstub.py). Строку «brew»
 # держит только этот файл (тест NoBrewLiteralTest), sandbox берёт имя отсюда.
@@ -313,18 +315,18 @@ def would_ask(p: dict, today: date) -> bool:
     return today.isoformat() not in st["offered"].values() and bool(brew_path())
 
 
-def offer(p: dict, ask: Callable, today: date,
-          installer: Optional[Callable] = None) -> Optional[str]:
-    """Конец рана: не больше ОДНОГО предложения. y — ставим (installer, по умолчанию
-    brew_install), n — отказ навсегда, l/пусто/прочее — спросим через LATER_DAYS дней.
-    Вернуть id, если поставили. Нет brew — не спрашиваем, один раз говорим строку."""
+
+
+def post_offer(p: dict, today: date) -> Optional[str]:
+    """Карточка утилиты без вопроса (в убежище вопрос живёт на деке): id утилиты или None.
+    Те же правила, что у offer: раз в день, без brew — одна строка и молчание."""
     from termit_app import ui
     cands = eligible(p, today)
     if not cands:
         return None
     st = _state(p)
     if today.isoformat() in st["offered"].values():
-        return None             # раз в день: три ./termit play подряд — не три карточки
+        return None             # раз в день: три ./termit train подряд — не три карточки
     if not brew_path():
         if not st.get("no_brew_told"):
             st["no_brew_told"] = True
@@ -334,11 +336,24 @@ def offer(p: dict, ask: Callable, today: date,
     imp = cands[0]
     _card(imp)
     st["offered"][imp.id] = today.isoformat()
-    answer = _ask(ask, text("ask"))
-    if answer in YES:
+    return imp.id
+
+
+def answer(p: dict, imp_id: str, reply: str, today: date,
+           installer: Optional[Callable] = None) -> Optional[str]:
+    """y — ставим (installer, по умолчанию brew_install), n — отказ навсегда,
+    l/пусто/прочее — спросим через LATER_DAYS дней. Вернуть id, если поставили."""
+    from termit_app import ui
+    imp = find(imp_id)
+    if imp is None:
+        return None
+    st = _state(p)
+    reply = (reply or "").strip().lower()
+    if reply in YES:
         return _install(st, imp, installer, today)
-    if answer in ("n", "no", "н", "нет"):
-        st["declined"].append(imp.id)
+    if reply in NO:
+        if imp.id not in st["declined"]:
+            st["declined"].append(imp.id)
         ui.say(text("declined"))
         return None
     st["later"][imp.id] = (today + timedelta(days=LATER_DAYS)).isoformat()
@@ -346,7 +361,14 @@ def offer(p: dict, ask: Callable, today: date,
     return None
 
 
-YES = ("y", "yes", "д", "да")
+def offer(p: dict, ask: Callable, today: date,
+          installer: Optional[Callable] = None) -> Optional[str]:
+    """Конец рана в разовом режиме: не больше ОДНОГО предложения, карточка и вопрос сразу.
+    Вернуть id, если поставили."""
+    imp_id = post_offer(p, today)
+    if imp_id is None:
+        return None
+    return answer(p, imp_id, _ask(ask, text("ask")), today, installer)
 
 
 def find(key: str) -> Optional[Implant]:

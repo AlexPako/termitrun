@@ -3,18 +3,19 @@ argv и уходит в cli.run_once, как ./termit СЛОВО. Таблица
 слов: из неё строятся help, Tab, строка подсказки и «может, home?»."""
 import difflib
 import os
-import re
 import shlex
 import sys
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Callable, Dict, List, Optional, Tuple
 
-from termit_app import (cli, commands, edition, hideout, hubline, hubview, loot, music, paths,
-                        progress, story, theme, tui, ui)
+from termit_app import (cli, commands, edition, hideout, hubline, hubview, layout, loot, music,
+                        paths, progress, pyenvs, story, theme, tui, ui)
 from termit_app.hubline import LINE_MAX
 from termit_app.implants import STUB_NAME     # «brew» — только из implants (охрана I-2)
+from termit_app import book as book_mod
 from termit_app import shop as shop_mod
+from termit_app import train as train_mod
 from termit_app.tasks import registry
 
 PROMPT = "убежище › "
@@ -34,10 +35,10 @@ class Word:
 WORDS = (
     Word("run", ("dozor",), "play"),
     Word("short", ("short",), "play"),
-    Word("lesson", ("more",), "play", aliases=("more",)),
+    Word("new", ("new",), "play", aliases=("more",)),
+    Word("train", ("train",), "play", "[ТЕМА|ID|exam]", aliases=("play",)),
     Word("master", ("master",), "play", rule="master"),
     Word("rehearse", ("rehearse",), "play", "ID", rule="rehearse"),
-    Word("play", ("play",), "play", "ID"),
     Word("home", ("home",), "home"),
     Word("look", ("home", "look"), "home", "ВЕЩЬ"),
     Word("board", ("home", "board"), "home", rule="board"),
@@ -76,7 +77,25 @@ WORDS = (
 )
 
 # команды ./termit, которых нет в убежище, — с причиной (охранный тест сверяет с ABOUT)
-HUB_SKIP = {"track": "из убежища убран: новое приходит только с раном и lesson (спека 2.2)"}
+HUB_SKIP = {
+    "track": "из убежища убран: новое приходит только с раном и new (спека 2.2)",
+    "play": "синоним train в убежище (спека 2.2)",
+}
+
+# группы help: порядок групп и заголовки (слово — в группе из Word.group)
+GROUPS: Tuple[Tuple[str, str], ...] = (
+    ("play", "Играть"),
+    ("home", "Дом"),
+    ("story", "История"),
+    ("help", "Справка"),
+    ("settings", "Настройки"),
+    ("hub", "Убежище"),
+)
+
+# команды задачи, которые игрок по привычке набирает в убежище, — с подсказкой, что здесь
+TASK_ONLY = {
+    "lesson": "lesson — мини-урок внутри задачи. Новый урок здесь — слово new.",
+}
 
 HUB_ABOUT = {
     "run": "ран дня на ~10 минут — главное дело дня",
@@ -88,7 +107,7 @@ HUB_ABOUT = {
 
 CLOSED = {
     "master": "Круг мастера откроется, когда решишь первое задание.",
-    "rehearse": "Репетиция откроется, когда встретишь стража и он устоит.",
+    "rehearse": "Репетиция откроется, когда встретишь первого стража.",
     "board": "Доска откроется после первого решённого задания.",
     "prompt": "Своё приглашение откроется, когда появится первая деталь для него.",
     "palette": "Палитры откроются, когда купишь первую на витрине.",
@@ -115,9 +134,6 @@ UNKNOWN = "Не знаю слова «{word}»."
 MAYBE = " Может, {word}?"
 HELP_TAIL = " Все слова — help."
 
-_RU = "йцукенгшщзхъфывапролджэячсмитьбю"
-_EN = "qwertyuiop[]asdfghjkl;'zxcvbnm,."
-LAYOUT = str.maketrans(_RU, _EN)
 TERMINAL = frozenset((
     "ls", "cd", "pwd", "cat", "mkdir", "rmdir", "rm", "mv", "cp", "echo", "open", "git",
     STUB_NAME, "python", "python3", "pip", "pip3", "touch", "less", "head", "tail", "grep",
@@ -213,11 +229,13 @@ def parse_line(line: str, p: dict) -> Action:
             return Action("empty", note=note)
     head = parts[0].lower()
     word = find(head)
-    if word is None and re.search("[а-яё]", head):
-        guess = find(head.translate(LAYOUT))
+    if word is None and layout.has_cyrillic(head):
+        guess = find(layout.to_qwerty(head).lower())
         if guess is not None:
             word = guess
             note = LAYOUT_NOTE.format(word=guess.name)
+    if word is None and head in TASK_ONLY:
+        return Action("say", text=TASK_ONLY[head])
     if word is None:
         if _terminal_like(parts, text):
             return Action("say", text=NOT_TERMINAL)
@@ -240,12 +258,26 @@ def _help_row(word: Word) -> List[str]:
     return ui.story_fill(f"{label.ljust(22)} {about(word)}", "  ", " " * 25).splitlines()
 
 
+BOOK_HEAD = "«{word}» — не слово убежища. В книге выученного:"
+
+
+def _book_lines(p: dict, name: str) -> List[str]:
+    """help ТЕРМИН: команда терминала из книги выученного (то же, что book ТЕРМИН)."""
+    found = book_mod.lines(book_mod.sections(p), name)
+    if not found:
+        return []
+    return [BOOK_HEAD.format(word=name)] + [line.lstrip("\n") for line in found]
+
+
 def help_lines(p: dict, name: str = "") -> List[str]:
-    """help — все открытые слова; help СЛОВО — подробно об одном (закрытое объясняет,
-    когда откроется)."""
+    """help — открытые слова по группам (не больше 20 строк); help СЛОВО — подробно об одном
+    (закрытое объясняет, когда откроется); не слово, но есть в книге — строки книги."""
     if name:
         word = find(name.lower())
         if word is None:
+            book = _book_lines(p, name)
+            if book:
+                return [tui.trunc(line, 78) for line in book]
             return [UNKNOWN.format(word=name) + HELP_TAIL]
         if not is_open(word, p):
             return [closed_text(word)]
@@ -253,10 +285,28 @@ def help_lines(p: dict, name: str = "") -> List[str]:
         if word.aliases:
             out.append("  то же: " + ", ".join(word.aliases))
         return out
-    out = ["Слова убежища (Enter — то, что отмечено ⏎):"]
-    for word in open_words(p):
-        out += _help_row(word)
+    words = open_words(p)
+    out = ["Слова убежища (Enter — то, что отмечено ⏎; help СЛОВО — подробно):"]
+    for group, title in GROUPS:
+        names = [w.name for w in words if w.group == group]
+        if names:
+            out += _group_rows("  " + (title + ":").ljust(12), names)
     return [tui.trunc(line, 78) for line in out]
+
+
+def _group_rows(head: str, names: List[str], width: int = 78) -> List[str]:
+    """Строка группы: слова через « · »; не влезло — перенос целым словом под первое слово
+    (точка остаётся в конце строки, а не в начале следующей)."""
+    rows = []
+    line = head
+    for i, name in enumerate(names):
+        piece = name + (" ·" if i < len(names) - 1 else "")
+        if line != head and len(line) + 1 + len(piece) > width:
+            rows.append(line)
+            line = " " * len(head)
+        line += piece if line.endswith(" ") else " " + piece
+    rows.append(line)
+    return rows
 
 
 def _open_task_ids(p: dict) -> List[str]:
@@ -268,7 +318,15 @@ def _open_task_ids(p: dict) -> List[str]:
 
 def _rehearse_ids(p: dict) -> List[str]:
     tasks = registry.all_tasks()
-    return [t for t in _open_task_ids(p) if tasks[t].boss and t not in p.get("bosses", ())]
+    return [t for t in _open_task_ids(p) if tasks[t].boss]
+
+
+def _train_args(p: dict) -> List[str]:
+    """Tab после train: exam, места, команды и id — как отбирает сама отработка (F16):
+    ни закрытых мест, ни стражей. Доступность — по кэшу, без подпроцессов."""
+    with pyenvs.cache_only():
+        ids = train_mod.candidates(p, date.today())
+    return ["exam"] + train_mod.places(p) + train_mod.commands_of(p) + sorted(ids)
 
 
 # аргументы для Tab после слова; невстреченное не предлагаем (спойлер и тупик)
@@ -281,8 +339,7 @@ ARG_SOURCES: Dict[str, Callable[[dict], List[str]]] = {
     "home": lambda p: list(commands.HOME_ABOUT),
     "music": lambda p: ["play", "stop", "vol", "preview", "run"],
     "sound": lambda p: ["on", "off", "test", "pack", "vol"],
-    "play": lambda p: sorted(_open_task_ids(p)),
-    "train": lambda p: [t.key for t in registry.unlocked(p.get("bosses", ()))],
+    "train": lambda p: _train_args(p),
     "rehearse": _rehearse_ids,
 }
 
@@ -312,7 +369,7 @@ BROKE = ("Что-то пошло не так, но убежище цело. По
 CLEAR = "\033[H\033[2J"
 BACK = "в убежище: Enter "
 # слова, после которых игрок был в задачах: терминал и музыку приводим в порядок
-RUN_WORDS = frozenset(("run", "short", "lesson", "master", "rehearse", "play", "train"))
+RUN_WORDS = frozenset(("run", "short", "new", "master", "rehearse", "train"))
 
 
 class Hub:

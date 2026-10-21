@@ -10,10 +10,9 @@ from datetime import date, timedelta
 from typing import Callable, List, Optional
 
 from termit_app import pyenvs
+from termit_app.textnorm import NO, YES
 
 LATER_DAYS = 3
-YES = ("y", "yes", "д", "да")
-NO = ("n", "no", "н", "нет")
 OPENS_AFTER = "boss_env"        # трек «Python» открыт — пора предложить склад «Аналитики»
 
 # сколько качать (M3 ревью Q4): оценка по известным размерам колёс PyPI для пинов lock.py —
@@ -153,29 +152,41 @@ def _card() -> None:
     ui.say("   " + command_line())
 
 
-def offer(p: dict, ask: Callable, today: date, getter: Optional[Callable] = None) -> bool:
-    """Конец рана: не больше одного вопроса в день. y — качаем (getter, по умолчанию
-    pyenvs.get_wheels), n — больше не спрашиваем, l/пусто/прочее — через LATER_DAYS дней.
-    Вернуть True, если склад теперь на месте."""
-    from termit_app import ui
+def post_offer(p: dict, today: date) -> bool:
+    """Карточка склада без вопроса (в убежище вопрос — на деке). True — карточка показана."""
     if not eligible(p, today):
         return False
-    st = _state(p)
-    st["offered"] = today.isoformat()
+    _state(p)["offered"] = today.isoformat()
     _card()
-    answer = _ask(ask, TEXT["ask"])
-    if answer in YES:
+    return True
+
+
+def answer(p: dict, reply: str, today: date, getter: Optional[Callable] = None) -> bool:
+    """y — качаем (getter, по умолчанию pyenvs.get_wheels), n — больше не спрашиваем,
+    l/пусто/прочее — через LATER_DAYS дней. True — склад теперь на месте."""
+    from termit_app import ui
+    st = _state(p)
+    reply = (reply or "").strip().lower()
+    if reply in YES:
         ok = _get(getter)
         if not ok:
             st["later"] = (today + timedelta(days=LATER_DAYS)).isoformat()
         return ok
-    if answer in NO:
+    if reply in NO:
         st["declined"] = True
         ui.say(TEXT["declined"])
         return False
     st["later"] = (today + timedelta(days=LATER_DAYS)).isoformat()
     ui.say(TEXT["later"])
     return False
+
+
+def offer(p: dict, ask: Callable, today: date, getter: Optional[Callable] = None) -> bool:
+    """Конец рана в разовом режиме: не больше одного вопроса в день, карточка и вопрос сразу.
+    Вернуть True, если склад теперь на месте."""
+    if not post_offer(p, today):
+        return False
+    return answer(p, _ask(ask, TEXT["ask"]), today, getter)
 
 
 def status_lines() -> List[str]:

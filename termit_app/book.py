@@ -83,6 +83,11 @@ def _names(spell: str) -> List[str]:
     return out
 
 
+def command_names(spell: str) -> List[str]:
+    """Команды строки книги — для train ТЕМА (отработка по команде)."""
+    return _names(spell or "")
+
+
 def decoded(parts: Sections) -> Sections:
     """В строке, где команда в книге впервые, — «· 🔤 cd: «change directory»», если такой
     расшифровки в строке ещё нет."""

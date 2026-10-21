@@ -473,11 +473,12 @@ def cmd_end(box, outcome: str, message: str) -> int:
 # FB3 (3): песочница после решения (session._linger). Проверок нет, переход — командами.
 LINGER_DONE = ("Задача уже засчитана — разбор выше. Пробуй свои способы; дальше — next, "
                "выйти — quit.")
-LINGER_NO_MORE = ("Ещё урок (more) игра предложит после итога рана. Сейчас дальше — next.")
+LINGER_NO_MORE = "Ещё урок — слово new в убежище после рана. Сейчас дальше — next."
 LINGER_SKIP = "Задача уже засчитана — идём дальше."
 LINGER_NO_RESET = ("После решения reset здесь недоступен: задача встретится снова и соберётся "
                    "заново. Дальше — next.")
-NOT_YET = "next и more — после решения задачи. Сейчас: skip — отложить, quit — выйти."
+NOT_YET = ("next — после решения задачи, ещё урок — new в убежище. Сейчас: skip — "
+           "отложить, quit — выйти.")
 
 
 def _lingering(box) -> bool:
@@ -491,7 +492,7 @@ def linger_cmd(box, cmd: str, args) -> int:
         return EXIT_SHELL if sandbox.result(box) else 0
     if cmd == "next":
         return cmd_end(box, "next", "Дальше.")
-    if cmd == "more":           # ещё урок — после итога рана, не из песочницы (17.10)
+    if cmd == "more":           # ещё урок — слово new в убежище, не из песочницы
         ui.say(LINGER_NO_MORE)
         return 0
     if cmd in ("skip", "giveup"):
