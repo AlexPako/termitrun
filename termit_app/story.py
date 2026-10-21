@@ -599,10 +599,10 @@ def _file_extras(item_id: str, lines: List[str], src: Optional[Source] = None) -
 
 def _file_lines(lines: List[str]) -> List[str]:
     """Строки файла по ширине терминала (cat не переносит слова сам)."""
-    from termit_app import ui
+    from termit_app import tui
     out = []
     for line in lines:
-        out += textwrap.wrap(line, ui.STORY_WIDTH, break_long_words=False,
+        out += textwrap.wrap(line, tui.story_width(), break_long_words=False,
                              break_on_hyphens=False) or [""]
     return out
 

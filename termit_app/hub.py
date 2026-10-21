@@ -406,7 +406,7 @@ def _short_rows(head: str, names: List[str], width: int, longest: int) -> List[s
     return rows
 
 
-def _group_rows(head: str, names: List[str], width: int = 78) -> List[str]:
+def _group_rows(head: str, names: List[str], width: int) -> List[str]:
     """Строка группы: слова через « · »; не влезло — перенос целым словом под первое слово
     (точка остаётся в конце строки, а не в начале следующей)."""
     rows = []

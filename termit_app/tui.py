@@ -17,8 +17,8 @@ import unicodedata
 from dataclasses import dataclass, replace
 from typing import Iterable, List, Optional, Sequence, Tuple, Union
 
-MAX_WIDTH = 78
-STORY = 76                              # абзацы: запас на двойную ширину эмодзи
+MAX_WIDTH = 100                         # FB17: вывод — по окну, но не шире 100 знаков
+MIN_WIDTH = 20
 NARROW = 60
 NBSP = "\u00a0"
 ANIM_LIMIT = 0.6                        # вся анимация одного экрана — не дольше, с
@@ -32,7 +32,7 @@ class Caps:
     level: str          # "rich" | "basic" | "plain"
     colors: int         # 0 | 8 | 256
     unicode: bool
-    width: int          # min(78, колонки окна)
+    width: int          # min(MAX_WIDTH, колонки окна), не меньше MIN_WIDTH
     anim: bool
 
 
@@ -55,7 +55,7 @@ def detect(env=None, stream=None, columns: Optional[int] = None) -> Caps:
     term = env.get("TERM", "")
     if columns is None:
         columns = shutil.get_terminal_size((80, 24)).columns
-    width = max(20, min(MAX_WIDTH, columns))
+    width = max(MIN_WIDTH, min(MAX_WIDTH, columns))
     if not tty or term == "dumb":
         return replace(PLAIN, width=width)
     colors = 0 if env.get("NO_COLOR") else (256 if "256" in term or env.get("COLORTERM") else 8)
@@ -72,6 +72,22 @@ def detect(env=None, stream=None, columns: Optional[int] = None) -> Caps:
 def caps() -> Caps:
     """Считается на каждый экран: дёшево, а stdout в тестах подменяется."""
     return detect()
+
+
+def width(c: Caps = None) -> int:
+    """FB17: ширина вывода игры — единый источник: min(100, колонки окна), не меньше 20."""
+    return (c or caps()).width
+
+
+def text_width(c: Caps = None) -> int:
+    """Текст карточек, уроков и разборов: на клетку уже окна (курсор в последней колонке
+    иначе переносит строку)."""
+    return width(c) - 1
+
+
+def story_width(c: Caps = None) -> int:
+    """Абзацы с эмодзи и реплики: на две клетки уже окна — запас на двойную ширину эмодзи."""
+    return width(c) - 2
 
 
 # --- Ширина --------------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 
 Запись Hack:
 - keys — сочетание или команда, как её набирают;
-- what — что делает (коротко: из этой строки собирается совет дня на доске, ≤ 78 клеток);
+- what — что делает (коротко: из этой строки собирается совет дня на доске, ≤ ui.BOARD_WIDTH клеток);
 - when — когда выручает;
 - origin — откуда имя или история, коротко (запоминать проще);
 - learn — где в игре учится: id задачи или LEARN_CATALOG (только этот каталог);
@@ -576,7 +576,8 @@ def _sentence(label: str, text: str) -> str:
 
 def _fill(text: str, indent: str) -> str:
     import textwrap
-    return textwrap.fill(text, 78, initial_indent=indent, subsequent_indent=indent,
+    from termit_app import tui
+    return textwrap.fill(text, tui.text_width(), initial_indent=indent, subsequent_indent=indent,
                          break_long_words=False, break_on_hyphens=False)
 
 

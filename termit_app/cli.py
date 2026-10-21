@@ -301,7 +301,7 @@ def _show_items(p, items, today, new_ids) -> None:
 def _wrap(text: str, first: str, rest: str) -> str:
     """Строка витрины по ширине сюжетных строк (длинный id — без переноса внутри)."""
     import textwrap
-    return textwrap.fill(text, ui.STORY_WIDTH, initial_indent=first, subsequent_indent=rest,
+    return textwrap.fill(text, tui.story_width(), initial_indent=first, subsequent_indent=rest,
                          break_long_words=False, break_on_hyphens=False)
 
 
@@ -632,7 +632,7 @@ def style_cmd(args) -> int:
 def _style_ids(p, kind: str) -> str:
     ids = cosmetics.known_style(p, kind)
     st = cosmetics.style_text
-    # длинный список id переносится: в plain строки не шире 78 (FINAL-review M4)
+    # длинный список id переносится: строки не шире окна (FINAL-review M4, FB17)
     return ui.story_fill(st("ids", ids=", ".join(ids)), "", "  ") if ids else st("no_ids")
 
 
@@ -882,7 +882,7 @@ def deck(args) -> int:
         if mid and shop_mod.desc(mid):
             ui.say(_wrap(shop_mod.desc(mid), "           ", "           "))
     spare = [m for m in shop_mod.MODULES if shop_mod.owned(p, m) and m not in installed]
-    if spare:                       # по одному в строке: имена длинные, ширина 76
+    if spare:                       # по одному в строке: имена длинные
         ui.say("  куплены, не стоят:")
         for m in spare:
             ui.say(f"    {shop_mod.name(m)} ({m})")

@@ -18,7 +18,7 @@ from typing import Iterable, List, Optional
 BOX_KNOWN = ".termit/errors_known"
 BOX_SEEN = ".termit/errors_seen"
 
-KINDS = ("not_found", "no_such_file", "is_dir", "permission")
+KINDS = ("not_found", "no_such_file", "is_dir", "permission", "root_walk", "two_paths")
 
 TEXT = {
     "not_found": ("command not found", "такой команды нет: опечатка в имени или программа не "
@@ -29,6 +29,13 @@ TEXT = {
                                  "папку целиком копирует и удаляет только -r."),
     "permission": ("Permission denied", "нет прав: файлу не разрешено то, что ты просишь. "
                                         "Запуск разрешает chmod +x."),
+    # владелец 21.10: ls /**/plan_final.txt — простыня «operation not permitted»
+    "root_walk": ("operation not permitted", "/ в начале — корень всего Mac, а песочница "
+                                             "пускает только в папку задания. Отсюда вглубь — "
+                                             "без /: ls **/имя"),
+    # владелец 21.10: cp **/plan_final.txt(D) без «куда» — cp печатает свою справку
+    "two_paths": ("usage: cp / mv", "команде нужны два адреса: что и куда. «Сюда, в эту "
+                                    "папку» — точка: cp notes/**/plan.txt ."),
 }
 
 # команды, чьи аргументы — пути (у grep первый аргумент — шаблон)
@@ -76,14 +83,42 @@ def _args(cmd: str, words: List[str]) -> List[str]:
     return out
 
 
+# обход от корня диска: ls /**/x, ls /*/x, find / -name x, ls -R /
+_ROOT_CMDS = ("ls", "find", "cat", "grep", "du", "tree", "head", "wc")
+
+
+def _root_walk(line: str) -> bool:
+    words = line.split()
+    if not words or words[0] not in _ROOT_CMDS:
+        return False
+    args = words[1:]
+    if any(w.startswith("/") and "*" in w for w in args):
+        return True
+    deep = words[0] in ("find", "du", "tree") or any(
+        w.startswith("-") and "r" in w.lower() for w in args)
+    return deep and "/" in args
+
+
+def _one_path(line: str) -> bool:
+    """cp или mv с одним адресом (маска — тоже один): «что» есть, «куда» — нет."""
+    words = line.split()
+    if not words or words[0] not in ("cp", "mv") or any(ch in line for ch in "|;&<>`$"):
+        return False
+    return len([w for w in words[1:] if not w.startswith("-")]) == 1
+
+
 def detect(line: str, rc, pwd, home: Optional[str] = None) -> Optional[str]:
     """Какая ошибка, скорее всего, была у этой команды (None — не знаем или ошибки нет)."""
     try:
         code = int(str(rc).split()[-1])
     except (ValueError, IndexError):
         return None
+    if _root_walk(line):        # простыня «operation not permitted» бывает и при успехе
+        return "root_walk"
     if code == 0:
         return None
+    if _one_path(line):
+        return "two_paths"
     if code == 127:
         from termit_app import layout
         first = line.split()[0] if line.split() else ""

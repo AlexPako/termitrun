@@ -9,6 +9,8 @@ import textwrap
 from pathlib import Path
 from typing import Dict, Iterable, List
 
+from termit_app import tui
+
 # расширение → (группа, что внутри и где встречается). Одна строка, без сюжета.
 EXTENSIONS: Dict[str, tuple] = {
     # текст
@@ -150,7 +152,7 @@ HEAD = ("Копилка расширений. Расширение — хвос�
 def sheet(seen: Iterable[str]) -> str:
     """Текст копилки: встреченные расширения по группам, в порядке словаря."""
     seen = set(seen)
-    rows = [textwrap.fill(HEAD, 78, break_long_words=False, break_on_hyphens=False), ""]
+    rows = [textwrap.fill(HEAD, tui.text_width(), break_long_words=False, break_on_hyphens=False), ""]
     if not seen:
         rows.append("Пока пусто: копилка пополняется сама, когда в задании встречается файл с "
                     "новым расширением.")
@@ -162,7 +164,7 @@ def sheet(seen: Iterable[str]) -> str:
         if kind != group:
             group = kind
             rows.append(f"{kind.capitalize()}:")
-        rows.append(textwrap.fill(describe(ext), 78, initial_indent="  ",
+        rows.append(textwrap.fill(describe(ext), tui.text_width(), initial_indent="  ",
                                   subsequent_indent="        ", break_long_words=False,
                                   break_on_hyphens=False))
     left = len(EXTENSIONS) - len(seen & set(EXTENSIONS))

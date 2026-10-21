@@ -25,7 +25,7 @@ import random
 from datetime import date
 from typing import List, Optional
 
-from termit_app import progress, theme
+from termit_app import progress, theme, tui
 from termit_app.tasks import registry
 
 MASTER_PAY = 10         # × ярус трека — за побитый рекорд круга (раз в день на задачу)
@@ -152,7 +152,7 @@ def summary_lines(p: dict) -> List[str]:
         items = [f"{name} {ui.fmt_time(b)}" for _, name, b in top]
         fit = 1
         while fit < len(items) and len("  " + t["records"].format(
-                items=", ".join(items[:fit + 1]))) <= 78:
+                items=", ".join(items[:fit + 1]))) <= tui.text_width():
             fit += 1
         out.append("  " + t["records"].format(items=", ".join(items[:fit])))
     return out

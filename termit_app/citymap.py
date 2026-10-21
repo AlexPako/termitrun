@@ -84,10 +84,10 @@ def lines(p: dict, c: tui.Caps = None, style: Optional[dict] = None) -> List[str
         for tr in registry.shown_tracks():
             s = states[tr.key]
             out += tui.fill(f"{s['name']} — {_status_words(s, tr.key == here)}",
-                            tui.STORY, "  ", "    ")
+                            tui.story_width(c), "  ", "    ")
         if later:
             out += tui.fill(_ui("later", "Дальше — закрыто:") + " " + ", ".join(later),
-                            tui.STORY, "  ", "    ")
+                            tui.story_width(c), "  ", "    ")
         return out
     rich = c.level == "rich"
     ms = style if style is not None else cosmetics.map_style(p)

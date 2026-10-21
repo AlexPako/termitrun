@@ -11,7 +11,7 @@ import os
 import textwrap
 from typing import Optional
 
-from termit_app import layout
+from termit_app import layout, tui
 
 FLAG = "iterm_setup_shown"           # p["flags"]: экран уже показан при входе
 
@@ -43,8 +43,9 @@ def needed(env: Optional[dict] = None) -> bool:
     return env.get("TERM_PROGRAM") != "iTerm.app"
 
 
-def screen(width: int = 78) -> str:
+def screen(width: int = None) -> str:
     """Экран целиком: заголовок, шаги с «зачем», как вернуться к нему."""
+    width = width or tui.text_width()
     out = [TITLE, ""]
     for n, (head, body) in enumerate(STEPS, 1):
         out.append(f"{n}. {head}")
@@ -53,7 +54,9 @@ def screen(width: int = 78) -> str:
     out += [""] + textwrap.wrap("Раскладка. " + layout.NOTE, width - 3, initial_indent="   ",
                                 subsequent_indent="   ", break_long_words=False,
                                 break_on_hyphens=False)
-    out += ["", "Вернуться к этому экрану: keys iterm (в задаче) или ./termit keys iterm."]
+    out += [""] + textwrap.wrap("Вернуться к этому экрану: keys iterm (в задаче) или ./termit "
+                                "keys iterm.", width, break_long_words=False,
+                                break_on_hyphens=False)
     return "\n".join(out)
 
 

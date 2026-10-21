@@ -248,12 +248,12 @@ def cmd_lesson(box) -> int:
     ui.say()
     if lesson:
         ui.say(ui.c("1;36", f"📖 Урок · {theme.speaker(task)}"))
-        ui.say(ui.code_spans(ui.lesson_block(lesson, min(78, cp.width - 1)), cp))
+        ui.say(ui.code_spans(ui.lesson_block(lesson, tui.text_width(cp)), cp))
     else:
         ui.say(ui.c("1;36", "📖 Урок"))
-        ui.say(ui._wrap(scroll, width=min(78, cp.width - 1)))
+        ui.say(ui._wrap(scroll, width=tui.text_width(cp)))
     ui.show_diagram(task.id, cp)
-    ui.origin_notes(task.id, cp, min(tui.STORY, cp.width - 2))
+    ui.origin_notes(task.id, cp, tui.story_width(cp))
     return 0
 
 

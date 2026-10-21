@@ -85,7 +85,6 @@ def default_action(p: dict, day: date) -> Tuple[str, str]:
     return line, LABELS[line]
 
 
-WIDTH = 74
 NEW_DAY = "Новый день: ран дня обновлён."
 TOUR = ("Это убежище — твой пульт между ранами. Здесь набирают короткие слова игры, а не "
         "команды терминала. Enter делает то, что отмечено ⏎. Все слова — help, выйти — "
@@ -94,13 +93,21 @@ SILENT = ("hub", "help", "clear", "quit", "home")      # всегда в под�
 NEW_IN_RELEASE = ("train", "inbox")     # слова этого выпуска: знакомство их не гасит
 MAX_FRESH = 8                           # столько новых слов предлагает пульт за раз
 MAX_HINT = 6
-HINT_WIDTH = 78
+WORD_COLUMN = 9                         # слово справа: «[Enter]», «inbox», «board»
+LABEL_COLUMN = 12
 
 
-def _row(label: str, text: str, word: str) -> str:
-    left = f"  {label}{' ' * max(1, 12 - tui.vlen(label))}{text}"
-    left = tui.trunc(left, WIDTH - 10)
-    return (tui.pad(left, WIDTH - 9) + word).rstrip()
+def row_width(cp=None) -> int:
+    """FB17: строка пульта — по окну (до 100), с запасом в 4 клетки справа."""
+    return tui.width(cp) - 4
+
+
+def row(label: str, text: str, word: str, width: int = None) -> str:
+    """«  Метка:     текст ……… слово»: колонки считаются от ширины окна."""
+    width = width or row_width()
+    left = f"  {tui.pad(label, LABEL_COLUMN - 1)} {text}"
+    left = tui.trunc(left, width - WORD_COLUMN - 1)
+    return (tui.pad(left, width - WORD_COLUMN) + word).rstrip()
 
 
 def header(p: dict, day: date) -> str:
@@ -129,6 +136,10 @@ def _board(p: dict, day: date, cp) -> List[str]:
     доступность задач считается по кэшу интерпретатора."""
     cp = cp or tui.caps()
     enter = default_action(p, day)[0].split()[0]
+    wide = row_width(cp)
+
+    def _row(label: str, text: str, word: str) -> str:
+        return row(label, text, word, wide)
 
     def mark(word: str) -> str:
         return "[Enter]" if word == enter else word
@@ -164,8 +175,9 @@ def _board(p: dict, day: date, cp) -> List[str]:
         rows.append(_row("Круг:", "знакомые дела на время, против рекорда", "[Enter]"))
     head = header(p, day)
     if cp.level == "plain":
-        return [tui.trunc(head, 78)] + rows
-    return [tui.trunc("  " + tui.label(head, cp), 78), tui.rule(cp, indent="  ")] + rows
+        return [tui.trunc(head, tui.width(cp))] + rows
+    return [tui.trunc("  " + tui.label(head, cp), tui.width(cp)),
+            tui.rule(cp, indent="  ")] + rows
 
 
 def fresh_words(p: dict, names: List[str]) -> List[str]:
@@ -185,7 +197,8 @@ HINT_LINES = 4
 TAIL = ["help — подробно", "quit — выйти"]
 
 
-def _wrap(items: List[str], width: int = HINT_WIDTH) -> List[str]:
+def _wrap(items: List[str], width: int = None) -> List[str]:
+    width = width or tui.width()
     lines, cur = [], ""
     for item in items:
         joined = f"{cur} · {item}" if cur else item
@@ -200,8 +213,8 @@ def _wrap(items: List[str], width: int = HINT_WIDTH) -> List[str]:
 def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = (),
               shorts: Optional[dict] = None) -> str:
     """Подсказка над приглашением: первым — что сделает ⏎, потом новое, потом все открытые
-    слова (words — в порядке групп help), последними — help и quit. До четырёх строк по 78
-    колонок; не влезло — слова убираются с конца, help и quit остаются (владелец 21.10:
+    слова (words — в порядке групп help), последними — help и quit. До четырёх строк по ширине
+    окна (до 100); не влезло — слова убираются с конца, help и quit остаются (владелец 21.10:
     «6 команд мало… всё должно быть на виду, особенно первые разы»)."""
     with pyenvs.cache_only():
         line, label = default_action(p, day)
@@ -228,4 +241,4 @@ def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = (),
         elif len(items) > 1:
             items.pop()
         else:
-            return "\n".join(tui.trunc(x, HINT_WIDTH) for x in lines[:HINT_LINES])
+            return "\n".join(tui.trunc(x, tui.width()) for x in lines[:HINT_LINES])

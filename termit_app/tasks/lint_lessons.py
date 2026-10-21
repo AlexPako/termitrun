@@ -18,10 +18,13 @@ Q001  первая задача места спрашивает больше о�
 import re
 from typing import Dict, List, Optional, Set
 
+from termit_app import tui
+
 # FB5 п. 41–50: урок — не телеграмма. Лимит «7 строк в 60 колонок» снят (толкал к обрывкам):
 # длина — сколько нужно для ясности, после LESSON_LINES строк в окне LESSON_WIDTH — только
-# мягкое предупреждение; задание при длинной карточке повторяется в её конце (ui.task_card)
-LESSON_WIDTH = 78
+# мягкое предупреждение; задание при длинной карточке повторяется в её конце (ui.task_card).
+# FB17: переносы считаются от самого широкого окна игры (tui.MAX_WIDTH, 100 колонок)
+LESSON_WIDTH = tui.MAX_WIDTH
 LESSON_LINES = 14
 LESSON_TRICKS = 4
 STRICT_TRACKS = ("basics",)

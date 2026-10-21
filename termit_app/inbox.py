@@ -12,6 +12,8 @@ import zlib
 from datetime import date
 from typing import Callable, Dict, List, Optional
 
+from termit_app import tui
+
 KEEP = 30
 MAX_TEXT = 2000
 NAME_MAX = 12
@@ -26,7 +28,7 @@ NO_SUCH = "Сообщения {n} нет. Весь список — inbox."
 WAITS = "ждёт ответа"
 ASK_PROMPT = "   Ответ (y — да, n — нет; Enter — решу потом): "
 LIST_TAIL = "  inbox N — открыть · inbox next — следующее новое"
-WIDTH = 78
+WHEN_COLUMN = 16
 SUMMARY = "✉ На деке {n} {word} — прочтёшь в убежище: inbox."
 
 
@@ -206,11 +208,14 @@ def list_lines(p: dict, today: date) -> List[str]:
         return [EMPTY]
     new = len(unread(p))
     out = [" ✉ ДЕКА · сообщения" + (f" · новых: {new}" if new else "")]
+    # FB17: колонки — от ширины окна: справа «когда» (до 16 знаков), первая строка — сколько влезет
+    right_at = tui.width() - WHEN_COLUMN
     for m in reversed(_shown(box)):
         dot = "●" if not m["read"] else " "
         right = WAITS if m["ask"] else when(m["day"], today)
-        left = f"  {dot} {m['id']:>2}  {sender_name(m['from']):<8} {_fit(_first_line(m['text']), 40)}"
-        out.append(left.ljust(62) + right)
+        head = f"  {dot} {m['id']:>2}  {sender_name(m['from']):<8} "
+        left = head + _fit(_first_line(m["text"]), right_at - len(head) - 2)
+        out.append(left.ljust(right_at) + right)
     out.append(LIST_TAIL)
     return out
 
@@ -224,7 +229,7 @@ def open_lines(msg: dict, today: date) -> List[str]:
             out.append("")
             continue
         indent = "  " + line[:len(line) - len(line.lstrip())]
-        out += textwrap.wrap(line.strip(), WIDTH, initial_indent=indent,
+        out += textwrap.wrap(line.strip(), tui.width(), initial_indent=indent,
                              subsequent_indent=indent, break_on_hyphens=False)
     return out
 

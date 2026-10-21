@@ -673,7 +673,7 @@ FRAMES = {"ascii": ("+", "+", "+", "+", "-", "|"),       # как всегда (
 
 
 def render(p: dict, frame: str = "ascii") -> List[str]:
-    """ASCII-комната: не больше 12 строк по 76 символов, только купленное и подаренное.
+    """ASCII-комната: не больше 12 строк (рамка — WIDTH + 4 символа), только купленное и подаренное.
     frame="box" — стены линиями ┌─┐ (графика rich), предметы те же."""
     items = owned_items(p)
     tl, tr, bl, br, h, v = FRAMES[frame]
@@ -1030,7 +1030,16 @@ def board_lines(p: dict, game: bool = True) -> List[str]:
         cards = cards + [GAME_CARD]             # внизу, у самого приглашения — как раньше
     if not game:
         cards = [card for card in cards if card != GAME_CARD]
-    return [text for text in (card_text(p, card) for card in cards) if text]
+    return [row for text in (card_text(p, card) for card in cards) if text
+            for row in _board_rows(text)]
+
+
+def _board_rows(text: str) -> List[str]:
+    """FB17: карточка доски — строкой по ширине окна (до 100); в узком окне — переносом по
+    словам, продолжение с отступом (zsh печатает строки над приглашением как есть)."""
+    from termit_app import tui
+    width = tui.text_width()
+    return [text] if tui.vlen(text) <= width else tui.fill(text, width, "", "  ")
 
 
 def _free(p: dict) -> int:
@@ -1153,7 +1162,7 @@ def board_view(p: dict) -> List[str]:
         out.append(ui.story_fill(f"{mark} {card:12} {CARD_NAMES[card]}{note}", "  ", " " * 17))
         sample = card_text(p, card)
         if sample:
-            out.append("    " + tui.trunc(sample, ui.BOARD_CARD_WIDTH))
+            out.append("    " + tui.trunc(sample, tui.width() - 4))
     out.append("")
     waiting = [c for c in open_cards(p) if c != GAME_CARD and c not in cards]
     if len(cards) >= slots and waiting:

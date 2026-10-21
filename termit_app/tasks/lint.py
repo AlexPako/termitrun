@@ -809,8 +809,11 @@ def _format_checks(task, state: dict, add) -> None:
     except (KeyError, IndexError, ValueError, AttributeError):
         return
     for i, h in enumerate(hints, 1):
-        if "\n" in h or len(h) > HINT_MAX:
-            add("H001", "error", f"{where}: подсказка {i} — не одна строка ≤ {HINT_MAX} симв.")
+        if "\n" in h:
+            add("H001", "error", f"{where}: подсказка {i} — не одна строка")
+        elif len(h) > HINT_MAX:     # FB17 (п. 50): длина — мягко, не толкать к телеграфу
+            add("H003", "warn", f"{where}: подсказка {i} длиннее {HINT_MAX} симв. — "
+                                "проверь, всё ли нужно")
     _taught_checks(task, state, hints, add)
 
 

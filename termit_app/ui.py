@@ -128,7 +128,8 @@ def fmt_time(sec: float) -> str:
     return f"{m}:{s:02d}"
 
 
-def _wrap(text: str, indent: str = "   ", width: int = 78) -> str:
+def _wrap(text: str, indent: str = "   ", width: int = None) -> str:
+    width = width or tui.text_width()
     return "\n".join(textwrap.fill(line, width, initial_indent=indent, subsequent_indent=indent,
                                      break_long_words=False, break_on_hyphens=False)
                      if line else "" for line in text.split("\n"))
@@ -147,10 +148,11 @@ def lesson_paragraphs(text: str) -> list:
     return [re.sub(r"[ \t\n]+", " ", p).strip() for p in text.split("\n\n") if p.strip()]
 
 
-def lesson_block(text: str, width: int = 78) -> str:
+def lesson_block(text: str, width: int = None) -> str:
     """Мини-урок: команда в `…` не рвётся, тире не начинает строку. Урок из нескольких абзацев
     (E1: приём в начале абзаца, ход игрока — последней строкой) — каждый абзац с новой строки,
     продолжение абзаца — с отступом поглубже; урок одним абзацем — как раньше, ровным краем."""
+    width = width or tui.text_width()
     paras = lesson_paragraphs(text)
     hang = LESSON_HANG if len(paras) > 1 else LESSON_INDENT
     out = []
@@ -196,7 +198,7 @@ def header(title: str, streak: int, rank: str, count: int, money: int = None) ->
         say(c("1", f"  {title} · {rest}"))
         return
     say("\n".join(tui.fill(f"{tui.label(title, cp)} {tui.style(rest, 'bold', c=cp)}",
-                            tui.STORY, "  ", "    ")))
+                            tui.story_width(cp), "  ", "    ")))
 
 
 # FB5 п. 45: подвал карточки — постоянное напоминание о клавишах, одна группа на карточку,
@@ -224,9 +226,10 @@ def key_group(task_id: str, variant: int, turn: int) -> int:
     return own if own is not None else turn % len(KEY_GROUPS)
 
 
-def key_group_rows(index: int, width: int = 78, one_line: bool = False) -> list:
+def key_group_rows(index: int, width: int = None, one_line: bool = False) -> list:
     """«⌨ Заголовок: клавиша — что · …» по ширине, пункт не рвётся; one_line — одна строка
     из того, что в неё влезло (длинная карточка, п. 43)."""
+    width = width or tui.text_width()
     title, items = KEY_GROUPS[index]
     rows, line, fresh = [], f"   ⌨ {title}:", True
     for k, item in enumerate(items):
@@ -257,16 +260,15 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     mode_word = master or theme.word("rehearsal_mode" if rehearsal else
                                      "job_mode" if mode == "job" else "train_mode")
     cp = _framed()
-    if cp.level == "plain":
-        say(c("1", label))
+    if cp.level == "plain":     # FB17: длинная шапка в узком окне — переносом
+        say("\n".join(c("1", r) for r in tui.fill(label, tui.text_width(cp), "", "   ")))
         say(c("2", "   " + mode_word))
     else:                   # шапка в рамке: задача — текст, поэтому рамка только вокруг шапки
         for row in tui.box([mode_word], title=label, kind="round", c=cp,
                            color="boss" if task.boss else "frame"):
             say(row)
     mark = "▸ " if cp.level == "rich" else "> " if cp.level == "basic" else ""
-    wide = 78 if cp.level == "plain" else min(78, cp.width - 1)    # текст — по окну 60–78
-    tw = tui.STORY if cp.level == "plain" else min(tui.STORY, cp.width - 2)
+    wide, tw = tui.text_width(cp), tui.story_width(cp)     # FB17: текст — по окну, до 100
     shown_lesson = None
     if task.scroll and not master and (first_time or mode == "train" or unsolved):
         lesson = theme.lesson(task, state)
@@ -286,7 +288,7 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     line = f"💬 {theme.speaker(task)}:" + (f" {head}" if head else "")
     # FB12-voices: на повторе того же варианта та же реплика не звучит — карточки без неё
     if fresh and cp.level == "plain":
-        say(textwrap.fill(line, 78, subsequent_indent="   ",
+        say(textwrap.fill(line, wide, subsequent_indent="   ",
                           break_long_words=False, break_on_hyphens=False))
     elif fresh:                 # по экранной ширине: эмодзи в начале — две клетки
         say("\n".join(tui.fill(line, tw, "", "   ")))
@@ -302,19 +304,19 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     timer = f"   {theme.word('timer')} {fmt_time(par)}" if timed else ""
     hint = (f"hint — {theme.word('soft_label')} за {theme.word('money')}" if job
             else "hint — бесплатно")
-    tall = card_rows(task, state, shown_lesson) + CARD_TAIL > CARD_ROWS
+    tall = card_rows(task, state, shown_lesson, wide) + CARD_TAIL > CARD_ROWS
     # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
     keys = (f"task — задание снова · {hint} · ans ОТВЕТ — сдать ответ · quit — выйти из задачи"
             if tall else
             f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ — сдать ответ · "
             "reset — собрать заново · giveup — сдаться, разбор · skip — на завтра · "
             "quit — выйти из задачи · bug — замечание")
-    if cp.level == "plain":     # Н3.8: в 80 колонок — переносом, таймер не отрывается
+    if cp.level == "plain":     # Н3.8: по ширине окна — переносом, таймер не отрывается
         items = (keys + timer.replace("   ", " · ", 1)).split(" · ")
         # по экранной ширине: 💳 и ⏱ — две клетки (textwrap считал их за одну)
-        rows = tui.fill((NBSP + "· ").join(x.replace(" ", NBSP) for x in items), 75)
+        rows = tui.fill((NBSP + "· ").join(x.replace(" ", NBSP) for x in items), wide - 3)
         say("\n".join(c("2", "   " + r.replace(NBSP, " ")) for r in rows))
-    else:               # под чертой; в 78 колонок — переносом, таймер не отрывается
+    else:               # под чертой; по ширине окна — переносом, таймер не отрывается
         say(tui.rule(cp))
         items = (keys + timer.replace("   ", " · ", 1)).split(" · ")
         # «bug — замечание» целиком, точка-разделитель — в конце строки, не в начале
@@ -336,7 +338,7 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         if not note:
             continue
         if cp.level == "plain":
-            say(c("2", textwrap.fill(note, 78, initial_indent="   ", subsequent_indent="   ",
+            say(c("2", textwrap.fill(note, wide, initial_indent="   ", subsequent_indent="   ",
                                      break_long_words=False, break_on_hyphens=False)))
         else:
             say("\n".join(tui.style(r, "dim", c=cp) for r in tui.fill(note, tw, "   ", "   ")))
@@ -346,12 +348,14 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         say(tui.style(task_reminder(task.text(state), wide), "bold", c=cp))
 
 
-def card_rows(task, state: dict, lesson: Optional[str]) -> int:
-    """Высота карточки до подвала — по ширине 78, одинаково для всех уровней экрана (что
-    сказано в plain, сказано и в rich): шапка, урок, рисунок, реплика, задание, шаги."""
-    rows = 4 + len(_wrap(task.text(state), width=78).split("\n")) + len(task.steps_for(state))
+def card_rows(task, state: dict, lesson: Optional[str], width: int = None) -> int:
+    """Высота карточки до подвала — по ширине текста (по умолчанию — окна), одинаково для всех
+    уровней экрана (что сказано в plain, сказано и в rich): шапка, урок, рисунок, реплика,
+    задание, шаги."""
+    width = width or tui.text_width()
+    rows = 4 + len(_wrap(task.text(state), width=width).split("\n")) + len(task.steps_for(state))
     if lesson:
-        rows += 1 + len(lesson_block(lesson, 78).split("\n"))
+        rows += 1 + len(lesson_block(lesson, width).split("\n"))
         rows += len(diagrams.rows(task.id))
     return rows
 
@@ -361,9 +365,10 @@ CARD_TAIL = 4       # подвал и заметки под заданием —
 REMINDER_LINES = 2
 
 
-def task_reminder(text: str, width: int = 78) -> str:
+def task_reminder(text: str, width: int = None) -> str:
     """«📋 Задание: …» — одна-две строки. Длинное задание — его конец: там то, что делать
     и как сдать (ans …); начало заменяет «…»."""
+    width = width or tui.text_width()
     whole = " ".join(text.split())
 
     def rows(tail: str) -> list:
@@ -382,7 +387,8 @@ def task_reminder(text: str, width: int = 78) -> str:
     return "\n".join(rows(words[-1]))
 
 
-# FB9c: рисунок в уроке (diagrams.py) — отступ 2: строка до 76 знаков влезает в 78 колонок
+# FB9c: рисунок в уроке (diagrams.py) — отступ 2: рисунок не шире diagrams.MAX_WIDTH влезает
+# в самое узкое окно карточки
 DIAGRAM_INDENT = "  "
 
 
@@ -408,7 +414,7 @@ def origin_notes(task_id: str, cp: tui.Caps, tw: int) -> None:
     FB6: следом «🐚 только в zsh: …» — приёмы урока, которых в bash нет (zsh_only.FIRST_SEEN)."""
     for line in origins.notes(task_id) + zsh_only.notes(task_id):
         if cp.level == "plain":
-            say(c("2", textwrap.fill(line, 78, initial_indent="   ", subsequent_indent="      ",
+            say(c("2", textwrap.fill(line, tw, initial_indent="   ", subsequent_indent="      ",
                                      break_long_words=False,
                                      break_on_hyphens=False).replace(NBSP, " ")))
         else:
@@ -533,7 +539,6 @@ def voice(name: str, line: str) -> None:
     say("\n".join(c("2;3", row) for row in text.splitlines()))
 
 
-STORY_WIDTH = 76    # сюжетные строки: запас на двойную ширину эмодзи в терминале
 
 
 def story_fill(text: str, first: str = "", rest: str = "   ", balance: bool = False) -> str:
@@ -546,7 +551,8 @@ def story_fill(text: str, first: str = "", rest: str = "   ", balance: bool = Fa
     glued = head + NBSP + tail if sep and head.strip() else text
     glued = glued.replace("./termit ", "./termit" + NBSP)     # команда не рвётся после ./termit
     out = None
-    for width in range(STORY_WIDTH, STORY_WIDTH - (30 if balance else 1), -1):
+    full = tui.story_width()        # FB17: по окну, до 100; запас на двойную ширину эмодзи
+    for width in range(full, full - (30 if balance else 1), -1):
         rows = textwrap.wrap(glued, width, initial_indent=first, subsequent_indent=rest,
                              break_long_words=False, break_on_hyphens=False)
         out = out or rows
@@ -676,6 +682,18 @@ def tomorrow(text: str, note: Optional[str] = None) -> None:
     say(story_fill(f"⏭ Завтра: {text}", balance=True))
     if note:
         say(c("2", story_fill(f"({note})", "   ", "   ")))
+
+
+def hang_lines(text: str, width: int) -> str:
+    """Строки «  команда   — что делает» по ширине окна (FB17): длинная — переносом, продолжение
+    под началом пояснения после «— »."""
+    out = []
+    for line in text.split("\n"):
+        at = line.find(" — ")
+        hang = " " * (at + 3) if 0 < at < width // 2 else "  "
+        out.append(textwrap.fill(line, width, subsequent_indent=hang, break_long_words=False,
+                                 break_on_hyphens=False))
+    return "\n".join(out)
 
 
 def answer_guide() -> str:
@@ -849,10 +867,11 @@ def keys_sheet(args=()) -> str:
 # FB5 (8): карточки доски убежища — строка над приглашением в каждой задаче (hideout.board_*).
 # Это короткие выжимки разделов KEYS_SHEET, а не новые формулировки: охрана в test_board
 # проверяет, что каждая клавиша карточки есть в шпаргалке. Одна карточка — одна строка
-# не шире BOARD_WIDTH клеток экрана; постоянные — не шире BOARD_CARD_WIDTH (в ./termit home
-# board они стоят с отступом 4). game — бывшая напоминалка TASK_TIPS (FB3).
-BOARD_WIDTH = 78
-BOARD_CARD_WIDTH = 74
+# не шире BOARD_WIDTH клеток в широком окне (в узком — переносом, hideout.board_lines);
+# постоянные — не шире BOARD_CARD_WIDTH (в ./termit home board они стоят с отступом 4).
+# game — бывшая напоминалка TASK_TIPS (FB3).
+BOARD_WIDTH = tui.MAX_WIDTH
+BOARD_CARD_WIDTH = tui.MAX_WIDTH - 4
 BOARD_CARDS = {
     # FB5 п. 40: каждая клавиша целиком и глаголом, не больше 4 пунктов; мнемоники букв —
     # только в keys и origins (обрывки «E End · U Undo» владелец не понял)
@@ -872,8 +891,9 @@ def hack_tip(line: str) -> None:
 def extension_notes(lines) -> None:
     """FB3: «📎 В копилку расширений: …» под карточкой задачи — тускло, переносом по ширине."""
     for line in lines:
-        say(c("2", textwrap.fill(line, 78, initial_indent="   ", subsequent_indent="      ",
-                                 break_long_words=False, break_on_hyphens=False)))
+        say(c("2", textwrap.fill(line, tui.text_width(), initial_indent="   ",
+                                 subsequent_indent="      ", break_long_words=False,
+                                 break_on_hyphens=False)))
 
 
 def show_intro(text: str, guide: bool = False) -> None:
@@ -892,27 +912,25 @@ def _show_intro(text: str, guide: bool) -> None:
     else:               # заголовок-плашка; в rich+tty печатается по буквам (≤ 0,6 с)
         tui.typewriter("  " + tui.label("TermitRun — тренажёр терминала", cp), c=cp)
         say(tui.rule(cp, indent="  "))
+    wide = tui.text_width(cp)
+    # FB17: абзацы — по окну; balance — без обрывка в одно слово на последней строке
     for para in text.split("\n\n"):
         say()
-        say(c("3", textwrap.fill(" ".join(para.split()), 78, initial_indent="  ",
-                                 subsequent_indent="  ", break_long_words=False,
-                                 break_on_hyphens=False)))
+        say(c("3", story_fill(" ".join(para.split()), "  ", "  ", balance=True)))
     say()
-    say(c("3", textwrap.fill(INTRO_SHELL, 78, initial_indent="  ", subsequent_indent="  ",
-                             break_long_words=False, break_on_hyphens=False)))
+    say(c("3", story_fill(INTRO_SHELL, "  ", "  ", balance=True)))
     say()
     for line in INTRO_SANDBOX.split("\n"):
-        say(c("3", textwrap.fill(line, 78, initial_indent="  ", subsequent_indent="  ",
-                                 break_long_words=False, break_on_hyphens=False)))
+        say(c("3", story_fill(line, "  ", "  ", balance=True)))
     say()
     if cp.level != "plain":
         say(tui.rule(cp, indent="  "))
     for line in intro_keys().split("\n"):
-        say(c("36", textwrap.fill(line, 78, initial_indent="  ", subsequent_indent="    ",
+        say(c("36", textwrap.fill(line, wide, initial_indent="  ", subsequent_indent="    ",
                                   break_long_words=False, break_on_hyphens=False)))
     if guide:
         say()
-        say(c("36", answer_guide()))
+        say(c("36", hang_lines(answer_guide(), wide)))
 
 
 def rank_up(rank: str) -> None:
