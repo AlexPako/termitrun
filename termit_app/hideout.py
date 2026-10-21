@@ -661,39 +661,78 @@ def shop_tip(p: dict) -> Optional[str]:
 
 # --- Комната -------------------------------------------------------------------------------
 
-def _row(glyphs: List[str], side: str = "|") -> str:
+def _row(glyphs: List[str], side: str = "|", inner: int = WIDTH) -> str:
     text = "   ".join(glyphs)
-    if len(text) > WIDTH - 4:
-        text = text[:WIDTH - 5] + "…"
-    return f"  {side}  {text:<{WIDTH - 2}}{side}"
+    if len(text) > inner - 4:
+        text = text[:inner - 5] + "…"
+    return f"  {side}  {text:<{inner - 2}}{side}"
+
+
+def _rows(glyphs: List[str], side: str, inner: int, wrap: bool) -> List[str]:
+    """Ряд комнаты; wrap — не влезло, вещи переносятся на следующую строку (пульт FB19), а не
+    обрезаются «…» (так рисует ./termit home)."""
+    if not wrap:
+        return [_row(glyphs, side, inner)]
+    lines, cur = [], []
+    for g in glyphs:
+        if cur and len("   ".join(cur + [g])) > inner - 4:
+            lines.append(cur)
+            cur = []
+        cur.append(g)
+    return [_row(part, side, inner) for part in lines + [cur]]
 
 
 FRAMES = {"ascii": ("+", "+", "+", "+", "-", "|"),       # как всегда (basic, plain)
           "box": ("┌", "┐", "└", "┘", "─", "│")}          # рамка линиями (rich)
+NEW_MARK = {"ascii": "*", "box": "✦"}                    # новая вещь на пульте (FB19)
+PLAYER_STILL = "[■oo]"
 
 
-def render(p: dict, frame: str = "ascii") -> List[str]:
+def glyph(p: dict, item_id: str, still: bool = False) -> str:
+    """Значок вещи. still — для пульта: без проверки процессов (играет ли запись) и без
+    сдвига питомца вдоль стены — значок короткий и считается мгновенно."""
+    if still and item_id == "player":
+        return PLAYER_STILL
+    if still and item_id == "shelf":            # полка короче: на пульте мало места
+        n = len(p.get("grimoire", {}))
+        return "|" * max(1, min(n, 4)) + f" {n}"
+    g = ITEMS[item_id]["glyph"](p)
+    return g.strip() if still else g
+
+
+def render(p: dict, frame: str = "ascii", inner: int = WIDTH, extra: Optional[dict] = None,
+           marks=(), still: bool = False) -> List[str]:
     """ASCII-комната: не больше 12 строк (рамка — WIDTH + 4 символа), только купленное и подаренное.
-    frame="box" — стены линиями ┌─┐ (графика rich), предметы те же."""
+    frame="box" — стены линиями ┌─┐ (графика rich), предметы те же.
+    Для пульта (FB19): inner — своя ширина (ряды тогда переносятся), extra — {ряд: [значки]}
+    сверх вещей комнаты (дека, звуки, досье), marks — id вещей с пометкой «новое», still —
+    см. glyph()."""
     items = owned_items(p)
+    extra = extra or {}
+    wrap = inner != WIDTH
     tl, tr, bl, br, h, v = FRAMES[frame]
-    top, edge = f"  {tl}" + h * WIDTH + tr, f"  {bl}" + h * WIDTH + br
+    top, edge = f"  {tl}" + h * inner + tr, f"  {bl}" + h * inner + br
     out = [f"  {title()}", top]
-    if not items:
+    if not items and not any(extra.values()):
         empty = _ui().get("empty") or "Голые стены. Вещи появятся из подарков и с витрины."
-        out += [_row([], v), _row(["[____]"], v), edge]
+        out += [_row([], v, inner), _row(["[____]"], v, inner), edge]
         from termit_app import ui
         out.append(ui.story_fill(empty, "  ", "  "))
         return out[:12]
-    by_row = {r: [ITEMS[i]["glyph"](p) for i in items if ITEMS[i]["row"] == r] for r in ROWS}
-    out.append(_row(by_row["wall"], v))
-    out.append(_row([], v))
-    out.append(_row(by_row["mid"], v))
+    mark = NEW_MARK[frame]
+
+    def drawn(i: str) -> str:
+        return glyph(p, i, still) + (mark if i in marks else "")
+    by_row = {r: [drawn(i) for i in items if ITEMS[i]["row"] == r] + list(extra.get(r, ()))
+              for r in ROWS}
+    out += _rows(by_row["wall"], v, inner, wrap)
+    out.append(_row([], v, inner))
+    out += _rows(by_row["mid"], v, inner, wrap)
     if by_row["desk"]:
-        out.append(_row(by_row["desk"], v))
-    out.append(_row(by_row["floor"] + ["[____]"], v))      # матрас стоит всегда
+        out += _rows(by_row["desk"], v, inner, wrap)
+    out += _rows(by_row["floor"] + ["[____]"], v, inner, wrap)      # матрас стоит всегда
     if by_row["pet"]:
-        out.append(_row(by_row["pet"], v))
+        out += _rows(by_row["pet"], v, inner, wrap)
     out.append(edge)
     return out
 
@@ -1007,7 +1046,13 @@ def card_text(p: dict, card: str) -> str:
     if card == "rotate":
         tips = _rotate_tips(p)
         return tips[_turn(p) % len(tips)] if tips else ""
-    return ui.BOARD_CARDS[card]
+    from termit_app import theme
+    return ui.BOARD_CARDS[card].replace("{money}", theme.word("money_name"))
+
+
+def game_rows(p: dict) -> List[str]:
+    """Подсказки игры над приглашением — готовыми строками: валюта темы, перенос по окну."""
+    return _board_rows(card_text(p, GAME_CARD))
 
 
 def board_tick(p: dict) -> None:
@@ -1022,7 +1067,7 @@ def board_lines(p: dict, game: bool = True) -> List[str]:
     заменяет своя строка linger_tips)."""
     from termit_app import ui
     if not has_board(p):
-        return [ui.BOARD_CARDS[GAME_CARD]] if game and basics_on(p) else []
+        return game_rows(p) if game and basics_on(p) else []
     if not board_on(p):
         return []
     cards = pinned(p)

@@ -13,6 +13,7 @@ from termit_app.implants import STUB_NAME     # «brew» — только из i
 
 FLAG_WORDS: Dict[Tuple[str, str], Tuple[str, str]] = {
     # ls
+    ("ls", "-d"): ("directory", "саму папку, а не её содержимое"),
     ("ls", "-a"): ("all", "все, и скрытые"),
     ("ls", "-A"): ("almost all", "почти все: без . и .."),
     ("ls", "-l"): ("long", "подробно"),

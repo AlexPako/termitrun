@@ -121,8 +121,8 @@ def topic_ids(p: dict, day: date, topic: str) -> Optional[List[str]]:
 # и буфера. Проверка у них и так по результату (файлы, сданное слово): без приёма решить
 # можно, но долго — отработка гоняет именно руки. Порядок — как в игре.
 KEYS = "keys"
-KEY_TASKS = ("line_edit", "cursor_clip", "history_recall", "screen_scroll", "screen_find",
-             "quick_fix", "job_control")
+KEY_TASKS = ("line_edit", "cursor_clip", "cut_paste", "history_recall", "screen_scroll",
+             "screen_find", "quick_fix", "job_control")
 
 
 def keys_ids(p: dict, day: date) -> List[str]:

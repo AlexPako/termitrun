@@ -938,7 +938,8 @@ def linger_tips(last: bool, hub: bool = False, end: str = "итог рана") -
     убежище, не отсюда (FB3 правка владельца 17.10: урок посреди рана путал счёт задач)."""
     go = f"next — {end}" if last else "next — следующее задание"
     out = "quit — в убежище" if hub else "quit — выйти"
-    return f"✓ засчитано · {go} · {out} · book · keys · bug"
+    return (f"✓ засчитано · {go} · {out} · book — выученное · keys — клавиши · "
+            "bug — замечание")
 
 
 def _linger(task, box, state, outcome: str, opts: Options, tally: dict, prompt, rprompt,

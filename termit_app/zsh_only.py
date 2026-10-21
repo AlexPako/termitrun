@@ -90,7 +90,6 @@ ITEMS: Dict[str, Trick] = {
 # Сверяет tools/audit_zsh.py.
 FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Основы»
-    "home_tilde": ("ctrl_u",),        # Ctrl+U впервые — в совете клавиш (ui.KEY_TIPS)
     "deep_dig": ("globstar", "qualifiers"),
     "history_recall": ("history",),
     "z_jump": ("setopt", "auto_pushd", "zshrc"),

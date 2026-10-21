@@ -2,7 +2,7 @@
 import os
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from termit_app import sandbox, textnorm
 from termit_app.tasks import kit
@@ -329,7 +329,8 @@ class BackUp(Task):
     scroll = (".. — папка на уровень выше. cd .. — подняться на этаж, cd ../.. — на два. "
               "cd без аргумента (слова после команды) — домой (~), cd - — туда, где был "
               "только что.\n"
-              "cd .. && ls — две команды подряд: && пускает вторую, только если первая удалась.")
+              "cd .. && ls — две команды подряд: && пускает вторую, только если первая удалась; "
+              "cd .. ; ls — ; пускает вторую в любом случае.")
     variants = (
         Variant("Ты стоишь в archive/{year}/q3/docs. Поднимись на три уровня вверх — "
                 "в саму папку archive — одной командой.",
@@ -399,11 +400,13 @@ class HomeTilde(AnswerTask):
         Variant("Записка ~/memo.txt нужна здесь, в текущей папке. Сделай её копию сюда "
                 "(копию делает cp ЧТО КУДА) — оригинал пусть остаётся дома.",
                 hints=("~ — домашняя папка: до файла можно дотянуться, не уходя отсюда.",
-                       "Точка . означает «сюда»: КУДА в cp можно записать одной точкой.",
-                       "cp ~/memo.txt ."),
-                solution="cp ~/memo.txt .", solution_script="cp ~/memo.txt .",
-                wrong=("mv ~/memo.txt .", "cat ~/memo.txt"),
-                alternatives=("cp ~/memo.txt memo.txt — то же с именем явно",)),
+                       "КУДА — имя копии здесь: просто memo.txt, без папки впереди.",
+                       "cp ~/memo.txt memo.txt"),
+                # FB18: точку «сюда» объясняют позже (hidden_cache, copy_move) — здесь имя
+                solution="cp ~/memo.txt memo.txt", solution_script="cp ~/memo.txt memo.txt",
+                wrong=("mv ~/memo.txt memo.txt", "cat ~/memo.txt"),
+                alternatives=("cp ~/memo.txt . — короче: точка значит «сюда», про неё — в "
+                              "задаче про скрытые файлы",)),
         Variant("Дома, в подпапке notes, лежит today.txt. Прочти его отсюда, никуда не "
                 "переходя, и сдай слово: ans СЛОВО",
                 hints=("~ работает и с вложенными папками: путь продолжается после ~/.",
@@ -474,11 +477,10 @@ class HiddenCache(AnswerTask):
     id = "hidden_cache"
     track = "basics"
     title = "Скрытый файл"
-    scroll = ("ls -la — показать все файлы, включая скрытые (имя начинается с точки), с "
-              "размерами и датами. Строки . и .. в начале — это сама папка и папка выше.\n"
-              "Скрытой бывает и папка: точка в начале — часть имени, а не команда.\n"
-              "Буквы после минуса — флаги (ключи): меняют поведение команды. -l — long "
-              "(подробно), -a — all (все); короткие склеивают: -la = -l -a. Регистр (большие или маленькие буквы) важен: ls -A — "
+    scroll = ("ls -la — все файлы, и скрытые (точка в начале — часть имени, не команда), с "
+              "датами. Первые строки . и .. — не файлы: . — эта самая папка, .. — папка выше.\n"
+              "Буквы после минуса — флаги (ключи): меняют поведение команды. -l — long, "
+              "-a — all; -la = -l -a. Регистр (большие или маленькие буквы) важен: ls -A — "
               "almost all, всё, кроме . и ..")
     variants = (
         Variant("В этой папке есть скрытый файл. Найди его и назови слово, что в нём "
@@ -499,7 +501,8 @@ class HiddenCache(AnswerTask):
                               "не заходя в неё",)),
         Variant("Сколько скрытых файлов в папке {folder}? Сдай число: ans ЧИСЛО",
                 hints=("Скрытые файлы покажет ls -la, имя у них начинается с точки.",
-                       "Строки . и .. — не файлы, а сама папка и папка выше: их не считай.",
+                       "Строки . и .. — не файлы: . — эта самая папка, .. — папка выше; их "
+                       "не считай (или смотри ls -A — он их не показывает).",
                        "ls -la {folder} — сосчитай строки с точкой, кроме . и .., и ans ЧИСЛО"),
                 solution="ls -la {folder}",
                 solution_script="ls -A {folder} | grep -c '^[.]'",
@@ -518,7 +521,9 @@ class HiddenCache(AnswerTask):
         "old": "Это .old_cache — старая копия, обманка. Слово лежит в другом скрытом файле.",
         "secret": "Это .secret — пустышка. Записка — в скрытой папке: ls -la покажет и её.",
         "stashdir": "Это имя скрытой папки, а нужно слово из записки, что лежит в ней.",
-        "dots": "Посчитаны и строки . и .. — это сама папка и папка выше, не файлы.",
+        "dots": "Посчитаны и строки . и .. — а это не файлы: . — эта самая папка, .. — папка "
+                "уровнем выше, они есть в каждой папке, даже в пустой. Их не считают; ls -A "
+                "покажет всё без них.",
         "all": "Посчитаны все файлы, а нужны только скрытые — те, чьё имя начинается с точки.",
     }
 
@@ -695,7 +700,9 @@ class CopyMove(Task):
     scroll = ("cp ЧТО КУДА — копия. mv ЧТО КУДА — перенос. mv старое новое — переименование. "
               "Перенос с новым именем: mv a.txt folder/b.txt\n"
               "Несколько файлов за раз: mv a.txt b.txt folder/ — перечисли их через пробел, "
-              "а последней в строке поставь папку. cp умеет так же.")
+              "а последней в строке поставь папку. cp умеет так же.\n"
+              "Сюда, где стоишь, — точка: cp inbox/a.txt . (та самая «эта самая папка» из "
+              "урока про скрытые файлы).")
     variants = (
         Variant("Сделай копию contract.txt в папку backup/, а черновик draft.txt перенеси "
                 "в archive/ и назови там contract_v2.txt.",
@@ -712,16 +719,19 @@ class CopyMove(Task):
                        "mv draft.txt final.txt && mv final.txt backup/{year}/"),
                 alternatives=("cp draft.txt backup/{year}/final.txt && mv draft.txt final.txt "
                               "— сначала копия, потом имя",)),
-        Variant("Таблицы {a}.csv, {b}.csv и index.csv переезжают в data/. Только index.csv "
-                "нужен и здесь: его — копией, остальные две — переносом.",
+        Variant("Таблицы {a}.csv, {b}.csv и index.csv лежат в inbox/, а нужны здесь, в этой "
+                "папке. {a}.csv и {b}.csv перенеси сюда, а index.csv — копией: в inbox/ он "
+                "тоже нужен.",
                 hints=("Две таблицы переносит mv, а для index.csv нужен cp — оригинал останется.",
-                       "mv берёт сразу несколько файлов: последней в строке идёт папка.",
-                       "mv {a}.csv {b}.csv data/ && cp index.csv data/"),
-                solution="mv {a}.csv {b}.csv data/ && cp index.csv data/",
-                wrong=("mv {a}.csv {b}.csv index.csv data/",
-                       "cp {a}.csv {b}.csv index.csv data/"),
-                alternatives=("cp index.csv data/ && mv {a}.csv {b}.csv data/ — порядок не "
-                              "важен",)),
+                       "«Сюда, где стоишь» в команде пишут точкой: последней в строке — . "
+                       "вместо папки.",
+                       "mv inbox/{a}.csv inbox/{b}.csv . && cp inbox/index.csv ."),
+                solution="mv inbox/{a}.csv inbox/{b}.csv . && cp inbox/index.csv .",
+                wrong=("mv inbox/{a}.csv inbox/{b}.csv inbox/index.csv .",
+                       "cp inbox/{a}.csv inbox/{b}.csv inbox/index.csv ."),
+                alternatives=("cp inbox/index.csv . && mv inbox/{a}.csv inbox/{b}.csv . — "
+                              "порядок не важен",
+                              "mv inbox/{a}.csv inbox/{b}.csv ./ — ./ значит то же, что .")),
     )
     par = 45
     hints = ("Копирует cp, переносит и переименовывает mv.",
@@ -745,14 +755,13 @@ class CopyMove(Task):
         if variant == 2:
             a, b = rng.sample(kit.LATIN, 2)
             names = [f"{a}.csv", f"{b}.csv", "index.csv"]
-            sha = {n: kit.sha(kit.write(box / n, f"id,{n}\n{rng.randint(1, 99)},x\n"))
+            sha = {n: kit.sha(kit.write(box / "inbox" / n, f"id,{n}\n{rng.randint(1, 99)},x\n"))
                    for n in names}
-            kit.write(box / "notes.txt", "Not a table.\n")
-            (box / "data").mkdir()
-            want = {f"data/{n}": sha[n] for n in names}
-            want["index.csv"] = sha["index.csv"]
+            kit.write(box / "inbox" / "notes.txt", "Not a table.\n")
+            want = {n: sha[n] for n in names}
+            want["inbox/index.csv"] = sha["index.csv"]
             return {"a": a, "b": b, "csv": names, "want": want,
-                    "gone": [f"{a}.csv", f"{b}.csv"]}
+                    "gone": [f"inbox/{a}.csv", f"inbox/{b}.csv"]}
         contract = kit.write(box / "contract.txt",
                              f"Contract #{rng.randint(1, 999)}: {kit.word(rng)}\n")
         draft = kit.write(box / "draft.txt", f"Draft: {kit.word(rng)} and {kit.word(rng)}\n")
@@ -1193,11 +1202,14 @@ class DeepDig(Task):
                 explain="Маска без папки впереди начинается там, где стоишь: **/*.csv — "
                         "отсюда вниз, на любую глубину; (D) добавил скрытые папки."),
         Variant("Где-то в глубине папки notes лежит {name} — может быть, и в скрытой папке. "
-                "Где именно — неизвестно. Скопируй его сюда, в текущую папку.",
+                "Где именно — неизвестно. Скопируй его сюда, в текущую папку: «сюда» — это "
+                "точка последним словом команды.",
                 hints=("Путь неизвестен, а имя — да: ** найдёт файл на любой глубине.",
                        "notes/**/{name} — от папки notes вниз; скрытые — с (D). Проверь ls.",
                        "ls notes/**/{name}(D) — проверить, затем cp notes/**/{name}(D) ."),
                 solution="cp notes/**/{name}(D) .",
+                # cp /**/… (маска от корня) в wrong не гоняем: обход всего диска — минуты;
+                # отклик на него проверяет tests/test_fb18_early.py
                 wrong=("cp notes/{name} .", "cp notes/**/{name} ."),
                 alternatives=("ls -R notes — всё дерево: где лежит файл, видно глазами",),
                 explain="Имя известно, путь — нет: notes/**/ИМЯ ищет от папки notes на "
@@ -1253,7 +1265,27 @@ class DeepDig(Task):
         (box / "collected").mkdir()
         return {"start": ".", "want": want, "dest": "collected", "loc": loc}
 
+    MSG_ROOT = ("/ в начале пути — корень всего Mac, а не эта папка: туда задание не пускает. "
+                "Убери / впереди — **/ИМЯ ищет отсюда вглубь.")
+    MSG_NO_DEST = ("cp не знает, куда копировать: последним словом нужно место. Сюда, в "
+                   "текущую папку, — точка: cp ЧТО .")
+
+    def _slip(self, ctx) -> Optional[str]:
+        """FB18: промахи владельца — маска от корня (/**) и cp без «куда»."""
+        last = ctx.cmds[-1].line.split() if ctx.cmds else []
+        if any(w.startswith("/**") for w in last[1:]):
+            return self.MSG_ROOT
+        if last[:1] == ["cp"] and len([w for w in last[1:] if not w.startswith("-")]) == 1:
+            return self.MSG_NO_DEST
+        return None
+
     def check(self, ctx):
+        verdict = self._check(ctx)
+        if verdict.solved or verdict.message:
+            return verdict
+        return Verdict(False, self._slip(ctx)) if self._slip(ctx) else verdict
+
+    def _check(self, ctx):
         if ctx.state["dest"] != ".":
             return _copies_check(ctx)
         b, s = ctx.box, ctx.state
@@ -1377,7 +1409,7 @@ class DeepRm(Task):
                               "глубже, чем достала маска. Проверь её через ls.")
 
 
-# --- FB4: уроки навигации по терминалу (временно — сразу после deep_rm) -------------------
+# --- FB4: уроки навигации по терминалу (FB18: места — в TASKS внизу) ------------------------
 # Проверка, как у всех задач, — по результату (файлы, ответ), а не по нажатым клавишам: без
 # приёма задачу решить можно, но неудобно (длинная строка из истории с правкой).
 
@@ -1418,19 +1450,20 @@ class LineEdit(Task):
     scroll = ("↑ — прошлая команда. Ctrl+A / Ctrl+E — в начало / в конец строки, Option+← → "
               "— через слово (вне игры — если в iTerm2 стоит пресет Natural Text Editing или "
               "Option как Esc+).\n"
-              "Ctrl+W — стереть слово слева (W — Word), Ctrl+K — до конца строки (K — Kill, "
-              "вырезать: Ctrl+Y вставит обратно), Ctrl+U — всю строку (в zsh; в bash — до "
-              "курсора). Tab — дописать имя.")
+              "Ctrl+W — стереть слово слева (W — Word), Ctrl+K — до конца строки (K — Kill), "
+              "Ctrl+U — всю строку (в zsh; в bash — до курсора).")
     variants = (
         Variant("Последнюю команду в истории набрали с опечаткой в самом начале — mkdri "
-                "вместо mkdir, и она не сработала. Не перепечатывай: ↑ вернёт строку, Ctrl+A "
-                "прыгнет в её начало. Исправь опечатку и нажми Enter.",
+                "вместо mkdir (mkdir — make directory, «создай папки»; подробно — позже), и "
+                "она не сработала. Не перепечатывай: ↑ вернёт строку, Ctrl+A прыгнет в её "
+                "начало. Исправь опечатку и нажми Enter.",
                 wrong=("mkdir -p archive/{year}/reports/q1",),
                 alternatives=("Ctrl+A, Option+→ — курсор за первым словом; Ctrl+W сотрёт его, "
                               "остаётся набрать mkdir",)),
-        Variant("Последняя команда в истории копирует три отчёта в папку shared/, но такой "
-                "папки нет — нужна outbox/ (она уже есть). Верни строку стрелкой ↑, сотри "
-                "последнее слово Ctrl+W, допиши outbox/ и нажми Enter.",
+        Variant("Последняя команда в истории копирует три отчёта (cp — copy, «скопируй»: "
+                "сначала что, последним словом — куда) в папку shared/, но такой папки нет — "
+                "нужна outbox/ (она уже есть). Верни строку стрелкой ↑, сотри последнее "
+                "слово Ctrl+W, допиши outbox/ и нажми Enter.",
                 hints=("Строка уже набрана — она в истории: ↑ вернёт её целиком.",
                        "Курсор после ↑ стоит в конце: Ctrl+W стирает слово слева от него. "
                        "Стёрлось не всё — нажми ещё раз.",
@@ -1441,9 +1474,10 @@ class LineEdit(Task):
                 wrong=("cp reports/{year}/summary.txt outbox/",),
                 alternatives=("↑, Option+← — к началу shared/, Ctrl+K сотрёт хвост, допиши "
                               "outbox/",)),
-        Variant("Последняя команда в истории переносит в archive/ четыре файла, но фото "
-                "{photo} должно остаться в inbox. Достань строку (↑), доберись до фото "
-                "прыжками Option+←, сотри его Ctrl+W и нажми Enter.",
+        Variant("Последняя команда в истории переносит в archive/ четыре файла (mv — move, "
+                "«перенеси»: сначала что, последним словом — куда), но фото {photo} должно "
+                "остаться в inbox. Достань строку (↑), доберись до фото прыжками Option+←, "
+                "сотри его Ctrl+W и нажми Enter.",
                 hints=("Строка — в истории: ↑. Перепечатывать её не нужно.",
                        "Option+← прыгает через слово влево. Встань сразу за именем фото — "
                        "Ctrl+W сотрёт его.",
@@ -1497,51 +1531,52 @@ class LineEdit(Task):
         return _files_check(ctx)
 
 
-class CursorClip(Task):
-    """FB13 (FB5 п. 47): курсор и буфер — «курсор ведёт себя не как в Ворде». Строка ввода и
-    вывод — разные зоны: курсор живёт только в строке, Option+клик ставит его туда (вариант 0);
-    Ctrl+W/U/K кладут вырезанное в карман zsh, Ctrl+Y вставляет, Esc y — вырезанное раньше
-    (вариант 1); | pbcopy — вывод в буфер обмена (вариант 2: в песочнице учебный pbcopy пишет в
-    .termit/clipboard, буфер владельца не трогаем). Проверка — по результату."""
+class CursorClip(AnswerTask):
+    """FB13 (FB5 п. 47), FB18: мышь и курсор — «курсор ведёт себя не как в Ворде». Строка
+    ввода и вывод — разные зоны: курсор живёт только в строке, Option+клик ставит его туда
+    (вариант 0); мышью из вывода копируют — двойной клик берёт слово (1), тройной — строку
+    (2), Cmd+C и Cmd+V. Карман zsh — отдельная задача cut_paste, pbcopy — pbcopy_list (после
+    трубы). id прежний: решённое владельцем «Курсор и буфер» остаётся решённым. Проверка —
+    по результату: файлы (0) или сданный ответ (1, 2)."""
     id = "cursor_clip"
     track = "basics"
-    title = "Курсор и буфер"
-    uses_clip_stub = True
-    scroll = ("Курсор — только в строке ввода: Option+клик ставит его туда (iTerm2: галочка "
-              "Option-Click moves cursor).\n"
-              "Мышью: двойной клик — слово, тройной — строка, Cmd+C и Cmd+V; Cmd+Shift+A — "
-              "вывод последней команды.\n"
-              "Ctrl+W/U/K — в карман zsh, Ctrl+Y — вставить, Esc y — то, что раньше (не буфер "
-              "обмена Mac). | pbcopy — в буфер, pbpaste — обратно.")
+    title = "Мышь и курсор"
+    start_dir = "{start}"
+    scroll = ("Курсор — только в строке ввода: Option+клик ставит его туда, куда кликнул "
+              "(iTerm2: галочка Option-Click moves cursor). Всё, что выше, — вывод: его читают "
+              "и копируют, но не правят.\n"
+              "Копировать из вывода мышью: двойной клик — слово, тройной — вся строка; Cmd+C — "
+              "скопировать, Cmd+V — вставить в строку ввода.")
     variants = (
-        Variant("Последняя команда в истории копирует в outbox/ три черновика, но в середине "
-                "строки опечатка: invoce вместо invoice. Верни строку (↑), поставь курсор "
-                "прямо в опечатку Option+кликом, исправь и нажми Enter.",
+        Variant("Последняя команда в истории копирует в outbox/ три черновика (cp — copy, "
+                "«скопируй»: сначала что, последним словом — куда), но в середине строки "
+                "опечатка: invoce вместо invoice. Верни строку (↑), поставь курсор прямо в "
+                "опечатку Option+кликом, исправь и нажми Enter.",
                 wrong=("cp drafts/{year}/contract_final.txt outbox/",),
                 alternatives=("↑ и Option+← прыжками до опечатки — тоже верно",)),
-        Variant("Последняя команда в истории переносит отчёт в outbox/, но слова перепутаны: "
-                "сначала папка, потом файл. Переставь их через карман zsh: ↑, Ctrl+W — вырезать "
-                "имя файла, Option+← — к началу outbox/, Ctrl+Y — вставить, пробел, Enter.",
-                hints=("Строка — в истории: ↑. Порядок у mv такой: что переносим, потом куда.",
-                       "Ctrl+W вырезает слово слева и кладёт его в карман zsh; Ctrl+Y вставляет "
-                       "его там, где курсор.",
-                       "↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter"),
-                solution="↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter",
-                solution_script="mv report_{year}.txt outbox/",
-                wrong=("mv outbox/ report_{year}.txt",),
-                alternatives=("набрать mv report_{year}.txt outbox/ заново — верно, но "
-                              "дольше",)),
-        Variant("Коллега просит список таблиц — имена всех файлов .csv в этой папке. Отправь "
-                "их в буфер обмена, не выделяя мышью: ls *.csv | pbcopy. Проверить, что "
-                "легло, — pbpaste.",
-                hints=("| передаёт вывод одной команды на вход другой.",
-                       "pbcopy забирает свой вход в буфер обмена. Нужны только .csv — маска "
-                       "*.csv.",
-                       "ls *.csv | pbcopy"),
-                solution="ls *.csv | pbcopy",
-                solution_script="ls *.csv | pbcopy",
-                wrong=("ls | pbcopy",),
-                alternatives=("ls -1 *.csv | pbcopy — то же, по одному имени в строке",)),
+        Variant("Код доступа лежит в переменной ACCESS_CODE — длинный, из букв и цифр. "
+                "Выведи его: echo $ACCESS_CODE. Не перепечатывай: дважды кликни по коду — он "
+                "выделится, Cmd+C — скопирован. Набери ans и пробел, вставь Cmd+V и нажми "
+                "Enter.",
+                hints=("Код печатает echo $ACCESS_CODE. Набирать его руками не нужно.",
+                       "Двойной клик выделяет слово целиком — код без пробелов, это одно слово. "
+                       "Потом Cmd+C.",
+                       "echo $ACCESS_CODE, двойной клик по коду, Cmd+C, ans, пробел, Cmd+V, "
+                       "Enter"),
+                solution="echo $ACCESS_CODE, двойной клик, Cmd+C, ans и Cmd+V",
+                solution_script="echo $ACCESS_CODE",
+                wrong=("echo {decoy}",),
+                alternatives=("ans $ACCESS_CODE — $ подставит код сам, без мыши",)),
+        Variant("Тебя забросило в глубокую папку. Сдай её полный путь, не перепечатывая: "
+                "pwd напечатает его, тройной клик по строке выделит её целиком, Cmd+C — "
+                "скопирует. Набери ans и пробел, вставь Cmd+V и нажми Enter.",
+                hints=("Путь печатает pwd. Набирать его руками не нужно.",
+                       "Тройной клик выделяет всю строку вывода — путь целиком. Потом Cmd+C.",
+                       "pwd, тройной клик по пути, Cmd+C, ans, пробел, Cmd+V, Enter"),
+                solution="pwd, тройной клик, Cmd+C, ans и Cmd+V",
+                solution_script="pwd",
+                wrong=("echo {decoy}",),
+                alternatives=("ans $(pwd) — $( ) подставит путь сам, без мыши",)),
     )
     par = 40
     hints = ("Строка уже набрана — она в истории: ↑ вернёт её целиком.",
@@ -1552,10 +1587,115 @@ class CursorClip(Task):
     solution_script = ("cp drafts/{year}/contract_final.txt drafts/{year}/invoice_final.txt "
                        "drafts/{year}/letter_final.txt outbox/")
     explain = ("Терминал — не Ворд: курсор только в строке ввода, Option+клик ставит его туда. "
-               "Вырезанное Ctrl+W/U/K лежит в кармане zsh (Ctrl+Y), а буфер Mac — Cmd+C, "
-               "Cmd+V и | pbcopy.")
-    spell = ("Option+клик — курсор в строку; Ctrl+Y — Yank, вставить вырезанное; "
-             "pbcopy — pasteboard copy, в буфер")
+               "Вывод выше не правят, а копируют: двойной клик — слово, тройной — строка, "
+               "Cmd+C и Cmd+V.")
+    spell = ("Option+клик — курсор в строку; двойной клик — слово, тройной — строка; "
+             "Cmd+C — скопировать, Cmd+V — вставить")
+    trap_messages = {"decoy": "Это не тот текст — скопируй то, что напечатала команда из "
+                              "задания."}
+
+    def env_for(self, state):
+        code = state.get("code")
+        return {"ACCESS_CODE": code} if code else {}
+
+    def expected(self, state):
+        """Код и путь игрок и должен видеть (echo $ACCESS_CODE, pwd), поэтому они лежат не под
+        секретным ключом answer: код — в окружении задачи, путь — её стартовая папка."""
+        return str(state.get("code") or state.get("where") or state["answer"])
+
+    def takes_answer(self, state):
+        return "want" not in state
+
+    def answer_kind(self, state):
+        return "path" if state.get("mode") == "path" else "text"
+
+    def setup_variant(self, box, rng, variant):
+        year = str(rng.randint(2724, 2726))
+        decoy = kit.word(rng)
+        if variant == 1:
+            alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
+            code = "".join(rng.choice(alphabet) for _ in range(20))
+            return {"year": year, "start": ".", "code": code,
+                    "decoy": decoy, "traps": [["decoy", decoy]]}
+        if variant == 2:
+            start = f"archive/{year}/clients/{kit.latin(rng)}/contracts"
+            (box / start).mkdir(parents=True)
+            kit.write(box / start / "readme.txt", "Signed contracts.\n")
+            return {"year": year, "start": start, "where": start, "mode": "path",
+                    "decoy": decoy, "traps": [["decoy", decoy]]}
+        fill = list(rng.sample(FILLER, 8))
+        want = {}
+        (box / "outbox").mkdir()
+        (box / ".termit").mkdir(exist_ok=True)      # история песочницы — в .termit
+        for name in ("contract_final.txt", "invoice_final.txt", "letter_final.txt"):
+            f = kit.write(box / "drafts" / year / name, f"{name}: {kit.word(rng)}\n")
+            want[f"outbox/{name}"] = kit.sha(f)
+        _history(box, fill + [f"cp drafts/{year}/contract_final.txt "
+                              f"drafts/{year}/invoce_final.txt "
+                              f"drafts/{year}/letter_final.txt outbox/"])
+        return {"year": year, "start": ".", "want": want}
+
+    def check(self, ctx):
+        if "want" in ctx.state:
+            return _files_check(ctx)
+        return super().check(ctx)
+
+
+class CutPaste(Task):
+    """FB18 (FB5 п. 47, часть «вырезать и вставить»): карман zsh. Ctrl+W/U/K не теряют стёртое,
+    а кладут в карман; Ctrl+Y вставляет его туда, где курсор, сколько угодно раз. Это не буфер
+    обмена Mac. Строка заготовлена в истории; проверка — по результату (файлы)."""
+    id = "cut_paste"
+    track = "basics"
+    title = "Карман zsh"
+    scroll = ("Карман zsh — куда zsh откладывает стёртое: Ctrl+W, Ctrl+U и Ctrl+K текст не "
+              "теряют, а кладут туда.\n"
+              "Ctrl+Y — вставить из кармана, где курсор (Y — Yank), хоть много раз.\n"
+              "Карман — не буфер обмена Mac: Cmd+V его не видит.")
+    variants = (
+        Variant("Последняя команда в истории не доделана: cp (copy — «скопируй»: сначала "
+                "что, потом куда) знает, что копировать, но не знает куда. Нужна копия рядом "
+                "— то же имя с хвостом .bak. Имя не перепечатывай: ↑, Ctrl+W — имя ушло в "
+                "карман, Ctrl+Y — вернулось, пробел, ещё раз Ctrl+Y, допиши .bak и Enter.",
+                wrong=("cp quarterly_report_{year}.txt copy.txt",),
+                alternatives=("↑, пробел и набрать имя заново с .bak — верно, но долго",)),
+        Variant("Последняя команда в истории переносит отчёт в outbox/ (mv — move, "
+                "«перенеси»: сначала что, потом куда), но слова перепутаны: сначала папка, "
+                "потом файл. Переставь их через карман: ↑, Ctrl+W — вырезать имя файла, "
+                "Option+← — к началу outbox/, Ctrl+Y — вставить, пробел, Enter.",
+                hints=("Строка — в истории: ↑. Порядок у mv такой: что переносим, потом куда.",
+                       "Ctrl+W вырезает слово слева и кладёт его в карман zsh; Ctrl+Y вставляет "
+                       "его там, где курсор.",
+                       "↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter"),
+                solution="↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter",
+                solution_script="mv report_{year}.txt outbox/",
+                wrong=("mv outbox/ report_{year}.txt",),
+                alternatives=("набрать mv report_{year}.txt outbox/ заново — верно, но "
+                              "дольше",)),
+        Variant("Последняя команда в истории переносит два файла (mv — move, «перенеси»), но "
+                "папка outbox/ стоит первой, а должна быть последней. Унеси её в конец через "
+                "карман: ↑, Ctrl+A, Option+→ дважды — курсор перед первым файлом, Ctrl+W — "
+                "outbox/ в кармане, Ctrl+E — в конец, пробел, Ctrl+Y и Enter.",
+                hints=("Строка — в истории: ↑. Последним словом у mv идёт папка — куда.",
+                       "Курсор встань сразу за outbox/ и нажми Ctrl+W: слово ляжет в карман. "
+                       "Ctrl+E унесёт курсор в конец, Ctrl+Y выложит слово там.",
+                       "↑, Ctrl+A, Option+→ дважды, Ctrl+W, Ctrl+E, пробел, Ctrl+Y, Enter"),
+                solution="↑, Ctrl+A, Option+→ дважды, Ctrl+W, Ctrl+E, пробел, Ctrl+Y, Enter",
+                solution_script="mv report_{year}.txt notes_{year}.txt outbox/",
+                wrong=("mv outbox/ report_{year}.txt notes_{year}.txt",),
+                alternatives=("набрать строку заново в нужном порядке — верно, но дольше",)),
+    )
+    par = 40
+    hints = ("Строка уже набрана — она в истории: ↑ вернёт её целиком.",
+             "Ctrl+W кладёт стёртое слово в карман, а Ctrl+Y выкладывает его — хоть два раза "
+             "подряд.",
+             "↑, Ctrl+W, Ctrl+Y, пробел, Ctrl+Y, допиши .bak и Enter")
+    solution = "↑, Ctrl+W, Ctrl+Y, пробел, Ctrl+Y, допиши .bak, Enter"
+    solution_script = "cp quarterly_report_{year}.txt quarterly_report_{year}.txt.bak"
+    explain = ("Стёртое Ctrl+W, Ctrl+U, Ctrl+K не пропадает: оно в кармане zsh, Ctrl+Y "
+               "вставляет его, где курсор, хоть десять раз. Буфер Mac (Cmd+C, Cmd+V) — "
+               "отдельный.")
+    spell = "Ctrl+W/U/K — стереть в карман zsh; Ctrl+Y — Yank, вставить из кармана"
 
     def setup_variant(self, box, rng, variant):
         year = str(rng.randint(2724, 2726))
@@ -1566,39 +1706,20 @@ class CursorClip(Task):
             _history(box, fill + [f"mv outbox/ report_{year}.txt"])
             return {"year": year, "want": {f"outbox/report_{year}.txt": kit.sha(f)}}
         if variant == 2:
-            tables = sorted(rng.sample(("customers", "orders", "payments", "products",
-                                        "regions", "returns", "stores"), 4))
-            for name in tables:
-                kit.write(box / f"{name}.csv", f"id,{name}\n1,{kit.word(rng)}\n")
-            kit.write(box / "readme.txt", "Tables for the weekly report.\n")
-            kit.write(box / "notes.md", f"# Notes\n{kit.word(rng)}\n")
-            return {"year": year, "csv": [f"{name}.csv" for name in tables]}
-        want = {}
-        (box / "outbox").mkdir()
-        for name in ("contract_final.txt", "invoice_final.txt", "letter_final.txt"):
-            f = kit.write(box / "drafts" / year / name, f"{name}: {kit.word(rng)}\n")
-            want[f"outbox/{name}"] = kit.sha(f)
-        _history(box, fill + [f"cp drafts/{year}/contract_final.txt "
-                              f"drafts/{year}/invoce_final.txt "
-                              f"drafts/{year}/letter_final.txt outbox/"])
-        return {"year": year, "want": want}
+            want = {}
+            for name in (f"report_{year}.txt", f"notes_{year}.txt"):
+                f = kit.write(box / name, f"{name}: {kit.word(rng)}\n")
+                want[f"outbox/{name}"] = kit.sha(f)
+            (box / "outbox").mkdir()
+            _history(box, fill + [f"mv outbox/ report_{year}.txt notes_{year}.txt"])
+            return {"year": year, "want": want}
+        name = f"quarterly_report_{year}.txt"
+        f = kit.write(box / name, f"Quarterly report {year}: {kit.word(rng)}\n")
+        _history(box, fill + [f"cp {name}"])
+        return {"year": year, "want": {name: kit.sha(f), f"{name}.bak": kit.sha(f)}}
 
     def check(self, ctx):
-        csv = ctx.state.get("csv")
-        if csv is None:
-            return _files_check(ctx)
-        got = sandbox._read(ctx.box, "clipboard")
-        if got is None:
-            return Verdict(False)
-        names = [x.strip() for x in got.splitlines() if x.strip()]
-        extra = [x for x in names if x not in csv]
-        if extra:
-            return Verdict(False, f"В буфере лишнее: {extra[0]}. Нужны только имена .csv — "
-                                  "маска *.csv после ls.")
-        if sorted(set(names)) != sorted(csv):
-            return Verdict(False, "В буфере не все таблицы. ls *.csv | pbcopy положит "
-                                  "все сразу.")
-        return Verdict(True)
+        return _files_check(ctx)
 
 
 class HistoryRecall(Task):
@@ -1611,7 +1732,7 @@ class HistoryRecall(Task):
               "выполнить, ← или → — поправить, Ctrl+G — отмена.\n"
               "history — свежие с номерами, вся — history 1; !N — команда номер N: !42.\n"
               "!! — последняя команда целиком: набери !! и Enter — zsh покажет подстановку и "
-              "выполнит. Без папки: mkdir -p папка && !! — папка, потом та команда.")
+              "выполнит. Не в той папке: cd папка && !! — сначала войти, потом та команда.")
     variants = (
         Variant("Когда-то ты уже копировал три шаблона из templates в папку клиента {old}: "
                 "команда лежит в истории. Теперь те же шаблоны нужны клиенту {new} — папка "
@@ -1620,21 +1741,21 @@ class HistoryRecall(Task):
                 wrong=("cp templates/invoice_base.txt clients/{new}/",),
                 alternatives=("history — найти строку глазами и !N по её номеру; потом ↑ и "
                               "поправить конец",)),
-        Variant("Последняя команда в истории копирует отчёты в shared/{month}/, но этой папки "
-                "ещё нет — команда упала. Создай папку и повтори ту команду, не "
-                "перепечатывая: !! — последняя команда истории.",
-                hints=("Папку с вложенной создаёт mkdir -p.",
+        Variant("Последняя команда в истории копирует отчёты в shared/{month}/, но набрали "
+                "её не в той папке: отчёты лежат в {project}, а ты стоишь снаружи — команда "
+                "упала. Войди в {project} и повтори ту команду, не перепечатывая: !! — "
+                "последняя команда истории.",
+                hints=("Войти в папку — cd {project}.",
                        "!! подставит последнюю команду истории — даже в той же строке, после "
                        "&&. Уже что-то набрал — тогда ↑ ↑ найдёт её.",
-                       "mkdir -p shared/{month} && !!"),
-                solution="mkdir -p shared/{month} && !!",
-                solution_script=("mkdir -p shared/{month} && cp reports/summary.txt "
+                       "cd {project} && !!"),
+                solution="cd {project} && !!",
+                solution_script=("cd {project} && cp reports/summary.txt "
                                  "reports/figures.csv reports/notes.txt shared/{month}/"),
-                wrong=("mkdir -p shared/{month}",),
-                alternatives=("mkdir -p shared/{month}, затем ↑ ↑ и Enter — та же команда "
-                              "стрелкой",)),
-        Variant("В истории есть команда, которая переносила снимки — IMG_*.jpg и скриншоты "
-                ".png — из downloads в photos. Сегодня снимков снова набежало. Найди её номер "
+                wrong=("cd {project}",),
+                alternatives=("cd {project}, затем ↑ ↑ и Enter — та же команда стрелкой",)),
+        Variant("В истории есть команда, которая переносила снимки и скриншоты из downloads "
+                "в photos (mv — move, «перенеси»). Сегодня снимков снова набежало. Найди её номер "
                 "командой history и запусти по номеру: !N.",
                 hints=("history печатает свежие команды, у каждой — номер слева; всю историю — history 1.",
                        "Нужна строка, где mv переносит в photos/. !N выполнит команду номер N.",
@@ -1662,13 +1783,16 @@ class HistoryRecall(Task):
         fill = list(rng.sample(FILLER, 12))
         if variant == 1:
             month = rng.choice(PICK_MONTHS)
+            project = f"project_{kit.latin(rng)}"
             want = {}
             for name in ("summary.txt", "figures.csv", "notes.txt"):
-                f = kit.write(box / "reports" / name, f"{name}: {kit.word(rng)}\n")
-                want[f"reports/{name}"] = want[f"shared/{month}/{name}"] = kit.sha(f)
+                f = kit.write(box / project / "reports" / name, f"{name}: {kit.word(rng)}\n")
+                want[f"{project}/reports/{name}"] = kit.sha(f)
+                want[f"{project}/shared/{month}/{name}"] = kit.sha(f)
+            (box / project / "shared" / month).mkdir(parents=True)
             _history(box, fill + ["cp reports/summary.txt reports/figures.csv "
                                   f"reports/notes.txt shared/{month}/"])
-            return {"month": month, "want": want}
+            return {"month": month, "project": project, "want": want}
         if variant == 2:
             want = {}
             for i in range(rng.randint(3, 5)):
@@ -1801,8 +1925,7 @@ class ScreenFind(AnswerTask):
               "совпадение, Esc — закрыть.\n"
               "Cmd+Shift+↑ ↓ — от команды к команде (метки iTerm2; меню iTerm2, Install Shell "
               "Integration). В Terminal.app — Cmd+↑ ↓.\n"
-              "Cmd+Shift+A — выделить вывод последней команды. Cmd+D — вторая панель рядом, "
-              "Cmd+W — закрыть.")
+              "Cmd+Shift+A — выделить вывод последней команды.")
     variants = (
         Variant("Склад выдал опись stock.txt на сотни строк. Где-то в середине одна строка "
                 "помечена словом MISSING (пропуск). Выведи опись командой cat, найди метку поиском "
@@ -1884,8 +2007,7 @@ class QuickFix(Task):
     scroll = ("Esc, потом точка — последнее слово прошлой команды; ещё раз — слово команды "
               "постарше (Option+. — если Option работает как Esc+).\n"
               "!$ — то же слово набором: cd !$. ^старое^новое — прошлая команда с заменой: "
-              "^q1^q2.\n"
-              "Ctrl+Y — вставить стёртое Ctrl+W, Ctrl+U, Ctrl+K. Ctrl+_ — отменить правку.")
+              "^q1^q2.")
     variants = (
         Variant("Последняя команда в истории создала папку с длинным путём. Перейди в неё, не "
                 "набирая путь: cd, пробел, Esc, потом точка — путь встанет сам — и Enter.",
@@ -1923,7 +2045,7 @@ class QuickFix(Task):
     solution_script = "cd projects/{client}/drafts/{year}/final"
     explain = ("Что уже набрано, не набирают снова: Esc . и !$ берут последнее слово прошлой "
                "команды, ^старое^новое повторяет её с заменой.")
-    spell = "Esc . и !$ — последний аргумент; ^старое^новое — повтор с заменой; Ctrl+Y, Ctrl+_"
+    spell = "Esc . и !$ — последний аргумент; ^старое^новое — повтор с заменой"
 
     CLIENTS = ("atlas", "orbit", "nova", "delta", "vertex")
     SERVERS = ("alpha", "bravo", "cobalt", "delta")
@@ -2546,13 +2668,14 @@ class BossBasics(Task):
 
 
 # FB5: MeetTerminal — первым: что такое терминал, оболочка и команда.
-# FB4: уроки навигации (LineEdit, HistoryRecall, ScreenScroll) — временно сразу после двух
-# задач на глубину: владелец проходит их следующими, потом их переставят на постоянное место.
-# FB10: за ними — лайфхаки: поиск по экрану (к прокрутке) и быстрая правка (строка + история)
-# FB13: «Курсор и буфер» — сразу за правкой строки
-TASKS = [MeetTerminal(), WhereAmI(), ClimbDown(), BackUp(), HomeTilde(), HiddenCache(),
+# FB18 (владелец 21.10): строку ввода правят с первых минут — правка строки, мышь и карман zsh
+# сразу за первыми командами (pwd); история — когда в ней уже есть свои cd и ls; прокрутка и
+# поиск по экрану — к первому длинному выводу (за ls -R в задачах на глубину), быстрая правка
+# — за ними.
+TASKS = [MeetTerminal(), WhereAmI(), LineEdit(), CursorClip(), CutPaste(),
+         ClimbDown(), BackUp(), HomeTilde(), HistoryRecall(), HiddenCache(),
          MkdirP(), CopyMove(), FileExt(), StarMask(), QuestionMask(),
          RunScript(), DeepDig(), DeepRm(),
-         LineEdit(), CursorClip(), HistoryRecall(), ScreenScroll(), ScreenFind(), QuickFix(),
+         ScreenScroll(), ScreenFind(), QuickFix(),
          CopyDir(),
          FzfPick(), ZJump(), BossBasics()]

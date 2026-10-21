@@ -357,10 +357,13 @@ def closed_words(p: dict) -> List[Word]:
 HELP_HEAD = "Слова убежища (Enter — то, что отмечено ⏎; help СЛОВО — подробно):"
 
 
-def help_lines(p: dict, name: str = "", width: Optional[int] = None) -> List[str]:
+def help_lines(p: dict, name: str = "", width: Optional[int] = None, dense: bool = False,
+               head: bool = True, closed_rows: Optional[int] = None) -> List[str]:
     """help — открытые слова по группам, у каждого короткая расшифровка (в две колонки, если
     окно позволяет); закрытые — именами; help СЛОВО — подробно об одном (закрытое объясняет,
-    когда откроется); не слово, но есть в книге — строки книги."""
+    когда откроется); не слово, но есть в книге — строки книги.
+    Для пульта (FB19, высота): dense — «слово — что» потоком через точку, а не сеткой;
+    head=False — без строки-заголовка; closed_rows — закрытые не больше стольких строк."""
     width = width or tui.caps().width
     if name:
         word = find(name.lower())
@@ -376,17 +379,70 @@ def help_lines(p: dict, name: str = "", width: Optional[int] = None) -> List[str
             out.append("  то же: " + ", ".join(word.aliases))
         return out
     words = open_words(p)
-    out = tui.fill(HELP_HEAD, width)
+    out = tui.fill(HELP_HEAD, width) if head else []
     longest = max(tui.vlen(_cell(w.name)) for w in words)     # одна сетка на все группы
     for group, title in GROUPS:
         names = [w.name for w in words if w.group == group]
-        if names:
+        if names and dense:
+            out += _flow_rows("  " + (title + ":").ljust(12), names, width)
+        elif names:
             out += _short_rows("  " + (title + ":").ljust(12), names, width, longest)
     closed = [w.name for w in closed_words(p)]
     if closed:
-        out += _group_rows(CLOSED_HEAD.ljust(14), closed, width)
-        out.append(" " * 14 + CLOSED_TAIL)
+        rows = _group_rows(CLOSED_HEAD.ljust(14), closed, width)
+        if closed_rows is not None and len(rows) + 1 > closed_rows:
+            out.append(_closed_line(closed, width))
+        else:
+            out += rows + [" " * 14 + CLOSED_TAIL]
     return [tui.trunc(line, width) for line in out]
+
+
+def _closed_line(closed: List[str], width: int) -> str:
+    """Закрытые одной строкой: сколько влезет, остальное — «ещё N», в конце — как узнать."""
+    for k in range(len(closed), 0, -1):
+        more = f" · ещё {len(closed) - k}" if k < len(closed) else ""
+        line = f"{CLOSED_HEAD.ljust(14)}{' · '.join(closed[:k])}{more} · {CLOSED_TAIL}"
+        if tui.vlen(line) <= width:
+            return line
+    return tui.trunc(f"{CLOSED_HEAD.ljust(14)}{CLOSED_TAIL}", width)
+
+
+def _flow_rows(head: str, names: List[str], width: int) -> List[str]:
+    """Группа слов потоком: «слово — что делает · слово — …», перенос целой парой."""
+    rows, line = [], head
+    for i, name in enumerate(names):
+        piece = f"{name} — {SHORT[name]}" + (" ·" if i < len(names) - 1 else "")
+        if line.strip() and line != head and tui.vlen(line) + 1 + tui.vlen(piece) > width:
+            rows.append(line)
+            line = " " * len(head)
+        line += piece if line.endswith(" ") else " " + piece
+    rows.append(line)
+    return rows
+
+
+SCREEN_LINES = 30           # FB19: пульт со словами убежища — не выше (окно 100)
+
+
+def board_screen(p: dict, day=None, cp=None) -> List[str]:
+    """Пульт целиком: строки с картинкой и слова убежища — не выше SCREEN_LINES. Не влезло —
+    сокращается по порядку: слова потоком вместо сетки, без заголовка, закрытые одной
+    строкой, комната строкой вместо картинки, строка комнаты — не выше двух строк (остальное
+    «… ещё N — в home»)."""
+    cp = cp or tui.caps()
+    day = day or hubview.today()
+    steps = ({"art": True}, {"art": True, "dense": True},
+             {"art": True, "dense": True, "head": False},
+             {"art": True, "dense": True, "head": False, "closed_rows": 1},
+             {"art": False, "dense": True, "head": False, "closed_rows": 1},
+             {"art": False, "dense": True, "head": False, "closed_rows": 1, "room_lines": 2})
+    for step in steps:
+        kw = dict(step)
+        art, room = kw.pop("art"), kw.pop("room_lines", None)
+        lines = (hubview.board(p, day, cp, art=art, room_lines=room) + [""] +
+                 help_lines(p, width=cp.width, **kw))
+        if len(lines) <= SCREEN_LINES:
+            break
+    return lines
 
 
 def _cell(name: str) -> str:
@@ -625,11 +681,14 @@ class Hub:
             self.mark_shown(hubview.tour_shown(p, names), tour=True)
             p = self.load()
         day = hubview.today()
-        for line in hubview.board(p, day):
+        for line in board_screen(p, day):   # владелец 21.10: все слова — на виду
             ui.say(line)
-        ui.say()
-        for line in help_lines(p):          # владелец 21.10: все слова — на виду
-            ui.say(line)
+        try:
+            self.mark_items(p)
+        except Exception as exc:        # noqa: BLE001 - пометка «новое» не важнее пульта
+            if self.strict:
+                raise
+            hubline.log_error(exc)
         self.board_above = True
         self.last_day = day         # пульт уже на сегодняшнюю дату: «новый день» не повторять
 
@@ -641,6 +700,19 @@ class Hub:
         q["hub"]["shown"] += [n for n in names if n not in q["hub"]["shown"]]
         if tour is not None:
             q["hub"]["tour"] = tour
+        progress.save(paths.PROGRESS_FILE, q)
+
+    def mark_items(self, p: dict) -> None:
+        """Вещи на картинке пульта — показаны: пометка «новое» больше не нужна (FB19). Старое
+        сохранение без памяти заводит её молча — всё, что уже есть, новым не считается."""
+        ids = hubview.room_ids(p)
+        seen = hubview.seen_items(p)
+        if (seen is not None and set(ids) <= seen) or not paths.PROGRESS_FILE.exists():
+            return
+        q = progress.load(paths.PROGRESS_FILE)
+        old = q["hub"].get("items")
+        old = [x for x in old if isinstance(x, str)] if isinstance(old, list) else []
+        q["hub"]["items"] = old + [i for i in ids if i not in old]
         progress.save(paths.PROGRESS_FILE, q)
 
     def safe_hint(self) -> None:

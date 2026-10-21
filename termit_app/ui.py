@@ -8,6 +8,7 @@ from typing import Optional
 
 from termit_app import (commands, diagrams, icons, lifehacks, origins, progress, textnorm, theme,
                         tui, zsh_only)
+from termit_app import alt_answer
 from termit_app.tasks.base import variant_index
 
 
@@ -217,7 +218,7 @@ KEY_GROUPS = (
 # урок про группу — её и показать: {задача: группа} или {"задача:вариант": группа}
 KEY_GROUP_OF = {"line_edit": 0, "line_edit:1": 1, "history_recall": 2, "quick_fix": 2,
                 "screen_scroll": 3, "screen_find": 3,
-                "cursor_clip": 0, "cursor_clip:1": 1, "cursor_clip:2": 3}
+                "cursor_clip": 0, "cursor_clip:1": 3, "cursor_clip:2": 3, "cut_paste": 1}
 
 
 def key_group(task_id: str, variant: int, turn: int) -> int:
@@ -302,15 +303,17 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     timed = job or timed        # экзамен отработки: таймер есть, подсказки даром
     par = task.par_for(state) if par is None else par         # с модулем «охладитель» — длиннее
     timer = f"   {theme.word('timer')} {fmt_time(par)}" if timed else ""
-    hint = (f"hint — {theme.word('soft_label')} за {theme.word('money')}" if job
-            else "hint — бесплатно")
+    # владелец 21.10: полными словами, без «софт» и обрывков
+    hint = (f"hint — подсказка за {theme.word('money_name')} {theme.word('money')}" if job
+            else "hint — подсказка, бесплатно")
     tall = card_rows(task, state, shown_lesson, wide) + CARD_TAIL > CARD_ROWS
     # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
     keys = (f"task — задание снова · {hint} · ans ОТВЕТ — сдать ответ · quit — выйти из задачи"
             if tall else
             f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ — сдать ответ · "
-            "reset — собрать заново · giveup — сдаться, разбор · skip — на завтра · "
-            "quit — выйти из задачи · bug — замечание")
+            "reset — собрать задачу заново · giveup — сдаться и посмотреть разбор · "
+            "skip — пропустить задачу, вернётся завтра · quit — выйти из задачи · "
+            "bug — написать замечание")
     if cp.level == "plain":     # Н3.8: по ширине окна — переносом, таймер не отрывается
         items = (keys + timer.replace("   ", " · ", 1)).split(" · ")
         # по экранной ширине: 💳 и ⏱ — две клетки (textwrap считал их за одну)
@@ -505,6 +508,11 @@ def review(task, state, outcome, mine, elapsed, stars_n, record_from,
         if mine:
             say(f"   Ты:     {tui.style(clean(mine), 'code', c=cp)}")
         say(f"   Эталон: {tui.style(clean(task.shown_solution(state)), 'code', c=cp)}")
+        if mine:        # FB20: верно, но иначе — чем отличается (таблица alt_answer)
+            diff = alt_answer.difference(clean(mine), clean(task.shown_solution(state)),
+                                         seed=state.get("_seed", 0))
+            if diff:
+                say(story_fill(f"Разница: {diff}", "   ", "   "))
     else:
         bad("Сдался — не беда. Вот решение:")
         say(f"   {tui.style(clean(task.shown_solution(state)), 'code', c=_framed())}")
@@ -716,7 +724,7 @@ _INTRO_KEYS_HEAD = (
     "прогресс не влияют.\n"
     "Ещё: reset — собрать задачу заново · skip — отложить на завтра · giveup — "
     "сдаться и посмотреть разбор.\n"
-    "Клавиши терминала — стрелки, история команд, прокрутка — в задаче набери keys.\n"
+    "Клавиши терминала — стрелки, история (прошлые команды), прокрутка — в задаче набери keys.\n"
     "Решил — песочница остаётся: пробуй другие способы. Дальше — next. "
     "Ещё урок — new в убежище. Что-то не так — bug, игра спросит текст.\n")
 INTRO_KEYS = (
@@ -774,8 +782,9 @@ KEY_TIPS = {
                   "стереть слово слева (W — Word). Все клавиши — keys.",
     "hidden_cache": "⌨ Вывод уехал вверх — прокрути колесом мыши или двумя пальцами по "
                     "трекпаду. Cmd+K — очистить экран. Все клавиши — keys.",
-    "mkdir_p": "⌨ Option+← → — прыжок через слово. Вывод длиннее экрана — допиши | less: "
-               "пробел листает, q — выход. Все клавиши — keys.",
+    # FB18: без «| less» — труба ещё не объяснена (её урок — после стража «Основ»)
+    "mkdir_p": "⌨ Option+← → — прыжок через слово. Esc, потом точка — вставить последнее "
+               "слово прошлой команды. Все клавиши — keys.",
 }
 
 KEYS_SHEET = """\
@@ -832,7 +841,9 @@ KEYS_SHEET = """\
 Команды игры
   task            задание снова (экран забит — сначала clear, потом task)
   lesson          мини-урок к заданию снова
-  hint            подсказка;  skip — отложить;  quit — выйти
+  hint            подсказка (в ране — за кредиты, на тренировке бесплатно)
+  skip            пропустить задачу: она вернётся завтра
+  quit            выйти из задачи
   bug             замечание: игра спросит текст — пиши как есть, любые символы
   next            после решения — дальше; до того пробуй другие способы
   new (в убежище) ещё урок: новая команда сверх нормы
@@ -878,8 +889,14 @@ BOARD_CARDS = {
     "keys-line": "⌨ Ctrl+A — в начало строки · Ctrl+E — в конец · Ctrl+W — стереть слово",
     "keys-history": "⌨ ↑↓ — прошлые команды · Ctrl+R — поиск по истории · !! — повторить",
     "keys-screen": "⌨ Cmd+↑↓ — прокрутить вывод · clear или Cmd+K — очистить экран",
-    "game": "task задание · hint подсказка · book выученное · keys клавиши · skip · bug",
+    # FB18: каждое слово — «слово — что делает» (владелец: skip и bug без расшифровки)
+    # владелец 21.10: «не нравятся сокращённые описания» — полными фразами, карточка может
+    # занять две строки (hideout._board_rows переносит по ширине окна)
+    "game": "task — показать задание снова · hint — подсказка (в ране — за {money}) · "
+            "book — выученные команды · keys — клавиши терминала · "
+            "skip — пропустить задачу, вернётся завтра · bug — написать замечание",
 }
+
 
 
 def hack_tip(line: str) -> None:

@@ -240,7 +240,7 @@ KIND_REQUIRES = {"hidden": "hidden_cache", "log_tail": "less_search", "deep_mem"
                  "script_line": "script_audit"}
 SHARD_META = ".termit/shard"        # пишет родитель: что лежит в этой песочнице
 CLAIMED = ".termit/claimed"         # пишет хук: игрок сдал верный код
-EMPTY = "Пусто. loot КОДОВОЕ_СЛОВО или loot ПУТЬ_К_ФАЙЛУ"
+EMPTY = "Пусто. loot КОДОВОЕ_СЛОВО — сдать находку (или loot ПУТЬ_К_ФАЙЛУ)"
 NO_ARG = ("Сдать находку: loot КОДОВОЕ_СЛОВО. Найденные осколки — после задачи: "
           "./termit memory")
 
