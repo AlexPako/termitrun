@@ -121,6 +121,7 @@ class Task:
     stock: Optional[str] = None
     uses_av = False                    # учебный clamscan (.termit/bin/clamscan, termit_app/avstub)
     uses_shellcheck = False            # учебный shellcheck (.termit/bin/shellcheck; FB14)
+    uses_clip_stub = False             # учебные pbcopy/pbpaste (.termit/clipboard; FB13)
     uses_crontab = False               # учебный crontab (.termit/bin/crontab, cronstub; FB14)
     # проверка смотрит журнал сервиса родителя (учебный API): без судьи задача не решается
     needs_judge = False

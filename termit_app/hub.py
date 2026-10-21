@@ -36,7 +36,7 @@ WORDS = (
     Word("run", ("dozor",), "play"),
     Word("short", ("short",), "play"),
     Word("new", ("new",), "play", aliases=("more",)),
-    Word("train", ("train",), "play", "[ТЕМА|ID|exam]", aliases=("play",)),
+    Word("train", ("train",), "play", "[ТЕМА|ID|exam|keys]", aliases=("play",)),
     Word("master", ("master",), "play", rule="master"),
     Word("rehearse", ("rehearse",), "play", "ID", rule="rehearse"),
     Word("home", ("home",), "home"),
@@ -67,6 +67,7 @@ WORDS = (
     Word("sound", ("sound",), "settings", "[on|off]"),
     Word("theme", ("theme",), "settings", "[ИМЯ]"),
     Word("owl", ("owl",), "settings", "[on|off]", rule="owl"),
+    Word("coach", ("coach",), "settings", "[on|off]"),
     Word("implants", ("implants",), "settings", rule="implants"),
     Word("wheels", ("wheels",), "settings", "[get]", rule="wheels"),
     Word("update", ("update",), "settings"),
@@ -326,7 +327,7 @@ def _train_args(p: dict) -> List[str]:
     ни закрытых мест, ни стражей. Доступность — по кэшу, без подпроцессов."""
     with pyenvs.cache_only():
         ids = train_mod.candidates(p, date.today())
-    return ["exam"] + train_mod.places(p) + train_mod.commands_of(p) + sorted(ids)
+    return ["exam", train_mod.KEYS] + train_mod.places(p) + train_mod.commands_of(p) + sorted(ids)
 
 
 # аргументы для Tab после слова; невстреченное не предлагаем (спойлер и тупик)
@@ -339,6 +340,7 @@ ARG_SOURCES: Dict[str, Callable[[dict], List[str]]] = {
     "home": lambda p: list(commands.HOME_ABOUT),
     "music": lambda p: ["play", "stop", "vol", "preview", "run"],
     "sound": lambda p: ["on", "off", "test", "pack", "vol"],
+    "coach": lambda p: ["on", "off"],
     "train": lambda p: _train_args(p),
     "rehearse": _rehearse_ids,
 }

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from termit_app import book as book_mod
-from termit_app import (edition, extensions, judge, layout, loot, progress, sandbox, shop,
+from termit_app import (coach, edition, extensions, judge, layout, loot, progress, sandbox, shop,
                         story, syserrors, theme, tui, ui)
 from termit_app.tasks import registry
 from termit_app.tasks.base import AnswerTask, Verdict, grep_recursive, grep_waits
@@ -185,6 +185,10 @@ def precmd(box, rc, pwd) -> int:
                 ui.say("   Застрял? Набери hint — подскажу.")
     elif verdict.message:
         _say_once(verdict.message, box)
+    if fresh:               # FB13: подсказчик привычек — не чаще совета за задачу
+        tip = coach.advise(box, cmds, SERVICE)
+        if tip:
+            ui.say(ui.c("2", tip))
     return 0
 
 

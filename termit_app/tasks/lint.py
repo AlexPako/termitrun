@@ -184,6 +184,9 @@ SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
     # FB4: уроки навигации — клавиши строки ввода и истории (↑, Ctrl+A, Ctrl+R, !!, !N): в
     # zsh -c их нет; показан путь клавишами, скрипт с готовой строкой — в reference
     "line_edit": ("skip", None, "клавиши строки ввода: ↑, Ctrl+A, Ctrl+W, Option+←"),
+    # FB13: курсор и буфер — Option+клик и карман zsh (Ctrl+W, Ctrl+Y) — клавиши и мышь
+    "cursor_clip:0": ("skip", None, "Option+клик по опечатке — мышь в строке ввода"),
+    "cursor_clip:1": ("skip", None, "карман zsh: Ctrl+W, Option+←, Ctrl+Y — клавиши строки"),
     "history_recall": ("skip", None, "поиск и подстановка из истории (Ctrl+R, !!, !N) — в "
                                      "zsh -c истории нет"),
     "screen_scroll": ("read", None, "cat печатает длинный вывод, слово из нужной строки игрок "

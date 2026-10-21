@@ -31,6 +31,7 @@ TOPICS = {
     "deep_dig": "deep-search",
     "deep_rm": "deep-delete",
     "line_edit": "edit-line",
+    "cursor_clip": "cut-paste",
     "history_recall": "history",
     "screen_scroll": "scroll-back",
     "screen_find": "screen-find",

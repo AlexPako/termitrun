@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 from termit_app import book as book_mod
-from termit_app import (contracts, cosmetics, edition, extensions, field, freezes, goal,
+from termit_app import (coach, contracts, cosmetics, edition, extensions, field, freezes, goal,
                         hideout, hook, implants, inbox, judge, lifehacks,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
                         remarks, repute, sound, story, syserrors, textnorm, theme, ui,
@@ -623,6 +623,9 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
         # FB12 (N6): какие системные ошибки игрок уже видел с переводом — хуку файлом
         sandbox.write_box_file(box, syserrors.BOX_KNOWN,
                                syserrors.box_text(p.get("errors_seen", ())))
+        # FB13: подсказчик привычек — включатель и сказанное; стражу не мешаем
+        sandbox.write_box_file(box, coach.BOX_STATE,
+                               coach.box_text(p, coach.on(p) and not task.boss))
         if mode == "job" and not opts.rehearsal and not in_master and not tally.get("warned"):
             tally["warned"] = True          # раз за ран: дальше таймер идёт сразу
             ui.say("\n" + ui.story_fill(COMBAT_WARNING, "", "   "))
@@ -690,6 +693,10 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
             sandbox.reap(box)
         outcome, hints = verdict
         syserrors.collect(p, box)       # FB12 (N6): новые переводы ошибок — в прогресс
+        # FB13: сказанный совет — в память без повторов; выход из задачи прогресс иначе не
+        # пишет, а совет не должен прозвучать снова
+        if coach.collect(p, box) and outcome in (None, "quit"):
+            progress.save(opts.progress_path, p)
         owl_paid = owl_asked = 0
         if bridge is not None:          # мост закрыт до подсчёта: счётчики окончательные
             bridge.stop()
@@ -1605,6 +1612,11 @@ def _drill_queue(p: dict, today: date, arg: Optional[str]) -> Tuple[List[str], L
         if not ids:
             return [], train.empty_lines(p, today)
         return ids, train.list_lines(p, ids, today, train.TITLE_WEAK)
+    if arg == train.KEYS:           # FB13: «сделай клавишами»
+        ids = train.keys_ids(p, today)
+        if not ids:
+            return [], [train.KEYS_EMPTY]
+        return ids, train.list_lines(p, ids, today, train.TITLE_KEYS)
     if arg in registry.all_tasks():
         why = train.single_problem(p, arg, today)
         if why:

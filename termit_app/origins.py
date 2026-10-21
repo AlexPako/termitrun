@@ -275,6 +275,7 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "run_script": ("chmod",),
     "deep_dig": ("zsh",),
     "line_edit": ("bash",),
+    "cursor_clip": ("pbcopy", "pbpaste"),
     "history_recall": ("history", "!!"),
     "screen_scroll": ("clear",),
     "fzf_pick": ("fzf", "grep"),

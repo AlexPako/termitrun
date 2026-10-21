@@ -1497,6 +1497,110 @@ class LineEdit(Task):
         return _files_check(ctx)
 
 
+class CursorClip(Task):
+    """FB13 (FB5 п. 47): курсор и буфер — «курсор ведёт себя не как в Ворде». Строка ввода и
+    вывод — разные зоны: курсор живёт только в строке, Option+клик ставит его туда (вариант 0);
+    Ctrl+W/U/K кладут вырезанное в карман zsh, Ctrl+Y вставляет, Esc y — вырезанное раньше
+    (вариант 1); | pbcopy — вывод в буфер обмена (вариант 2: в песочнице учебный pbcopy пишет в
+    .termit/clipboard, буфер владельца не трогаем). Проверка — по результату."""
+    id = "cursor_clip"
+    track = "basics"
+    title = "Курсор и буфер"
+    uses_clip_stub = True
+    scroll = ("Курсор — только в строке ввода: Option+клик ставит его туда (iTerm2: галочка "
+              "Option-Click moves cursor).\n"
+              "Мышью: двойной клик — слово, тройной — строка, Cmd+C и Cmd+V; Cmd+Shift+A — "
+              "вывод последней команды.\n"
+              "Ctrl+W/U/K — в карман zsh, Ctrl+Y — вставить, Esc y — то, что раньше (не буфер "
+              "обмена Mac). | pbcopy — в буфер, pbpaste — обратно.")
+    variants = (
+        Variant("Последняя команда в истории копирует в outbox/ три черновика, но в середине "
+                "строки опечатка: invoce вместо invoice. Верни строку (↑), поставь курсор "
+                "прямо в опечатку Option+кликом, исправь и нажми Enter.",
+                wrong=("cp drafts/{year}/contract_final.txt outbox/",),
+                alternatives=("↑ и Option+← прыжками до опечатки — тоже верно",)),
+        Variant("Последняя команда в истории переносит отчёт в outbox/, но слова перепутаны: "
+                "сначала папка, потом файл. Переставь их через карман zsh: ↑, Ctrl+W — вырезать "
+                "имя файла, Option+← — к началу outbox/, Ctrl+Y — вставить, пробел, Enter.",
+                hints=("Строка — в истории: ↑. Порядок у mv такой: что переносим, потом куда.",
+                       "Ctrl+W вырезает слово слева и кладёт его в карман zsh; Ctrl+Y вставляет "
+                       "его там, где курсор.",
+                       "↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter"),
+                solution="↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter",
+                solution_script="mv report_{year}.txt outbox/",
+                wrong=("mv outbox/ report_{year}.txt",),
+                alternatives=("набрать mv report_{year}.txt outbox/ заново — верно, но "
+                              "дольше",)),
+        Variant("Коллега просит список таблиц — имена всех файлов .csv в этой папке. Отправь "
+                "их в буфер обмена, не выделяя мышью: ls *.csv | pbcopy. Проверить, что "
+                "легло, — pbpaste.",
+                hints=("| передаёт вывод одной команды на вход другой.",
+                       "pbcopy забирает свой вход в буфер обмена. Нужны только .csv — маска "
+                       "*.csv.",
+                       "ls *.csv | pbcopy"),
+                solution="ls *.csv | pbcopy",
+                solution_script="ls *.csv | pbcopy",
+                wrong=("ls | pbcopy",),
+                alternatives=("ls -1 *.csv | pbcopy — то же, по одному имени в строке",)),
+    )
+    par = 40
+    hints = ("Строка уже набрана — она в истории: ↑ вернёт её целиком.",
+             "Мышь в строке ввода работает с Option: зажми Option и кликни по опечатке — "
+             "курсор встанет туда.",
+             "↑, Option+клик по invoce, допиши i после «invo», Enter")
+    solution = "↑, Option+клик по опечатке, исправь invoce на invoice, Enter"
+    solution_script = ("cp drafts/{year}/contract_final.txt drafts/{year}/invoice_final.txt "
+                       "drafts/{year}/letter_final.txt outbox/")
+    explain = ("Терминал — не Ворд: курсор только в строке ввода, Option+клик ставит его туда. "
+               "Вырезанное Ctrl+W/U/K лежит в кармане zsh (Ctrl+Y), а буфер Mac — Cmd+C, "
+               "Cmd+V и | pbcopy.")
+    spell = ("Option+клик — курсор в строку; Ctrl+Y — Yank, вставить вырезанное; "
+             "pbcopy — pasteboard copy, в буфер")
+
+    def setup_variant(self, box, rng, variant):
+        year = str(rng.randint(2724, 2726))
+        fill = list(rng.sample(FILLER, 8))
+        if variant == 1:
+            f = kit.write(box / f"report_{year}.txt", f"report {year}: {kit.word(rng)}\n")
+            (box / "outbox").mkdir()
+            _history(box, fill + [f"mv outbox/ report_{year}.txt"])
+            return {"year": year, "want": {f"outbox/report_{year}.txt": kit.sha(f)}}
+        if variant == 2:
+            tables = sorted(rng.sample(("customers", "orders", "payments", "products",
+                                        "regions", "returns", "stores"), 4))
+            for name in tables:
+                kit.write(box / f"{name}.csv", f"id,{name}\n1,{kit.word(rng)}\n")
+            kit.write(box / "readme.txt", "Tables for the weekly report.\n")
+            kit.write(box / "notes.md", f"# Notes\n{kit.word(rng)}\n")
+            return {"year": year, "csv": [f"{name}.csv" for name in tables]}
+        want = {}
+        (box / "outbox").mkdir()
+        for name in ("contract_final.txt", "invoice_final.txt", "letter_final.txt"):
+            f = kit.write(box / "drafts" / year / name, f"{name}: {kit.word(rng)}\n")
+            want[f"outbox/{name}"] = kit.sha(f)
+        _history(box, fill + [f"cp drafts/{year}/contract_final.txt "
+                              f"drafts/{year}/invoce_final.txt "
+                              f"drafts/{year}/letter_final.txt outbox/"])
+        return {"year": year, "want": want}
+
+    def check(self, ctx):
+        csv = ctx.state.get("csv")
+        if csv is None:
+            return _files_check(ctx)
+        got = sandbox._read(ctx.box, "clipboard")
+        if got is None:
+            return Verdict(False)
+        names = [x.strip() for x in got.splitlines() if x.strip()]
+        extra = [x for x in names if x not in csv]
+        if extra:
+            return Verdict(False, f"В буфере лишнее: {extra[0]}. Нужны только имена .csv — "
+                                  "маска *.csv после ls.")
+        if sorted(set(names)) != sorted(csv):
+            return Verdict(False, "В буфере не все таблицы. ls *.csv | pbcopy положит "
+                                  "все сразу.")
+        return Verdict(True)
+
+
 class HistoryRecall(Task):
     """FB4: история — Ctrl+R (поиск), history и !N, !!. В истории песочницы — заготовленная
     длинная команда: достать, поправить и выполнить."""
@@ -2445,8 +2549,10 @@ class BossBasics(Task):
 # FB4: уроки навигации (LineEdit, HistoryRecall, ScreenScroll) — временно сразу после двух
 # задач на глубину: владелец проходит их следующими, потом их переставят на постоянное место.
 # FB10: за ними — лайфхаки: поиск по экрану (к прокрутке) и быстрая правка (строка + история)
+# FB13: «Курсор и буфер» — сразу за правкой строки
 TASKS = [MeetTerminal(), WhereAmI(), ClimbDown(), BackUp(), HomeTilde(), HiddenCache(),
          MkdirP(), CopyMove(), FileExt(), StarMask(), QuestionMask(),
          RunScript(), DeepDig(), DeepRm(),
-         LineEdit(), HistoryRecall(), ScreenScroll(), ScreenFind(), QuickFix(), CopyDir(),
+         LineEdit(), CursorClip(), HistoryRecall(), ScreenScroll(), ScreenFind(), QuickFix(),
+         CopyDir(),
          FzfPick(), ZJump(), BossBasics()]

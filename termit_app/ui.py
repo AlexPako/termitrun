@@ -214,7 +214,8 @@ KEY_GROUPS = (
 )
 # урок про группу — её и показать: {задача: группа} или {"задача:вариант": группа}
 KEY_GROUP_OF = {"line_edit": 0, "line_edit:1": 1, "history_recall": 2, "quick_fix": 2,
-                "screen_scroll": 3, "screen_find": 3}
+                "screen_scroll": 3, "screen_find": 3,
+                "cursor_clip": 0, "cursor_clip:1": 1, "cursor_clip:2": 3}
 
 
 def key_group(task_id: str, variant: int, turn: int) -> int:

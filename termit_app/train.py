@@ -33,7 +33,8 @@ CLOSED_TASK = "«{title}» сейчас не собрать на этом ком
 TOPIC_EMPTY = "По теме «{topic}» сейчас нечего отрабатывать — всё в ране дня или уже сегодня."
 FEW_FOR_EXAM = ("Для экзамена нужно 5 знакомых заданий — пройди ещё пару ранов. "
                 "Отработанное сегодня отдыхает до завтра.")
-UNKNOWN = "Нет такой темы: {topic}. Места: {places}. Команды: {cmds}."
+UNKNOWN = ("Нет такой темы: {topic}. Места: {places}. Команды: {cmds}. Клавиши — "
+           "./termit train keys.")
 
 
 def score(rec: dict) -> int:
@@ -116,6 +117,22 @@ def topic_ids(p: dict, day: date, topic: str) -> Optional[List[str]]:
     return pool[:DRILL_SIZE]
 
 
+# FB13 (FB5 п. 45 в): вид отработки «сделай клавишами» — уроки строки ввода, истории, экрана
+# и буфера. Проверка у них и так по результату (файлы, сданное слово): без приёма решить
+# можно, но долго — отработка гоняет именно руки. Порядок — как в игре.
+KEYS = "keys"
+KEY_TASKS = ("line_edit", "cursor_clip", "history_recall", "screen_scroll", "screen_find",
+             "quick_fix", "job_control")
+
+
+def keys_ids(p: dict, day: date) -> List[str]:
+    """train keys: встреченные уроки клавиш, что можно отработать сегодня, — слабые первыми,
+    потом давно не трогавшие; не больше DRILL_SIZE."""
+    pool = [t for t in candidates(p, day) if t in KEY_TASKS]
+    pool.sort(key=lambda t: (score(p["tasks"][t]) < WEAK_FROM, _stale(p["tasks"][t])))
+    return pool[:DRILL_SIZE]
+
+
 def exam_pool(p: dict, day: date, place: Optional[str] = None) -> List[str]:
     """Знакомые решённые задачи для экзамена; меньше EXAM_SIZE — экзамена нет."""
     tasks = registry.all_tasks()
@@ -178,7 +195,8 @@ def empty_lines(p: dict, day: date) -> List[str]:
         return [IN_RUN]
     if any(p["tasks"][t].get("drill_day") == day.isoformat() for t in weak):
         return [DONE_TODAY]
-    menu = [NO_WEAK, "   ./termit train ТЕМА — знакомое из одного места или по одной команде"]
+    menu = [NO_WEAK, "   ./termit train ТЕМА — знакомое из одного места или по одной команде",
+            "   ./termit train keys — уроки клавиш: сделай руками, без перепечатки"]
     if exam_pool(p, day):
         menu.append("   ./termit train exam — 5 заданий из разных мест, на время")
     else:
@@ -205,6 +223,10 @@ TITLE_ONE = "🎯 Отработка: одна задача — без тайм�
 TITLE_TOPIC = "🎯 Отработка: «{topic}» — без таймера, подсказки даром."
 GYM = "  Не платит и серию не держит — это спортзал, а не работа."
 START = "  Enter — начать · Ctrl+C — назад "
+TITLE_KEYS = ("🎯 Отработка: клавиши — сделай руками, без перепечатки: засчитывается "
+              "результат. Без таймера, подсказки даром.")
+KEYS_EMPTY = ("Клавиши отрабатывать пока нечего: уроки клавиш (правка строки, история, "
+              "экран) придут в ране. Уже встреченные сегодня — в ране дня или отработаны.")
 TITLE_EXAM = "🎯 Экзамен: 5 заданий вперемешку, на время. Без денег и без серии."
 STOPPED = "  Отработка прервана — ничего не засчитано, день не тронут."
 EXAM_TAIL = "  Без денег и без серии. Слабое — в ./termit train."

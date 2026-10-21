@@ -8,6 +8,7 @@ import re
 from termit_app import (citymap, contracts, cosmetics, diary, hideout, implants, loot, music,
                         paths, progress, repute, sandbox, session, story, updates, warehouse, weekly)
 from termit_app import book as book_mod
+from termit_app import coach as coach_mod
 from termit_app import inbox as inbox_mod
 from termit_app import goal
 from termit_app import commands, edition, extensions, icons, textnorm, theme, tui, ui
@@ -70,7 +71,7 @@ def usage(p: dict = None) -> str:
                    line("dossier", cmd("dossier", "[ИМЯ]"), has_story))
     fence_line = line("fence", cmd("fence", "[sell N]"), loot.enabled())
     master_line = line("master", cmd("master"))
-    train_line = cmd("train", "[ТЕМА|ID|exam]")
+    train_line = cmd("train", "[ТЕМА|ID|exam|keys]")
     rehearse_line = line("rehearse", cmd("rehearse", "ID"))
     deck_line = line("deck", cmd("deck", "[on|off ID]"))
     implants_line = line("implants", cmd("implants", "", "\n" + " " * 27 + "shell — подключить fzf и zoxide к своему zsh"))
@@ -101,7 +102,7 @@ def usage(p: dict = None) -> str:
 {callsign_line}{deck_line}{story_lines}{fence_line}{cmd("inbox", "[N|next]")}{cmd("book", "[слово]")}\
 {diary_line}{cmd("theme", "[ИМЯ]", themes)}{cmd("sound", "[on|off]", ";")}\
                            test, pack ID|off, vol 1..10
-{music_line}{implants_line}{wheels_line}{owl_line}{cmd("feedback")}\
+{music_line}{implants_line}{wheels_line}{owl_line}{cmd("coach", "[on|off]")}{cmd("feedback")}\
 {report_line}{cmd("help")}{later}
 Флаги: --theme ИМЯ (тема на один запуск), --no-sandbox (без защиты sandbox-exec),
        --bare (без твоего ~/.zshrc), --no-gui (open не открывает окна)"""
@@ -1060,6 +1061,25 @@ def music_cmd(args) -> int:
     return 2
 
 
+COACH_ON = ("Подсказчик привычек включён: в задаче иногда, не чаще раза за задачу, "
+            "подскажет клавишу вместо перепечатки — ↑, Esc и точку, ^старое^новое.")
+COACH_OFF = "Подсказчик привычек выключен. Вернуть: ./termit coach on"
+
+
+def coach_cmd(args) -> int:
+    """./termit coach [on|off] (FB13, FB5 п. 45 б): подсказчик привычек в задаче."""
+    p = progress.load(paths.PROGRESS_FILE)
+    sub = args[0] if args else ""
+    if sub in ("on", "off"):
+        p.setdefault("settings", {})[coach_mod.SETTING] = sub == "on"
+        _save_settings(p)
+    elif sub:
+        ui.say("./termit coach [on|off]")
+        return 2
+    ui.say(COACH_ON if coach_mod.on(p) else COACH_OFF)
+    return 0
+
+
 MODEL_NAME = re.compile(r"^[A-Za-z0-9._:/-]{1,80}$")
 
 
@@ -1463,6 +1483,8 @@ def _dispatch(cmd, args, opts) -> int:
         return music_cmd(args[1:])
     elif cmd == "owl":
         return owl_cmd(args[1:])
+    elif cmd == "coach":
+        return coach_cmd(args[1:])
     elif cmd == "fence":
         return fence(args[1:])
     elif cmd == "inbox":

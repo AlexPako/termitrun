@@ -78,6 +78,19 @@ CRONTAB_STUB = """#!/bin/sh
 """
 
 
+# FB13 (FB5 п. 47): учебные pbcopy и pbpaste — урок «Курсор и буфер». Буфер обмена
+# владельца не трогаем: «буфер» — файл .termit/clipboard рядом с bin (путь — от $0, без
+# окружения). Молчит, как настоящий: что буфер учебный, говорит урок.
+PBCOPY_STUB = """#!/bin/sh
+head -c 65536 > "${0%/bin/*}/clipboard"
+"""
+PBPASTE_STUB = """#!/bin/sh
+cat "${0%/bin/*}/clipboard" 2>/dev/null
+exit 0
+"""
+CLIP_STUBS = {"pbcopy": PBCOPY_STUB, "pbpaste": PBPASTE_STUB}
+
+
 def _stubs() -> dict:
     """Обёртки в .termit/bin — она в PATH песочницы впереди системных."""
     from termit_app import implants
@@ -318,6 +331,9 @@ def create(task, seed: int, root=None, defer_spawn: bool = True,
     if getattr(task, "uses_crontab", False):
         write_box_file(box, ".termit/bin/crontab",
                        CRONTAB_STUB.format(run=paths.py_line("termit_app.cronstub")), mode=0o755)
+    if getattr(task, "uses_clip_stub", False):     # FB13: буфер владельца не трогаем
+        for name, body in CLIP_STUBS.items():
+            write_box_file(box, f".termit/bin/{name}", body, mode=0o755)
     if getattr(task, "uses_shellcheck", False):
         write_box_file(box, ".termit/bin/shellcheck",
                        SHELLCHECK_STUB.format(run=paths.py_line("termit_app.shellstub")),

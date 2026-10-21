@@ -246,6 +246,29 @@ command_not_found_handler() {
 # Esc, потом «.» в русской раскладке приходит как Esc, «ю» — то же «последнее слово»
 bindkey '\eю' insert-last-word 2>/dev/null
 
+# FB13 (FB5 п. 45 б): подсказчик привычек. Хуку нужно знать, набрана ли строка руками: ↑,
+# поиск по истории, Esc+., Tab, вставка, Ctrl+Y и !-подстановка — уже не «перепечатал».
+# zle-line-pre-redraw видит каждый виджет; 2+ знака разом не от self-insert (Tab, вставка,
+# подсказка autosuggestions) — тоже не руками. Флаг: 0 — руками, 1 — нет, 2 — неизвестно
+# (zle не работал); preexec пишет его с меткой команды в .termit/typed. Хуки zle — через
+# add-zle-hook-widget: чужие (syntax-highlighting и т.п.) не сбиваются.
+typeset -gi _tr_recall=2 _tr_blen=0
+_tr_typed_init() { _tr_recall=0; _tr_blen=$#BUFFER }
+_tr_typed_redraw() {
+  [[ $LASTWIDGET == *(history|search|last-word|prev|paste|complet|autosuggest|yank|expand)* ]] &&
+    _tr_recall=1
+  (( $#BUFFER - _tr_blen >= 2 )) && [[ $LASTWIDGET != *self-insert* ]] && _tr_recall=1
+  _tr_blen=$#BUFFER
+}
+_tr_typed_finish() {
+  [[ $BUFFER == *'!'* || $BUFFER == '^'* ]] && _tr_recall=1
+}
+if autoload -Uz add-zle-hook-widget 2>/dev/null; then
+  add-zle-hook-widget line-init _tr_typed_init 2>/dev/null
+  add-zle-hook-widget line-pre-redraw _tr_typed_redraw 2>/dev/null
+  add-zle-hook-widget line-finish _tr_typed_finish 2>/dev/null
+fi
+
 # Служебные команды не попадают в историю — иначе !! повторит task.
 typeset -ga _tr_service=(task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson)
 [[ -n $TERMIT_LINGER ]] && _tr_service+=(next)
@@ -270,6 +293,8 @@ _tr_preexec() {
   fi
   _tr_stamp=$EPOCHREALTIME
   print -r -- "$_tr_stamp"$'\t'"$PWD"$'\t'"${1//$'\n'/ }" >> $TERMIT_BOX/.termit/cmds.log
+  print -r -- "$_tr_stamp"$'\t'"$_tr_recall" >| $TERMIT_BOX/.termit/typed
+  _tr_recall=2
 }
 _tr_precmd() {
   local rc=$? ps="${pipestatus[*]}"
@@ -332,7 +357,7 @@ if [[ -n $TERMIT_HUB ]]; then
   command_not_found_handler() {
     _termit_layout_hint "$1" && return 127
     case $1 in
-      board|callsign|clear|deck|diary|dossier|feedback|fence|help|home|hub|implants|inbox|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|train|update|wheels)
+      board|callsign|clear|coach|deck|diary|dossier|feedback|fence|help|home|hub|implants|inbox|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|train|update|wheels)
         print -r -- "$1 — слово убежища. quit — и ты в убежище, там набери $1."
         return 127 ;;
     esac
