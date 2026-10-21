@@ -140,6 +140,9 @@ def precmd(box, rc, pwd) -> int:
         note = syserrors.explain_once(box, rc, pwd, cmds[-1].line)
         if note:
             ui.say(note)
+        found = story.auto_claim(box, cmds[-1].line, pwd)
+        if found:               # владелец 21.10: прочитал осколок — он сохранён
+            ui.ok(story.found_message(found) + " — " + AUTO_CLAIMED)
     task, state = _load(box)
     if not sandbox.inside(Path(pwd), box):
         ui.warn(f"ты вне песочницы: {pwd} — вернуться: cd $TERMIT_BOX")
@@ -229,6 +232,7 @@ def cmd_task(box) -> int:
 
 TASK_AGAIN_TIP = ("   Экран забит — clear (или Ctrl+L), потом снова task: задание будет наверху. "
                   "Урок к заданию — lesson.")
+AUTO_CLAIMED = "осколок сохранён. Перечитать в убежище: memory"
 NO_LESSON = "У этого задания нет мини-урока. Застрял — hint, выученное — book."
 
 

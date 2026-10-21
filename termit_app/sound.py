@@ -17,6 +17,7 @@ EVENTS = {"boss_down": "Hero", "record": "Glass", "milestone": "Purr"}
 # купленная позиция → пакет synth
 PACKS = {"snd_synth": "synth", "snd_chip": "chip", "snd_noir": "noir"}
 AFPLAY = "/usr/bin/afplay"
+BELL_FILE = "/System/Library/Sounds/Tink.aiff"
 SOUNDS_DIR = "/System/Library/Sounds"
 
 _popen = subprocess.Popen       # подменяется в тестах
@@ -115,7 +116,10 @@ def ring(p: dict, event: str) -> Optional[str]:
     if "cassette" in owned and _run(p, sound_file(event)):
         return "cassette"
     if "bell" in owned:
-        print("\a", end="", flush=True)
+        # владелец 21.10: «нажимал test — никакого звука»: символ звонка \a iTerm2 часто глушит
+        # или заменяет миганием, поэтому звонок — системный «дзинь» через afplay, \a — запасной
+        if not _run(p, BELL_FILE):
+            print("\a", end="", flush=True)
         return "bell"
     return None
 

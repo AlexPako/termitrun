@@ -722,6 +722,8 @@ THEME["tasks"].update({k: dict(v, lesson=_data.LESSONS[k]) for k, v in _data.TAS
 for _tid, _by in _data.VARIANT_LESSONS.items():      # FB14: уроки вариантов (п. 38)
     THEME["tasks"][_tid]["variant_lessons"] = dict(_by)
 THEME["voices"]["tasks"].update(_data.VOICES)
+from termit_app.themes.cyberpunk import regex as _regex  # noqa: E402  (FB21, «Регулярки»)
+_regex.merge(THEME)
 from termit_app.themes.cyberpunk import db as _db  # noqa: E402  (часть 9а, «Картотека»)
 _db.merge(THEME)
 from termit_app.themes.cyberpunk import sql as _sql  # noqa: E402  (часть 9б, «Хранилище»)

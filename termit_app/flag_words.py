@@ -56,6 +56,9 @@ FLAG_WORDS: Dict[Tuple[str, str], Tuple[str, str]] = {
     ("grep", "-A"): ("After", "строки после"),
     ("grep", "-B"): ("Before", "строки до"),
     ("grep", "-C"): ("Context", "строки вокруг"),
+    # FB21: блок «Регулярки»
+    ("grep", "-x"): ("line regexp", "шаблон на всю строку"),
+    ("grep", "-P"): ("Perl", "шаблоны как в языке Perl"),
     ("find", "-iname"): ("insensitive", "имя без учёта регистра"),
     ("find", "-mtime"): ("modification time", "время изменения"),
     ("fd", "-e"): ("extension", "расширение"),

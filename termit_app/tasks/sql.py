@@ -956,7 +956,11 @@ class PgDialect(SqlAnswer):
                        "psql -At -c \"SELECT COUNT(*) FROM customers WHERE district = "
                        "'Kazan'\""),
                 alternatives=("psql -At -c \"SELECT COUNT(*) FROM customers WHERE "
-                              "lower(district) = 'kazan'\" — всё к строчным",)),
+                              "lower(district) = 'kazan'\" — всё к строчным",
+                              # FB21: регулярки в PostgreSQL — ~ и ~* (без учёта регистра)
+                              "psql -At -c \"SELECT COUNT(*) FROM customers WHERE district ~* "
+                              "'^kazan$'\" — ~* — регулярка без учёта регистра, ^…$ — "
+                              "строка целиком")),
         Variant("Сколько счетов выписано {day}? issued_at хранит дату вместе со временем. "
                 "Ответ: ans ЧИСЛО",
                 hints=("Время мешает: '{day}' для timestamp — только полночь.",

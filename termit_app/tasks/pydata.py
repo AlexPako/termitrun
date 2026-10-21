@@ -715,4 +715,5 @@ def add_tasks(more) -> None:
 # FB15: вторая половина pandas — termit_app/tasks/pdmore.py (после пропусков), страж —
 # termit_app/tasks/pdboss.py
 from termit_app.tasks import pdmore  # noqa: E402,F401
+from termit_app.tasks import pdregex  # noqa: E402,F401  (FB21: регулярки в pandas)
 from termit_app.tasks import pdboss  # noqa: E402,F401  (страж — последним)

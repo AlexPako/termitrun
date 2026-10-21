@@ -166,6 +166,14 @@ class OpenGui(Task):
                     default = True
         if shown and right:
             return Verdict(True)
+        # владелец 21.10: сделал половину (open -e) — игра молчала; говорим, что осталось
+        where = "open reports" if v == 1 else "open . (точка — эта папка)"
+        prog = "open -a Preview plan.png" if v == 1 else "open -e inventory.txt"
+        if right and not shown:
+            return Verdict(False, f"{name} открыт где надо ✓. Осталось показать папку в Finder: "
+                                  f"{where}")
+        if shown and not right and not default:
+            return Verdict(False, f"Папка в Finder открыта ✓. Осталось открыть {name}: {prog}")
         if default and not right:
             prog = "Preview: open -a Preview" if v == 1 else "TextEdit: open -a TextEdit (или -e)"
             return Verdict(False, f"{name} открылся в программе по умолчанию, а нужна {prog}")

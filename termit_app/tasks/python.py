@@ -1447,6 +1447,154 @@ class PyStats(pykit.PyEditTask):
         return Verdict(False, self.MSG_WRONG)
 
 
+# --- 10б. py_regex (FB21) -------------------------------------------------------------------
+
+class PyRegex(pykit.PyEditTask):
+    """FB21: регулярки в Python — re.findall (все совпадения списком, группа — только она) и
+    re.sub (заменить всё, что подошло). Знаки шаблонов — из блока «Регулярки» трека «Данные»."""
+    id = "py_regex"
+    track = "py"
+    title = "Регулярки в Python"
+    par = 90
+    script = "codes.py"
+    run = "python3 codes.py > out.txt"
+    outputs = ("out.txt",)
+    scroll = py("re.findall(r\"шаблон\", s) — все совпадения списком, а не первое: "
+                "re.findall(r\"\\d+\", \"a1 b22\") — это ['1', '22']; \\d — цифра, как [0-9]. "
+                "Группа ( ) в шаблоне — в список идёт только она.\n"
+                "re.sub(r\"шаблон\", \"на что\", s) — заменить всё, что подошло: "
+                "re.sub(r\"\\s+\", \" \", s) — лишние пробелы в один. r\"…\" — сырая строка: "
+                "\\d в ней Python не трогает.")
+    variants = (
+        Variant("Сколько кодов ошибок (E и три цифры, вроде E404) в app.log — не строк, а самих "
+                "кодов? В строке их бывает два. Допиши codes.py, итог — в out.txt: python3 "
+                "codes.py > out.txt",
+                hints=("Открой codes.py: nano codes.py — одна строка # TODO.",
+                       py("re.findall(шаблон, text) вернёт список всех кодов; шаблон — "
+                          "r\"E\\d{3}\": E и три цифры.")),
+                wrong=("python3 codes.py > out.txt",),
+                alternatives=("grep -Eo 'E[0-9]{{3}}' app.log | wc -l — то же в оболочке",),
+                key="findall"),
+        Variant("Какой почтовый домен (то, что после @) чаще всех в contacts.txt? Допиши "
+                "codes.py — домен без @ — в out.txt: python3 codes.py > out.txt",
+                hints=("Открой codes.py: nano codes.py — одна строка # TODO.",
+                       py("re.findall с группой ( ) отдаёт только группу: r\"@([a-z.]+)\" — "
+                          "домен без @.")),
+                wrong=("python3 codes.py > out.txt",),
+                alternatives=("grep -Eo '@[a-z.]+' contacts.txt | sort | uniq -c | sort -rn — "
+                              "то же в оболочке",),
+                key="group"),
+        Variant("Один телефон в phones.txt записан по-разному: 415-555-0134, (415) 555-0134, "
+                "4155550134. Сколько разных телефонов? Допиши codes.py, итог — в out.txt: "
+                "python3 codes.py > out.txt",
+                hints=("Открой codes.py: nano codes.py — одна строка # TODO.",
+                       py("re.sub(r\"[^0-9]\", \"\", line) — убрать всё, кроме цифр: разные "
+                          "записи станут одной.")),
+                wrong=("python3 codes.py > out.txt",),
+                alternatives=("sed -E 's/[^0-9]//g' phones.txt | sort -u | wc -l — то же в "
+                              "оболочке",),
+                key="sub"),
+    )
+    hints = variants[0].hints
+    explain = ("re.findall отдаёт все совпадения списком — len() их и сосчитает, а с группой "
+               "( ) — только кусок из скобок. re.sub заменяет всё, что подошло. Шаблон пиши "
+               "сырой строкой r\"…\": \\d в ней Python не трогает.")
+    spell = py("re.findall(r\"E\\d{3}\", text) — все совпадения; re.sub(r\"[^0-9]\", \"\", s) "
+               "— заменить")
+    trap_messages = {
+        "lines": "Это строки, а не коды: в строке бывает два. re.findall по всему тексту "
+                 "отдаёт каждый код.",
+        "at": "Домен — без @: возьми его в группу ( ) — r\"@([a-z.]+)\", и findall отдаст "
+              "только группу.",
+        "raw": "Это разные записи, а не разные телефоны: оставь в строке одни цифры — re.sub.",
+    }
+    MSG_EMPTY = "out.txt пуст: допиши строку # TODO и запусти: python3 codes.py > out.txt"
+    MSG_WRONG = "Не то. Глянь, что попадает в список, — print его — и запусти снова."
+    crash_tips = {
+        "NameError": "Скрипт упал с NameError: имя не задано — строка # TODO и задаёт его "
+                     "(codes, domains или digits).",
+        "IndexError": "Скрипт упал с IndexError: список пуст — шаблон ничего не нашёл. Проверь "
+                      "его: r\"…\" и знаки.",
+    }
+
+    def prepare(self, box, rng, variant):
+        from termit_app.tasks import regex as rx
+        if variant == 1:
+            lines = rx._contacts(rng, rng.randint(30, 60))
+            found = [m for x in lines for m in re.findall(r"@([a-z.]+)", x)]
+            counts = {}
+            for d in found:
+                counts[d] = counts.get(d, 0) + 1
+            top = max(sorted(counts), key=lambda k: counts[k])
+            if sum(n == counts[top] for n in counts.values()) > 1:
+                lines.append(f"from {rng.choice(rx.PEOPLE)}@{top} re: meeting")
+            kit.write(Path(box) / "contacts.txt", "\n".join(lines) + "\n")
+            return {"expect": top, "traps": [["at", f"@{top}"]]}
+        if variant == 2:
+            lines = []
+            for digits in {f"415{rng.randint(2000000, 9999999)}"
+                           for _ in range(rng.randint(5, 9))}:
+                for form in rng.sample(range(4), rng.randint(1, 4)):
+                    lines.append(rx._phone(rng, digits, form))
+            rng.shuffle(lines)
+            kit.write(Path(box) / "phones.txt", "\n".join(lines) + "\n")
+            uniq = {re.sub(r"[^0-9]", "", x) for x in lines}
+            return {"expect": len(uniq), "traps": [["raw", len(set(lines))]]}
+        lines = rx._plant_codes(rng, rx._log_lines(rng), rng.randint(20, 40),
+                                two=rng.randint(5, 10))
+        kit.write(Path(box) / "app.log", "\n".join(lines) + "\n")
+        found = [m for x in lines for m in re.findall(r"E\d{3}", x)]
+        hit = sum(bool(re.search(r"E\d{3}", x)) for x in lines)
+        return {"expect": len(found), "traps": [["lines", hit]]}
+
+    def skeleton(self, state: dict) -> str:
+        v = _v(self, state)
+        if v == 0:
+            lines = ["# codes.py: how many error codes (E and 3 digits) in app.log; a line can "
+                     "hold two", "import re", "", 'text = open("app.log").read()',
+                     "# TODO 1: codes: every code in text, a list: re.findall",
+                     "print(len(codes))"]
+        elif v == 1:
+            lines = ["# codes.py: the most frequent mail domain in contacts.txt (after @)",
+                     "import re", "from collections import Counter", "",
+                     'text = open("contacts.txt").read()',
+                     "# TODO 1: domains: every domain after @, a list: re.findall with a group",
+                     "print(Counter(domains).most_common(1)[0][0])"]
+        else:
+            lines = ["# codes.py: how many different phones in phones.txt; one number is "
+                     "written in many ways", "import re", "", "seen = set()",
+                     'for line in open("phones.txt"):',
+                     "    # TODO 1: digits: the line with nothing but digits: re.sub",
+                     "    seen.add(digits)", "print(len(seen))"]
+        return "\n".join(lines) + "\n"
+
+    def edits(self, state: dict) -> List[Tuple[str, str]]:
+        v = _v(self, state)
+        if v == 0:
+            return [("# TODO 1", 'codes = re.findall(r"E\\d{3}", text)')]
+        if v == 1:
+            return [("# TODO 1", 'domains = re.findall(r"@([a-z.]+)", text)')]
+        return [("# TODO 1", 'digits = re.sub(r"[^0-9]", "", line)')]
+
+    def check_outputs(self, ctx) -> Verdict:
+        st = ctx.state
+        kind, text = envkit.box_text(ctx.box, "out.txt", envkit.TEXT_CAP)
+        if kind != "ok":
+            return Verdict(False, envkit.file_problem(kind, "out.txt"))
+        value = pykit.last_value(text)
+        if not value:
+            return Verdict(False, self.MSG_EMPTY)
+        for key, trap in st.get("traps") or ():
+            if key in self.trap_messages and value == str(trap):
+                return Verdict(False, self.trap_messages[key].format(**st))
+        exp = st["expect"]
+        if isinstance(exp, str):
+            return Verdict(True) if value == exp else Verdict(False, self.MSG_WRONG)
+        if pykit.same_num(value, exp):
+            return Verdict(True)
+        return Verdict(False, self.MSG_WRONG)
+
+
 # --- 11. py_urllib --------------------------------------------------------------------------
 
 URLLIB_HEAD = ["import json", "import urllib.request", "", "import sockhttp", "",
@@ -1865,4 +2013,5 @@ class BossPy(Task):
 from termit_app.tasks import pycheck  # noqa: E402
 
 TASKS = [PyRun(), PyVars(), PyLoop(), PyDict(), PyFunc()] + pycheck.TASKS + [
-    PyRepl(), PyJson(), PyCsvJson(), PyFiles(), PyStats(), PyUrllib(), BossPy()]
+    PyRepl(), PyJson(), PyCsvJson(), PyFiles(), PyStats(), PyRegex(), PyUrllib(),
+    BossPy()]

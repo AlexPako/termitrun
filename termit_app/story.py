@@ -328,6 +328,38 @@ def claim(box, arg: str) -> Optional[dict]:
     return meta if write_mark(Path(box) / CLAIMED, body) else None
 
 
+READERS = ("cat", "less", "more", "head", "tail", "bat", "nano", "vim", "grep", "sort")
+
+
+def auto_claim(box, line: str, pwd: str) -> Optional[dict]:
+    """Хук после команды: игрок прочитал файл, в котором лежит код осколка этой песочницы
+    (cat/less/head… по пути к нему), — сдать код за него (владелец 21.10: «прочитал осколок,
+    и он нигде не сохранился»). Уже сдан — None."""
+    from termit_app import sandbox
+    words = line.split()
+    if not words or words[0] not in READERS or (Path(box) / CLAIMED).exists():
+        return None
+    meta = _read_json(box, SHARD_META)
+    shard = next((s for s in SHARDS if meta and s.id == meta.get("id")), None)
+    t = shard_text(shard) if shard else None
+    if t is None:
+        return None
+    code = str(t["code"])
+    for word in words[1:]:
+        if word.startswith("-"):
+            continue
+        path = (Path(pwd) / os.path.expanduser(word)).resolve()
+        if not path.is_file() or not sandbox.inside(path, box):
+            continue
+        try:
+            text = path.read_text("utf-8", errors="replace")[:65536]
+        except OSError:
+            continue
+        if code in text:
+            return claim(box, code)
+    return None
+
+
 def write_mark(path: Path, body: bytes) -> bool:
     """Хук пишет служебную метку в .termit: без перехода по симлинкам, только обычный файл."""
     try:
@@ -703,10 +735,19 @@ def _ui6(key: str, default: str) -> str:
     return theme.story("dossier_ui").get(key) or default
 
 
+OPEN_STEPS = ("Как прочитать: 1) зайди в любое задание (run или train, кроме стража); "
+              "2) набери там {how}; 3) текст появится на экране и сохранится здесь. {explain} "
+              "Через open не открывай: Mac отдаст файл своей программе «Архиватор», а читать "
+              "нужно прямо в терминале.")
+
+
 def where_line(item_id: str) -> str:
-    """Куплено, но ещё не открыто: где лежит и чем открыть."""
-    return _ui6("where", "куплено, лежит в ~/drop: открой в любом ране — {how}").format(
-        how=how_to_open(item_id), path=drop_path(item_id))
+    """Куплено, но ещё не открыто: где лежит и чем открыть — по шагам (владелец 21.10:
+    «досье открывается архиватором… непонятно, как его запустить»)."""
+    how, path = how_to_open(item_id), drop_path(item_id)
+    how = how.split(" (или ")[0]        # одна команда: запасной вариант новичка путает
+    return f"куплено, лежит в ~/{path}. " + OPEN_STEPS.format(how=how,
+                                                              explain=explain(item_id) or "")
 
 
 def bought_lines(item_id: str) -> List[str]:

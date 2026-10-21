@@ -8,6 +8,7 @@ import hashlib
 import math
 import os
 import random
+import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable, Dict, List, Optional
 
@@ -339,9 +340,9 @@ def _board_look(p: dict) -> List[str]:
     return [look_text("board", cards=cards, free=_free(p)) + state]
 
 
-LOOKS["board"] = ("Приколото: {cards}; свободных мест: {free}. Над приглашением это обычный "
-                  "текст в переменной PROMPT — в задаче набери `echo $PROMPT`: увидишь и "
-                  "карточки, и коды цвета %F{{…}}. Поменять — ./termit home board.")
+LOOKS["board"] = ("Приколото: {cards}; свободных мест: {free}. Карточки висят над строкой "
+                  "ввода в каждой задаче. Приколоть, снять и посмотреть, что есть, — "
+                  "./termit home board.")
 ITEMS["board"] = {"name": "доска", "row": "wall", "glyph": _board_glyph, "look": _board_look}
 ROWS = ("wall", "mid", "desk", "floor", "pet")     # desk и pet пустыми не рисуются
 
@@ -922,33 +923,80 @@ def auto_enable(p: dict, item_ids) -> Optional[str]:
     return " ".join(m for m in (msg, board) if m) or None
 
 
+PROMPT_WHAT = ("Приглашение (по-английски prompt) — надпись в начале строки ввода в задаче, "
+               "перед курсором: терминал как бы говорит «готов, вводи». Хорошее приглашение "
+               "сразу показывает, где ты стоишь и не упала ли прошлая команда.")
+# как деталь выглядит на деле (папка-пример drum внутри ~/projects/drum/src)
+PROMPT_LOOKS: Dict[str, str] = {
+    "path_short": "drum % — только папка, где стоишь",
+    "path_full": "~/projects/drum/src % — весь путь от дома (~ — домашняя папка)",
+    "exit_code": "drum ✗1 % — красный ✗ и код ошибки, только если прошлая команда упала",
+    "deck_icon": "⟁ drum % — значок деки в начале",
+    "two_lines": "путь на одной строке, ввод — на следующей: длинный путь не съедает место",
+    "time_right": "время у правого края: …   18:15:07",
+}
+
+
+def prompt_sample(left: str, right: str) -> str:
+    """Собранное приглашение — так, как его видно в задаче (пример: папка drum, прошлая
+    команда упала с кодом 1), без кодов zsh."""
+    text = left
+    for code, shown in (("%F{red}", ""), ("%F{magenta}", ""), ("%f", ""), ("%1~", "drum"),
+                        ("%~", "~/projects/drum/src"), ("%(?..", ""), ("✗%? )", "✗1 "),
+                        ("%#", "%")):
+        text = text.replace(code, shown)
+    text = re.sub(r"%F\{\d+\}", "", text)
+    rows = text.split("\n")
+    if right:
+        rows[-1] = rows[-1] + "▌" + " " * 8 + right.replace("%*", "18:15:07")
+    else:
+        rows[-1] += "▌"
+    return "\n".join(rows)
+
+
 def prompt_lines(p: dict) -> List[str]:
-    """`./termit home prompt`: детали (✓ или цена), состояние и собранная строка."""
+    """`./termit home prompt`: что это, как выглядит сейчас, детали с примером вида — есть и
+    можно купить (владелец 21.10: «совсем непонятно, что за промпт, что за приглашение,
+    какие-то цифры, знаки»). Коды zsh — только в prompt show."""
+    from termit_app import commands, tui, ui
+    pre = "" if commands.hub_on() else "./termit home "
     have = set(prompt_parts(p))
     cash = theme.word("money")
-    out = ["Приглашение: " + ("включено" if prompt_on(p) else "выключено")]
+    out = [*ui.story_fill(PROMPT_WHAT, "", "").splitlines(), ""]
+    left, right = build_prompt(p)
+    if prompt_on(p) and (left or right):
+        out += ui.story_fill("Сейчас в задачах оно выглядит так (пример: ты в папке drum, "
+                             "прошлая команда упала):", "", "").splitlines()
+        out += ["    " + row for row in prompt_sample(left, right).split("\n")]
+    else:
+        out.append("Сейчас своё приглашение выключено: в задачах — обычное приглашение игры. "
+                   f"Включить — {pre}prompt on.")
     on_sale = {i.id for i in shop.visible(p, date.today())}
-    for pid in PROMPT_PARTS:
-        if pid in have:
-            out.append(f"  ✓ {pid:11} {shop.name(pid)}")
-        elif pid in on_sale:
-            out.append(f"  · {pid:11} {shop.name(pid)} — {shop.get(pid).price} {cash}, "
-                       f"./termit shop {pid}")
-        else:
-            out.append(f"  · {pid:11} {shop.name(pid)} — пока не продаётся")
+    owned = [pid for pid in PROMPT_PARTS if pid in have]
+    buy = [pid for pid in PROMPT_PARTS if pid not in have]
+    if owned:
+        out += ["", "Детали, которые у тебя есть:"]
+        out += [ui.story_fill(f"{pid} — {PROMPT_LOOKS[pid]}", "  ", "      ") for pid in owned]
+    if buy:
+        out += ["", "Можно купить:"]
+        for pid in buy:
+            price = (f" · {shop.get(pid).price} {cash}, купить: shop {pid}" if pid in on_sale
+                     else " · пока не продаётся")
+            out.append(ui.story_fill(f"{pid} — {PROMPT_LOOKS[pid]}{price}", "  ", "      "))
     pals = palettes(p)
     if pals:
         cur = _settings(p).get("palette")
-        out.append("  палитры: " + ", ".join(
-            (f"▸{x[4:]}" if x == cur else x[4:]) for x in pals) + "  (./termit home palette ID)")
-    left, right = build_prompt(p)
-    if left or right:
-        out += ["", "  сейчас:"]
-        out += [f"  PROMPT={zsh_quote(left)}"] if left else []
-        out += [f"  RPROMPT={zsh_quote(right)}"] if right else []
-    out += ["", "  ./termit home prompt on|off · prompt path short|full",
-            "  ./termit home prompt show — как устроено, чтобы перенести к себе"]
-    return out
+        out += ["", "Палитры (цвет пути): " + ", ".join(
+            (f"▸{x[4:]}" if x == cur else x[4:]) for x in pals) + f" — выбрать: {pre}palette ID"]
+    out += ["", "Как поменять (набирай здесь, в убежище):",
+            f"  {pre}prompt off — выключить своё приглашение",
+            f"  {pre}prompt on — включить снова",
+            f"  {pre}prompt path full — весь путь",
+            f"  {pre}prompt path short — только папка",
+            f"  {pre}prompt show — как это записано на языке zsh,",
+            "  чтобы перенести такое же приглашение в свой терминал (~/.zshrc)",
+            "  Изменения видно со следующей задачи."]
+    return [row for x in out for row in (x.split("\n") if "\n" in x else [x])]
 
 
 # --- Доска «перед глазами» (FB5, п. 8) -------------------------------------------------------
@@ -1182,43 +1230,70 @@ def open_note(card: str) -> str:
     return f"откроется после задания «{title}»"
 
 
+def board_cmd(rest: str) -> str:
+    """Команда доски так, как её набирают здесь: в убежище — «board …», снаружи — полностью."""
+    from termit_app import commands
+    return f"board {rest}" if commands.hub_on() else f"./termit home board {rest}"
+
+
+BOARD_WHERE = ("Доска — подсказки, которые висят над строкой ввода (там, где набираешь "
+               "команды) в каждой задаче. Увидеть их — зайди в задачу (run или train): "
+               "карточки будут прямо над строкой.")
+
+
 def board_view(p: dict) -> List[str]:
-    """`./termit home board`: что это, что приколото, что ещё можно и как поменять."""
+    """`./termit home board`: что это, где видно, что приколото, что можно и как поменять —
+    готовыми командами с настоящими именами карточек (владелец 21.10: «не понятно, как
+    работать с доской, как прикалывать, откреплять, где смотреть»)."""
     from termit_app import tui, ui
     if not has_board(p):
         return ["Доски пока нет — её подарят за первое решённое задание. На неё прикалывают "
                 "подсказки (скажем, клавиши терминала), и они висят строкой над приглашением "
                 "в каждой задаче."]
     cards, slots = pinned(p), board_slots(p)
-    state = "включена" if board_on(p) else "выключена — над приглашением ничего"
-    out = [f"Доска: {state} · мест {slots} из {1 + len(BOARD_SLOTS)}, "
-           f"занято {len(cards)}",
-           "Что приколото — то и висит строкой над приглашением (строка, где набираешь "
-           "команды) в каждой задаче.", ""]
-    for card in CARDS:
-        mark = "▸" if card in cards else "·"
-        if not card_open(p, card):
-            out.append(ui.story_fill(f"{mark} {card:12} {CARD_NAMES[card]} — "
-                                     f"{open_note(card)}", "  ", " " * 17))
-            continue
-        note = ""
-        if card == GAME_CARD and basics_on(p) and card not in cards:
-            note = " — висит сама, пока идут «Основы»"
-        out.append(ui.story_fill(f"{mark} {card:12} {CARD_NAMES[card]}{note}", "  ", " " * 17))
+    width = tui.width() - 4
+    state = "включена" if board_on(p) else f"выключена — над строкой ничего (вернуть: {board_cmd('on')})"
+    out = [*ui.story_fill(BOARD_WHERE, "", "").splitlines(), "",
+           f"Доска {state} · мест {slots}, занято {len(cards)}", ""]
+
+    def card_rows(card: str, note: str = "") -> List[str]:
+        rows = [f"  {card} — {CARD_NAMES[card]}{note}"]
         sample = card_text(p, card)
         if sample:
-            out.append("    " + tui.trunc(sample, tui.width() - 4))
-    out.append("")
-    waiting = [c for c in open_cards(p) if c != GAME_CARD and c not in cards]
-    if len(cards) >= slots and waiting:
+            rows.append("      " + tui.trunc(sample, width - 2))
+        return rows
+
+    out.append("Приколото сейчас:" if cards else "Приколото сейчас: ничего")
+    for card in cards:
+        out += card_rows(card)
+    waiting = [c for c in CARDS if c not in cards and card_open(p, c)]
+    if waiting:
+        out += ["", "Можно приколоть:"]
+        for card in waiting:
+            note = (" (пока идут «Основы», висит сама — прикалывать не нужно)"
+                    if card == GAME_CARD and basics_on(p) else "")
+            out += card_rows(card, note)
+    closed = [c for c in CARDS if not card_open(p, c)]
+    if closed:
+        out += ["", "Закрыто:"]
+        out += [ui.story_fill(f"{c} — {CARD_NAMES[c]}: {open_note(c)}", "  ", "    ")
+                for c in closed]
+    out += ["", "Как поменять (набирай здесь, в убежище):"]
+    target = next((c for c in waiting if c != GAME_CARD), None)
+    if cards:
+        out.append(f"  {board_cmd('unpin ' + cards[-1])} — снять «{CARD_NAMES[cards[-1]]}», "
+                   "место освободится")
+    if target:
+        out.append(f"  {board_cmd('pin ' + target)} — приколоть «{CARD_NAMES[target]}»")
+    out.append(f"  {board_cmd('off')} — спрятать всю доску · {board_cmd('on')} — вернуть")
+    if len(cards) >= slots and target:
         from datetime import date
         on_sale = "board2" in {i.id for i in shop.visible(p, date.today())}
-        more = (f"ещё место — ./termit shop board2 ({shop.get('board2').price} "
-                f"{theme.word('money')})" if on_sale else "больше мест пока нет")
-        out.append(ui.story_fill(f"Мест нет: сначала unpin, потом pin; {more}.", "  ", "  "))
-    out += ["  ./termit home board pin КАРТОЧКА — приколоть · unpin КАРТОЧКА — снять",
-            "  ./termit home board off — убрать всё · on — вернуть",
-            "  Набирай после рана, не в задаче. Клавиши целиком — ./termit keys"]
+        more = (f" Или купи ещё место: shop board2 ({shop.get('board2').price} "
+                f"{theme.word('money')})." if on_sale else "")
+        out.append(ui.story_fill("Свободных мест нет: сначала сними одну карточку (unpin), "
+                                 "потом приколи другую (pin)." + more, "  ", "  "))
+    out.append("  Изменения видно со следующей задачи. Все клавиши терминала — keys.")
     return out
 
 

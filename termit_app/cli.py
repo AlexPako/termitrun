@@ -701,7 +701,8 @@ BOARD_REPLIES = {
     "unknown": "Нет такой карточки: {card}. Есть: {cards}.",
     "closed": "Карточка {card} ещё закрыта — {note}.",
     "pinned": "Карточка {card} уже на доске.",
-    "full": "Мест на доске нет: сначала сними одну — ./termit home board unpin КАРТОЧКА.",
+    "full": ("Мест на доске нет. Сначала сними одну карточку — например, {unpin} — "
+             "потом снова {pin}."),
     "not_pinned": "Карточки {card} на доске и так нет.",
     "auto": ("Карточка game висит сама, пока идут «Основы», и уйдёт после их стража. Убрать "
              "всё сейчас — ./termit home board off."),
@@ -733,15 +734,21 @@ def home_board(p, args) -> int:
         if ok:
             _save_settings(p)
             if sub == "pin":
-                ui.ok(f"Приколото: {card} — со следующей задачи над приглашением.")
+                ui.ok(f"Приколото: {card} — увидишь в следующей задаче над строкой ввода.")
             else:
-                ui.say(f"Снято: {card}. Вернуть — ./termit home board pin {card}")
+                ui.say(f"Снято: {card}, место свободно. Вернуть — "
+                       f"{hideout.board_cmd('pin ' + card)}")
             return 0
         note = hideout.open_note(card) if card in hideout.CARDS else ""
-        ui.say(BOARD_REPLIES[code].format(card=card, cards=", ".join(hideout.CARDS),
-                                          note=note))
+        pinned = hideout.pinned(p)
+        ui.say(BOARD_REPLIES[code].format(
+            card=card, cards=", ".join(hideout.CARDS), note=note,
+            unpin=hideout.board_cmd("unpin " + (pinned[-1] if pinned else "КАРТОЧКА")),
+            pin=hideout.board_cmd("pin " + card)))
         return 2
-    ui.say("./termit home board — что на доске · pin КАРТОЧКА · unpin КАРТОЧКА · off · on")
+    ui.say(f"{hideout.board_cmd('')}— что на доске и как поменять · "
+           f"{hideout.board_cmd('pin КАРТОЧКА')} — приколоть · "
+           f"{hideout.board_cmd('unpin КАРТОЧКА')} — снять · off — спрятать · on — вернуть")
     return 2
 
 

@@ -77,12 +77,20 @@ TOPICS = {
     "redirect_report": "report-file",
     "cut_uniq": "column",
     "top_values": "hit-parade",
+    "regex_mask": "not-a-mask",
+    "regex_anchor": "line-edges",
+    "regex_class": "char-class",
+    "regex_repeat": "repeats",
+    "regex_group": "this-or-that",
+    "grep_only": "only-matches",
     "awk_sum": "cash-sum",
     "log_period": "crash-time",
     "join_parts": "join-parts",
     "stderr_split": "two-streams",
     "tee_log": "call-log",
     "sed_fix": "text-fix",
+    "sed_groups": "swap-parts",
+    "regex_clean": "dirty-export",
     "jq_field": "json-field",
     "jq_deep": "nested-json",
     "curl_api": "direct-line",
@@ -159,6 +167,7 @@ TOPICS = {
     "py_csv_json": "py-tables",
     "py_files": "py-stock",
     "py_stats": "py-summary",
+    "py_regex": "py-patterns",
     "py_urllib": "py-server",
     # Аналитика
     "pd_install": "pd-install",
@@ -173,6 +182,7 @@ TOPICS = {
     "pd_save": "pd-export",
     "pd_sql": "pd-sql",
     "rq_get": "rq-rates",
+    "pd_regex": "pd-patterns",
 }
 
 _TOPIC = re.compile(r"^[a-z][a-z0-9-]*$")
