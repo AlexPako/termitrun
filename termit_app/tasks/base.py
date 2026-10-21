@@ -120,6 +120,8 @@ class Task:
     # кэша в box/.termit/stock (reset его не трогает, setup берёт оттуда); None — без запаса
     stock: Optional[str] = None
     uses_av = False                    # учебный clamscan (.termit/bin/clamscan, termit_app/avstub)
+    uses_shellcheck = False            # учебный shellcheck (.termit/bin/shellcheck; FB14)
+    uses_crontab = False               # учебный crontab (.termit/bin/crontab, cronstub; FB14)
     # проверка смотрит журнал сервиса родителя (учебный API): без судьи задача не решается
     needs_judge = False
     start_dir = ""                     # где стартует zsh, относительно песочницы

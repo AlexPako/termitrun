@@ -2463,6 +2463,323 @@ def _net_problem(cmds) -> Optional[str]:
     return None
 
 
+# --- FB14: curl POST, заголовки, опрос задачи; постраничная выдача ------------------------------
+# Курс-карта (раздел 6, «Данные»): API спринтов 9 и 11 — POST с JSON, ключ в заголовке, task_id
+# с опросом до готовности, offset/limit до пустой страницы. Сервер — тот же учебный api.sock
+# (apiserver), обработчики собираются у родителя из state; ответы — по-английски (FB5 п. 42).
+
+ORDER_ITEMS = ("lamp", "desk", "mug", "chair", "rug", "shelf", "kettle", "clock")
+JSON_TYPE = "application/json"
+
+
+def _post_routes(state: dict) -> dict:
+    """Маршруты curl_post: /orders (POST JSON), /report (ключ в X-Api-Key), /jobs и
+    /jobs/<task_id> (опрос: первый GET — running, дальше — done)."""
+    want = state["order"]
+    seen = {"posted": False, "polls": 0}
+
+    def orders(req):
+        if req.method != "POST":
+            return 405, {"error": "use POST: curl -X POST -d '{...}'"}
+        if JSON_TYPE not in req.headers.get("content-type", ""):
+            return 400, {"error": "say it is JSON: -H 'Content-Type: application/json'"}
+        body = req.body if isinstance(req.body, dict) else {}
+        if body.get("item") != want["item"] or body.get("qty") != want["qty"]:
+            return 400, {"error": "need item and qty", "got": body}
+        return 201, {"id": state["order_id"], "item": want["item"], "qty": want["qty"]}
+
+    def report(req):
+        key = req.headers.get("x-api-key")
+        if not key:
+            return 401, {"error": "no key: add -H 'X-Api-Key: ...'"}
+        if key != state["key"]:
+            return 401, {"error": "bad key"}
+        return 200, {"report": {"day": state["day"], "revenue": state["revenue"]}}
+
+    def jobs(req):
+        if req.method != "POST":
+            return 405, {"error": "start a job with POST"}
+        seen["posted"], seen["polls"] = True, 0
+        return 201, {"task_id": state["task_id"], "status": "queued"}
+
+    def job(req):
+        if not seen["posted"]:
+            return 404, {"error": "no such job: start it with POST /jobs"}
+        seen["polls"] += 1
+        if seen["polls"] < 2:
+            return 200, {"task_id": state["task_id"], "status": "running"}
+        return 200, {"task_id": state["task_id"], "status": "done", "result": state["result"]}
+
+    return {"/": (200, {"endpoints": ["/orders", "/report", "/jobs"]}),
+            "/orders": orders, "/report": report, "/jobs": jobs,
+            f"/jobs/{state['task_id']}": job}
+
+
+class CurlPost(_DataAnswer):
+    """curl -X POST -H 'Content-Type: application/json' -d '{…}'; -H 'X-Api-Key: …'; task_id и
+    опрос до status done."""
+    id = "curl_post"
+    title = "Отправить в API"
+    par = 120
+    scroll = ("curl -H 'X-Api-Key: КЛЮЧ' АДРЕС — запрос с заголовком: -H — header, строчка "
+              "«Имя: значение»; ключ из файла — -H \"X-Api-Key: $(cat key.txt)\".\n"
+              "Отправить данные — curl -X POST -d '{}' АДРЕС: -X — request, метод; -d — data, "
+              "тело.\n"
+              "Сервер тот же: curl -s --unix-socket api.sock http://localhost/путь.")
+    variants = (
+        Variant("Отчёт /report учебного API (сокет api.sock) отдаётся только с ключом: ключ "
+                "лежит в key.txt, передают его заголовком X-Api-Key. Сдай выручку (revenue) из "
+                "отчёта: ans ЧИСЛО",
+                hints=("Без ключа сервер ответит 401. Заголовок добавляет -H 'Имя: значение'.",
+                       "-H \"X-Api-Key: $(cat key.txt)\" — двойные кавычки, чтобы $( ) "
+                       "подставил ключ; дальше | jq .report.revenue",
+                       "curl -s --unix-socket api.sock -H \"X-Api-Key: $(cat key.txt)\" "
+                       "http://localhost/report | jq .report.revenue"),
+                solution="curl -s --unix-socket api.sock -H \"X-Api-Key: $(cat key.txt)\" "
+                         "http://localhost/report | jq .report.revenue",
+                wrong=("curl -s --unix-socket api.sock http://localhost/report | jq "
+                       ".report.revenue",
+                       "curl -s --unix-socket api.sock -H 'X-Api-Key: $(cat key.txt)' "
+                       "http://localhost/report | jq .report.revenue"),
+                alternatives=("curl -s --unix-socket api.sock -H \"X-Api-Key: {key}\" "
+                              "http://localhost/report — ключ, вставленный руками",)),
+        Variant("Оформи заказ в учебном API (сокет api.sock): POST на /orders с JSON — item "
+                "{item}, qty {qty}. Сервер ответит номером заказа — сдай его: ans ЧИСЛО",
+                hints=("Отправить данные — curl -X POST, тело — -d '{{…}}', что это JSON — "
+                       "заголовок -H.",
+                       "-H 'Content-Type: application/json' -d '{{\"item\": \"{item}\", "
+                       "\"qty\": {qty}}}' — и номер заберёт | jq .id",
+                       "curl -s --unix-socket api.sock -X POST -H 'Content-Type: "
+                       "application/json' -d '{{\"item\": \"{item}\", \"qty\": {qty}}}' "
+                       "http://localhost/orders | jq .id"),
+                solution="curl -s --unix-socket api.sock -X POST -H 'Content-Type: "
+                         "application/json' -d '{{\"item\": \"{item}\", \"qty\": {qty}}}' "
+                         "http://localhost/orders | jq .id",
+                wrong=("curl -s --unix-socket api.sock -X POST -d '{{\"item\": \"{item}\", "
+                       "\"qty\": {qty}}}' http://localhost/orders | jq .id",
+                       "curl -s --unix-socket api.sock -X POST -H 'Content-Type: "
+                       "application/json' -d '{{\"item\": \"{item}\", \"qty\": \"{qty}\"}}' "
+                       "http://localhost/orders | jq .id"),
+                alternatives=("curl -s --unix-socket api.sock --json '{{\"item\": \"{item}\", "
+                              "\"qty\": {qty}}}' http://localhost/orders — --json ставит и "
+                              "метод, и заголовок",)),
+        Variant("Отчёт в учебном API (сокет api.sock) считается не сразу: POST на /jobs с "
+                "пустым JSON {{}} вернёт task_id, а GET /jobs/ЭТОТ_ID отвечает status "
+                "running, пока не готово, и done с result, когда готово. Номер удобно держать "
+                "в переменной tid. Сдай result: ans ЧИСЛО",
+                hints=("Сначала POST: curl … -X POST -d '{{}}' http://localhost/jobs — в ответе "
+                       "task_id.",
+                       "Потом спрашивай GET /jobs/ID ещё раз, пока status не станет done: "
+                       "стрелка вверх и Enter.",
+                       "tid=$(curl -s --unix-socket api.sock -X POST -d '{{}}' "
+                       "http://localhost/jobs | jq -r .task_id); curl -s --unix-socket api.sock "
+                       "http://localhost/jobs/$tid | jq .result — дважды"),
+                solution="tid=$(curl -s --unix-socket api.sock -X POST -d '{{}}' "
+                         "http://localhost/jobs | jq -r .task_id); curl -s --unix-socket api.sock "
+                         "http://localhost/jobs/$tid > /dev/null; curl -s --unix-socket api.sock "
+                         "http://localhost/jobs/$tid | jq .result",
+                wrong=("curl -s --unix-socket api.sock http://localhost/jobs | jq .result",),
+                alternatives=("for i in 1 2 3; do curl -s --unix-socket api.sock "
+                              "http://localhost/jobs/{task_id}; sleep 1; done — опрос циклом",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("GET забирает, POST отправляет: -X задаёт метод, -d — тело, а -H — заголовок, "
+               "по которому сервер понимает, что пришло (Content-Type) и кто пришёл (ключ). "
+               "Долгую работу API (вход сервиса для программ) часто отдаёт номером задачи — "
+               "его опрашивают, пока не станет "
+               "done.")
+    spell = ("curl -X POST -H 'Content-Type: application/json' -d '{…}' URL; -H 'X-Api-Key: …'; "
+             "task_id → GET до done")
+    trap_messages = {
+        "qty": "Это количество из заказа, а сдать нужно номер, который выдал сервер: | jq .id.",
+        "day": "Это дата отчёта, а нужна выручка: .report.revenue.",
+    }
+    fallback = ("Не то. Посмотри весь ответ сервера без jq — в нём видно и ошибку, и нужное "
+                "поле.")
+
+    def missing(self, root=None):
+        return CurlApi.missing(self, root)
+
+    def setup_variant(self, box, rng, variant):
+        apiserver.link(box)
+        item = rng.choice(ORDER_ITEMS)
+        qty = rng.randint(2, 9)
+        st = {"order": {"item": item, "qty": qty}, "item": item, "qty": qty,
+              "order_id": rng.randint(1000, 9999),
+              "key": "k-" + "".join(rng.choice("abcdef0123456789") for _ in range(12)),
+              "day": f"2026-10-{rng.randint(1, 28):02d}", "revenue": rng.randint(10000, 99999),
+              "task_id": f"t-{rng.randint(10000, 99999)}", "result": rng.randint(100, 999)}
+        kit.write(Path(box) / "key.txt", st["key"] + "\n")
+        # FB14, ревью: вариант 0 — самый простой (один заголовок с ключом), 1 — POST с JSON
+        if variant == 0:
+            st.update({"answer": st["revenue"], "traps": []})
+        elif variant == 2:
+            st.update({"answer": st["result"], "traps": []})
+        else:
+            st.update({"answer": st["order_id"], "traps": [["qty", qty]]})
+        return st
+
+    def service(self, box, state):
+        return apiserver.open_server(box, _post_routes(state))
+
+    def check(self, ctx):
+        net = _net_problem(ctx.cmds)
+        if ctx.answer is None:
+            return Verdict(False, net)
+        if not self.matches(ctx.answer, ctx):
+            return Verdict(False, net or self.wrong_message(ctx.answer, ctx))
+        return Verdict(True)
+
+
+PAGE_LIMITS = (4, 5, 6)
+
+
+def _pages_routes(state: dict) -> dict:
+    """/items?offset=N&limit=M — кусок списка; total — сколько всего, next_offset — откуда
+    следующий кусок (null — дальше пусто). limit больше 10 сервер не даёт."""
+    items = state["items"]
+
+    def handle(req):
+        raw_off = (req.query.get("offset") or ["0"])[0]
+        raw_lim = (req.query.get("limit") or [str(state["limit"])])[0]
+        if not (raw_off.isdigit() and raw_lim.isdigit()):
+            return 400, {"error": "offset and limit are numbers: ?offset=0&limit=5"}
+        off, lim = int(raw_off), min(int(raw_lim), 10)
+        chunk = items[off:off + lim]
+        nxt = off + lim if off + lim < len(items) else None
+        return 200, {"total": len(items), "offset": off, "next_offset": nxt, "items": chunk}
+
+    return {"/": (200, {"endpoints": ["/items?offset=0&limit=5"]}), "/items": handle}
+
+
+class CurlPages(_DataAnswer):
+    """Постраничная выдача: offset/limit циклом, склейка jq -s; total и next_offset."""
+    id = "curl_pages"
+    title = "Страница за страницей"
+    par = 120
+    scroll = ("Сервер отдаёт длинный список кусками: "
+              "?offset=0&limit=5 — пять с начала, "
+              "?offset=5&limit=5 — следующие пять. Адрес с ? и & — в кавычках.\n"
+              "Все куски циклом: for o in 0 5 10; do curl -s … \"http://localhost/items?"
+              "offset=$o&limit=5\"; done.\n"
+              "Склеить ответы — jq -s: slurp, «всё разом», сделает из них один массив.")
+    variants = (
+        Variant("Учебный API (сокет api.sock) отдаёт товары кусками: /items?offset=N&limit="
+                "{limit}, в ответе total — сколько всего. Собери все куски и сдай сумму qty по "
+                "всем товарам: ans ЧИСЛО",
+                hints=("Первый кусок — offset=0; total в ответе скажет, сколько кусков нужно.",
+                       "Цикл по offset {offsets}, ответы — в jq -s и сложить: map(.items[].qty) "
+                       "| add.",
+                       "for o in {offsets}; do curl -s --unix-socket api.sock "
+                       "\"http://localhost/items?offset=$o&limit={limit}\"; done | jq -s "
+                       "'map(.items[].qty) | add'"),
+                solution="for o in {offsets}; do curl -s --unix-socket api.sock "
+                         "\"http://localhost/items?offset=$o&limit={limit}\"; done | jq -s "
+                         "'map(.items[].qty) | add'",
+                wrong=("curl -s --unix-socket api.sock 'http://localhost/items?offset=0&limit="
+                       "{limit}' | jq '[.items[].qty] | add'",),
+                alternatives=("curl -s --unix-socket api.sock 'http://localhost/items?offset=0&"
+                              "limit=10' | jq .total — сколько всего, прежде чем считать "
+                              "куски",)),
+        Variant("Учебный API (сокет api.sock) отдаёт товары кусками по {limit}: "
+                "/items?offset=N&limit={limit}, в ответе total — сколько всего. Сохрани все "
+                "товары одним массивом в all.json и "
+                "сдай, сколько их: ans ЧИСЛО",
+                hints=("Пройди куски циклом по offset; total в первом ответе скажет, где конец.",
+                       "jq -s 'map(.items) | add' склеит куски в один массив; > all.json; jq "
+                       "length all.json.",
+                       "for o in {offsets}; do curl -s --unix-socket api.sock "
+                       "\"http://localhost/items?offset=$o&limit={limit}\"; done | jq -s "
+                       "'map(.items) | add' > all.json; jq length all.json"),
+                solution="for o in {offsets}; do curl -s --unix-socket api.sock "
+                         "\"http://localhost/items?offset=$o&limit={limit}\"; done | jq -s "
+                         "'map(.items) | add' > all.json; jq length all.json",
+                wrong=("curl -s --unix-socket api.sock 'http://localhost/items?offset=0&limit="
+                       "{limit}' | jq .items > all.json; jq length all.json",),
+                alternatives=("next_offset в ответе — откуда следующий кусок; null — дальше "
+                              "пусто",)),
+        Variant("Учебный API (сокет api.sock) отдаёт товары кусками: /items?offset=N&limit="
+                "{limit}, в ответе total — сколько всего. Сколько товаров со status sold? "
+                "Собери все куски: ans ЧИСЛО",
+                hints=("Куски — циклом по offset; без всех кусков посчитаешь только первые.",
+                       "jq -s 'map(.items[]) | map(select(.status == \"sold\")) | length'.",
+                       "for o in {offsets}; do curl -s --unix-socket api.sock "
+                       "\"http://localhost/items?offset=$o&limit={limit}\"; done | jq -s "
+                       "'map(.items[]) | map(select(.status == \"sold\")) | length'"),
+                solution="for o in {offsets}; do curl -s --unix-socket api.sock "
+                         "\"http://localhost/items?offset=$o&limit={limit}\"; done | jq -s "
+                         "'map(.items[]) | map(select(.status == \"sold\")) | length'",
+                wrong=("curl -s --unix-socket api.sock 'http://localhost/items?offset=0&limit="
+                       "{limit}' | jq '[.items[] | select(.status == \"sold\")] | length'",),
+                alternatives=("jq -s '[.[].items[] | select(.status == \"sold\")] | length' — "
+                              "та же склейка другой записью",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("Большой список сервер отдаёт кусками, чтобы не грузить всё разом: offset — с "
+               "какого места, limit — сколько. Куски собирают циклом до конца (total или пустой "
+               "next_offset), а jq -s превращает поток ответов в один массив.")
+    spell = ("for o in 0 5 10; do curl -s \"URL?offset=$o&limit=5\"; done | jq -s "
+             "'map(.items) | add'")
+    trap_messages = {
+        "first": "Это только первый кусок. Товаров больше — total в ответе; пройди все offset "
+                 "циклом.",
+    }
+    fallback = "Не то. Проверь, что собраны все куски: offset от 0 до total с шагом limit."
+
+    def missing(self, root=None):
+        return CurlApi.missing(self, root)
+
+    def setup_variant(self, box, rng, variant):
+        apiserver.link(box)
+        limit = rng.choice(PAGE_LIMITS)
+        n = rng.randint(2 * limit + 1, 3 * limit)        # ровно три куска, последний неполный
+        items = [{"id": f"P-{100 + i}", "item": rng.choice(ORDER_ITEMS),
+                  "qty": rng.randint(1, 20), "status": rng.choice(("open", "sold"))}
+                 for i in range(n)]
+        first = items[:limit]
+        offsets = " ".join(str(o) for o in range(0, n, limit))
+        st = {"items": items, "limit": limit, "offsets": offsets}
+        if variant == 1:
+            st.update({"answer": n, "file": "all.json", "want": items,
+                       "traps": [["first", limit]]})
+        elif variant == 2:
+            sold = sum(x["status"] == "sold" for x in items)
+            st.update({"answer": sold,
+                       "traps": [["first", sum(x["status"] == "sold" for x in first)]]})
+        else:
+            st.update({"answer": sum(x["qty"] for x in items),
+                       "traps": [["first", sum(x["qty"] for x in first)]]})
+        st["traps"] = [t for t in st["traps"] if t[1] != st["answer"]]
+        return st
+
+    def service(self, box, state):
+        return apiserver.open_server(box, _pages_routes(state))
+
+    def check(self, ctx):
+        st = ctx.state
+        net = _net_problem(ctx.cmds)
+        if ctx.answer is None:
+            return Verdict(False, net)
+        if not self.matches(ctx.answer, ctx):
+            return Verdict(False, net or self.wrong_message(ctx.answer, ctx))
+        if st.get("file"):
+            raw = sandbox.read_in_box(ctx.box, st["file"], READ_CAP)
+            if raw is None:
+                return Verdict(False, "Число верное. Осталось сохранить все товары в all.json "
+                                      "(> all.json) и сдать ans ещё раз.")
+            try:
+                data = json.loads(raw.decode("utf-8", errors="replace"))
+            except ValueError:
+                data = None
+            if data != st["want"]:
+                return Verdict(False, "Число верное, но в all.json не все товары одним "
+                                      "массивом: склей куски jq -s 'map(.items) | add' > "
+                                      "all.json и сдай ans ещё раз.")
+        return Verdict(True)
+
+
 # --- D19: страж ----------------------------------------------------------------------------
 
 ACCESS = "access.log"
@@ -2962,4 +3279,5 @@ class BossData(Task):
 
 TASKS = [HeadTail(), GrepCount(), PipeCount(), RedirectReport(), CutUniq(),
          TopValues(), FlagReview(), AwkSum(), LogPeriod(), JoinParts(), StderrSplit(),
-         TeeLog(), SedFix(), JqField(), JqDeep(), CurlApi(), BossData()]
+         TeeLog(), SedFix(), JqField(), JqDeep(), CurlApi(), CurlPost(), CurlPages(),
+         BossData()]

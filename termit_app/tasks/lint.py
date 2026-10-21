@@ -73,6 +73,15 @@ EXTRA_OK: Dict[str, Set[str]] = {
     "fzf_pick": {"nano"},
     # stamp — учебная программа задачи в ~/tools/bin (её и ищут по PATH), а не команда урока
     "path_which": {"stamp"},
+    # rep и mkcd — короткие имена, которые игрок заводит сам (alias, функция); eval — только в
+    # скрипте прогона: alias из source в той же строке zsh -c не видит
+    "alias_rc": {"rep", "mkcd", "eval"},
+    # графы sku и note в списках «(sku, qty)», «…, note = …» — не команды
+    "merge_into": {"sku", "qty", "note"},
+    # py_test: discount — имя функции в prices.py; py_types: from — строка Python
+    # «from typing import Optional», которую игрок вписывает в nano
+    "py_test": {"discount", "price"},
+    "py_types": {"from"},
     # datapeek — учебный пакет задачи: его консольную команду игрок сам и ставит (pip)
     "pip_offline": {"datapeek"},
 }
@@ -104,6 +113,15 @@ SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
                                      "игрок сдаёт сам"),
     "hidden_cache:2": ("look", None, "ls -la показывает файлы, сосчитать их — работа игрока"),
     "man_flag": ("skip", None, "клавиши внутри man: /слово, n, q"),
+    "columnar:1": ("look", None, "три суммы pg_column_size рядом — самую большую графу игрок "
+                                 "называет сам"),
+    "segments": ("look", None, "GROUP BY печатает узлы и число строк на каждом — наибольшее "
+                               "или наименьшее игрок выбирает сам"),
+    "alias_rc:0": ("skip", None, "alias, заведённый source в той же строке, zsh -c прогона не "
+                                 "видит (разбирает строку целиком заранее); у игрока команды "
+                                 "идут по одной — скрипт прогона зовёт rep через eval"),
+    "alias_rc:1": ("skip", None, "alias, заведённый source в той же строке, zsh -c прогона не "
+                                 "видит; скрипт прогона зовёт rep через eval"),
     "flag_review:2": ("read", None, "grep -n -m 1 печатает строку с номером, номер игрок "
                                  "сдаёт сам"),
     "flag_use": ("read", None, "grep -c и ls -r печатают ответ, игрок сдаёт его сам"),

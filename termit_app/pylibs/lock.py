@@ -1,4 +1,5 @@
-"""Пины склада колёс сторонних пакетов (часть 10, A3): pandas и requests с зависимостями.
+"""Пины склада колёс сторонних пакетов (часть 10, A3): pandas и requests с зависимостями;
+FB14 — линтеры и тесты трека «Python» (flake8, pep8-naming, flake8-isort, pytest, mypy).
 
 Только колёса (--only-binary=:all:): sdist не собирается, ничей setup.py не исполняется. Для
 пакетов с машинным кодом (pandas, numpy) — два файла: cp39 под macOS arm64 и x86_64; чистый
@@ -62,6 +63,75 @@ LOCK: Dict[str, Tuple[Tuple[str, str], ...]] = {
     "six==1.17.0": (
         ("six-1.17.0-py2.py3-none-any.whl",
          "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274"),
+    ),
+    # FB14 (FB5 п. 35, 37): линтеры и тесты трека «Python» — flake8 с pep8-naming и
+    # flake8-isort, pytest, mypy (у mypy — собранные колёса cp39, его чистое колесо не берём:
+    # ровно один файл на архитектуру). sha256 — из метаданных PyPI, как у остальных
+    "flake8==7.1.2": (
+        ("flake8-7.1.2-py2.py3-none-any.whl",
+         "1cbc62e65536f65e6d754dfe6f1bada7f5cf392d6f5db3c2b85892466c3e7c1a"),
+    ),
+    "pycodestyle==2.12.1": (
+        ("pycodestyle-2.12.1-py2.py3-none-any.whl",
+         "46f0fb92069a7c28ab7bb558f05bfc0110dac69a0cd23c61ea0040283a9d78b3"),
+    ),
+    "pyflakes==3.2.0": (
+        ("pyflakes-3.2.0-py2.py3-none-any.whl",
+         "84b5be138a2dfbb40689ca07e2152deb896a65c3a3e24c251c5c62489568074a"),
+    ),
+    "mccabe==0.7.0": (
+        ("mccabe-0.7.0-py2.py3-none-any.whl",
+         "6c2d30ab6be0e4a46919781807b4f0d834ebdd6c6e3dca0bda5a15f863427b6e"),
+    ),
+    "pep8-naming==0.14.1": (
+        ("pep8_naming-0.14.1-py3-none-any.whl",
+         "63f514fc777d715f935faf185dedd679ab99526a7f2f503abb61587877f7b1c5"),
+    ),
+    "flake8-isort==6.1.1": (
+        ("flake8_isort-6.1.1-py3-none-any.whl",
+         "0fec4dc3a15aefbdbe4012e51d5531a2eb5fa8b981cdfbc882296a59b54ede12"),
+    ),
+    "isort==5.13.2": (
+        ("isort-5.13.2-py3-none-any.whl",
+         "8ca5e72a8d85860d5a3fa69b8745237f2939afe12dbf656afbcb47fe72d947a6"),
+    ),
+    "pytest==8.3.5": (
+        ("pytest-8.3.5-py3-none-any.whl",
+         "c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820"),
+    ),
+    "iniconfig==2.0.0": (
+        ("iniconfig-2.0.0-py3-none-any.whl",
+         "b6a85871a79d2e3b22d2d1b94ac2824226a63c6b741c88f7ae975f18b6778374"),
+    ),
+    "packaging==24.2": (
+        ("packaging-24.2-py3-none-any.whl",
+         "09abb1bccd265c01f4a3aa3f7a7db064b36514d2cba19a2f694fe6150451a759"),
+    ),
+    "pluggy==1.5.0": (
+        ("pluggy-1.5.0-py3-none-any.whl",
+         "44e1ad92c8ca002de6377e165f3e0f1be63266ab4d554740532335b9d75ea669"),
+    ),
+    "exceptiongroup==1.2.2": (
+        ("exceptiongroup-1.2.2-py3-none-any.whl",
+         "3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b"),
+    ),
+    "tomli==2.2.1": (
+        ("tomli-2.2.1-py3-none-any.whl",
+         "cb55c73c5f4408779d0cf3eef9f762b9c9f147a77de7b258bef0a5628adc85cc"),
+    ),
+    "mypy==1.14.1": (
+        ("mypy-1.14.1-cp39-cp39-macosx_10_9_x86_64.whl",
+         "3888a1816d69f7ab92092f785a462944b3ca16d7c470d564165fe703b0970c35"),
+        ("mypy-1.14.1-cp39-cp39-macosx_11_0_arm64.whl",
+         "46c756a444117c43ee984bd055db99e498bc613a70bbbc120272bd13ca579fbc"),
+    ),
+    "typing_extensions==4.12.2": (
+        ("typing_extensions-4.12.2-py3-none-any.whl",
+         "04e5ca0351e0f3f85c6853954072df659d0d13fac324d0072316b67d7794700d"),
+    ),
+    "mypy_extensions==1.0.0": (
+        ("mypy_extensions-1.0.0-py3-none-any.whl",
+         "4392f6c0eb8a5668a69e23d168ffa70f0be9ccfd32b5cc2d26a34ae5b844552d"),
     ),
 }
 

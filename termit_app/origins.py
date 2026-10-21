@@ -172,6 +172,9 @@ COMMANDS: Dict[str, Origin] = {
     "export": Origin("наружу",
                      "«экспорт»: переменная уходит наружу — детям, программам, что ты "
                      "запустишь отсюда."),
+    "alias": Origin("псевдоним",
+                    "«alias» — «псевдоним», другое имя: так по-английски говорят про "
+                    "кличку или сценическое имя."),
     "set": Origin("set", "«set» — «задать»: настройки самой оболочки."),
     "source": Origin("источник",
                      "«источник»: прочитать файл и выполнить его строки здесь, в этой же "
@@ -181,11 +184,29 @@ COMMANDS: Dict[str, Origin] = {
                       "Пайтона»."),
     "venv": Origin("virtual environment", "«virtual environment» — «виртуальное окружение»."),
     "deactivate": Origin("deactivate", "«deactivate» — «выключить» окружение."),
+    "flake8": Origin("pyflakes",
+                     "от pyflakes («хлопья» — мелкие соринки в коде) и PEP 8, свода правил "
+                     "оформления Python: две проверки в одной."),
+    "isort": Origin("import sort", "«import sort» — «сортировка импортов»."),
+    "pytest": Origin("py test", "«py test» — «тесты для Python»; начинался в 2004-м как часть "
+                     "проекта PyPy."),
+    "mypy": Origin("Лехтосало",
+                   "проверку типов для Python начал писать Юкка Лехтосало в 2012 году, ещё в "
+                   "аспирантуре."),
     "pip": Origin("pip installs packages",
                   "«pip installs packages» — «pip ставит пакеты»: имя расшифровывается само "
                   "через себя, любимая шутка программистов."),
     "clamscan": Origin("Clam AntiVirus",
                        "проверка антивирусом ClamAV — «Clam AntiVirus», свободным антивирусом."),
+    "exit": Origin("выход", "«exit» — «выход»: закончить скрипт (или закрыть оболочку) "
+                            "прямо здесь."),
+    "crontab": Origin("cron table",
+                      "«cron table» — «таблица cron», а само слово cron — от греческого "
+                      "chronos, «время». "
+                      "Служба живёт в Unix с 1970-х."),
+    "shellcheck": Origin("shell check",
+                         "«shell check» — «проверка шелла»: читает скрипт и ищет грабли. "
+                         "Видар Холен начал его в 2012-м."),
     "shasum": Origin("Secure Hash Algorithm",
                      "сумма по SHA — «Secure Hash Algorithm», «надёжный алгоритм хэша»."),
     # «Аналитика»
@@ -291,13 +312,19 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Окружение», Python
     "env_vars": ("env", "printenv"),
     "export_child": ("export",),
+    "alias_rc": ("alias",),
     "perm_basics": ("whoami", "groups", "sudo"),
     "dotenv": ("set", "source"),
     "shebang_run": ("python3",),
     "script_audit": ("shasum",),
+    "shell_lint": ("shellcheck",),
+    "cron_line": ("crontab",),
     "av_scan": ("clamscan",),
     "venv_basics": ("venv", "deactivate"),
     "pip_offline": ("pip",),
+    "py_lint": ("flake8",),
+    "py_test": ("pytest",),
+    "py_types": ("mypy",),
     "py_repl": ("Ctrl+D",),
     "pd_install": ("pandas",),
 }

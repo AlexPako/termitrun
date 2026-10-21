@@ -65,6 +65,20 @@ AV_STUB = """#!/bin/sh
 """
 
 
+SHELLCHECK_STUB = """#!/bin/sh
+# Учебный shellcheck тренажёра (FB14): знает несколько проверок, ничего не исполняет и не
+# качает (termit_app/shellstub.py). Есть только у задач с uses_shellcheck.
+{run}
+"""
+
+
+CRONTAB_STUB = """#!/bin/sh
+# Учебный crontab тренажёра (FB14): расписание — в .termit/crontab песочницы, настоящий
+# crontab владельца не трогает (termit_app/cronstub.py). Есть только у задач с uses_crontab.
+{run}
+"""
+
+
 def _stubs() -> dict:
     """Обёртки в .termit/bin — она в PATH песочницы впереди системных."""
     from termit_app import implants
@@ -302,6 +316,13 @@ def create(task, seed: int, root=None, defer_spawn: bool = True,
     if getattr(task, "uses_av", False):
         write_box_file(box, ".termit/bin/clamscan",
                        AV_STUB.format(run=paths.py_line("termit_app.avstub")), mode=0o755)
+    if getattr(task, "uses_crontab", False):
+        write_box_file(box, ".termit/bin/crontab",
+                       CRONTAB_STUB.format(run=paths.py_line("termit_app.cronstub")), mode=0o755)
+    if getattr(task, "uses_shellcheck", False):
+        write_box_file(box, ".termit/bin/shellcheck",
+                       SHELLCHECK_STUB.format(run=paths.py_line("termit_app.shellstub")),
+                       mode=0o755)
     if getattr(task, "stock", None):       # запас готовых venv/колёс (A4) — до setup задачи
         from termit_app import pyenvs
         pyenvs.stock_into(box, task.stock)

@@ -1860,6 +1860,8 @@ class BossPy(Task):
         return Verdict(False)
 
 
-TASKS = [PyRun(), PyVars(), PyLoop(), PyDict(), PyFunc(), PyRepl(), PyJson(),
-         PyCsvJson(), PyFiles(), PyStats(), PyUrllib(),
-         BossPy()]
+# FB14: линтеры и тесты (termit_app/tasks/pycheck.py) — сразу после своих функций (py_func)
+from termit_app.tasks import pycheck  # noqa: E402
+
+TASKS = [PyRun(), PyVars(), PyLoop(), PyDict(), PyFunc()] + pycheck.TASKS + [
+    PyRepl(), PyJson(), PyCsvJson(), PyFiles(), PyStats(), PyUrllib(), BossPy()]

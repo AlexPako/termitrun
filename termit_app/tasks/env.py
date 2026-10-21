@@ -16,7 +16,7 @@ import shlex
 import shutil
 import stat
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from termit_app import textnorm
 from termit_app.tasks import envkit, kit
@@ -318,6 +318,186 @@ class ExportChild(Task):
             return Verdict(False, self.MSG_SEEN.format(fields=" ".join(fields),
                                                        why="; ".join(why)))
         return Verdict(False, self.MSG_OTHER.format(**st))
+
+
+# --- FB14: alias и свой ~/.zshrc ------------------------------------------------------------
+# Курс-карта (раздел 6, «Окружение»): короткое имя для длинной команды — alias в ~/.zshrc
+# песочницы, source ~/.zshrc — перечитать; вариант C — функция mkcd (alias не умеет
+# аргументы в середине). Проверка — по результату: отчёт пишет учебный скрипт, и журнал
+# показывает, что его звали коротким именем, а не полным путём.
+
+REPORT_SH = """#!/bin/sh
+# Daily report: writes the chosen mode (first word) into report.txt.
+echo "report ${{1:-none}}" > {out}
+echo "daily_report: done, see report.txt"
+"""
+REPORT_MODES = ("short", "full", "night", "brief", "weekly", "sales")
+ALIAS_NAME = "rep"
+ALIAS_RC_HEAD = "# my settings\nexport EDITOR=nano\n"
+MKCD_DIRS = ("reports/2026-10", "photos/trip", "notes/work", "backup/old", "music/live")
+_ALIAS_LINE = re.compile(r"^\s*alias\s+(?:--\s+)?([A-Za-z_][\w-]*)=(.+)$")
+_ALIAS_SPACED = re.compile(r"^\s*alias\s+[A-Za-z_][\w-]*\s+=|^\s*alias\s+[A-Za-z_][\w-]*=\s")
+_FUNC_LINE = re.compile(r"^\s*(?:function\s+mkcd\b|mkcd\s*\(\s*\))")
+
+
+def _alias_rc(mode: str) -> str:
+    """Строка alias для варианта A и B: короткое имя → скрипт с ключом режима."""
+    return f"alias {ALIAS_NAME}='~/tools/daily_report.sh {mode}'"
+
+
+class AliasRc(Task):
+    """alias ИМЯ='команда' в ~/.zshrc песочницы, source ~/.zshrc, функция mkcd."""
+    id = "alias_rc"
+    track = "env"
+    title = "Короткое имя"
+    par = 75
+    scroll = ("alias ls='ls -a' — короткое имя для команды: без пробелов у =, команда — в "
+              "одинарных кавычках.\n"
+              "Насовсем — той же строкой в ~/.zshrc: echo \"alias …\" >> ~/.zshrc. "
+              "source ~/.zshrc — перечитать файл в этом окне.")
+    variants = (
+        Variant("Каждый день ты набираешь ~/tools/daily_report.sh {mode}. Заведи короткое имя "
+                "rep: строкой alias в ~/.zshrc, перечитай файл и запусти rep — он напишет "
+                "report.txt.",
+                hints=("alias rep='команда' — короткое имя; насовсем — эта строка в ~/.zshrc.",
+                       "Допиши строку через >> (echo \"alias rep='…'\" >> ~/.zshrc), потом "
+                       "source ~/.zshrc и rep.",
+                       "echo \"alias rep='~/tools/daily_report.sh {mode}'\" >> ~/.zshrc; "
+                       "source ~/.zshrc; rep"),
+                solution="echo \"alias rep='~/tools/daily_report.sh {mode}'\" >> ~/.zshrc; "
+                         "source ~/.zshrc; rep",
+                solution_script="echo \"alias rep='~/tools/daily_report.sh {mode}'\" >> "
+                                "~/.zshrc; source ~/.zshrc; eval rep",
+                wrong=("~/tools/daily_report.sh {mode}",
+                       "alias rep='~/tools/daily_report.sh {mode}'; eval rep"),
+                alternatives=("nano ~/.zshrc — дописать строку alias руками, потом source "
+                              "~/.zshrc",)),
+        Variant("В ~/.zshrc уже есть короткое имя rep для отчёта, но source ~/.zshrc ругается "
+                "bad assignment, и rep не работает. Почини строку, перечитай файл и запусти "
+                "rep — он напишет report.txt.",
+                hints=("source ~/.zshrc покажет ошибку и номер строки.",
+                       "bad assignment — пробелы вокруг =. В alias имя, = и кавычка идут "
+                       "вплотную: rep='…'. Убрать пробелы — sed.",
+                       "sed -i '' 's/rep = /rep=/' ~/.zshrc; source ~/.zshrc; rep"),
+                solution="sed -i '' 's/rep = /rep=/' ~/.zshrc; source ~/.zshrc; rep",
+                solution_script="sed -i '' 's/rep = /rep=/' ~/.zshrc; source ~/.zshrc; eval rep",
+                wrong=("~/tools/daily_report.sh {mode}",
+                       "alias rep='~/tools/daily_report.sh {mode}'; eval rep"),
+                alternatives=("nano ~/.zshrc — убрать пробелы вокруг = руками (Ctrl+O, "
+                              "Enter, Ctrl+X), потом source ~/.zshrc",)),
+        Variant("Заведи в ~/.zshrc функцию mkcd (короткое имя, которое принимает слова): "
+                "mkcd ПАПКА создаёт папку со всеми родителями и сразу в неё заходит. "
+                "Перечитай файл и сделай mkcd {target}.",
+                hints=("alias не умеет вставлять слово в середину команды, функция (имя со "
+                       "словами) умеет: $1 — первое слово после её имени.",
+                       "Строка функции (имени со словами): mkcd() {{ mkdir -p \"$1\" && cd "
+                       "\"$1\"; }} — допиши её в ~/.zshrc через >>, потом source ~/.zshrc.",
+                       "echo 'mkcd() {{ mkdir -p \"$1\" && cd \"$1\"; }}' >> ~/.zshrc; source "
+                       "~/.zshrc; mkcd {target}"),
+                solution="echo 'mkcd() {{ mkdir -p \"$1\" && cd \"$1\"; }}' >> ~/.zshrc; "
+                         "source ~/.zshrc; mkcd {target}",
+                wrong=("mkdir -p {target}; cd {target}",
+                       "mkcd() {{ mkdir -p \"$1\" && cd \"$1\"; }}; mkcd {target}"),
+                alternatives=("nano ~/.zshrc — вписать функцию (имя со словами) руками; "
+                              "function mkcd {{ … }} — та же функция другой записью",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("alias — короткое имя для длинной команды, функция — короткое имя, которое "
+               "принимает слова ($1). Набранное в окне живёт до его закрытия; строка в "
+               "~/.zshrc — в каждом новом окне, а source ~/.zshrc перечитывает файл сразу.")
+    spell = "alias ИМЯ='команда' — короткое имя; в ~/.zshrc — насовсем; source ~/.zshrc"
+    RC = ".termit/home/.zshrc"
+    OUT = "report.txt"
+    MSG_NO_REPORT = "report.txt нет: его пишет отчёт, когда ты запускаешь rep."
+    MSG_OTHER = "В report.txt «{got}», а нужен отчёт со словом {mode}: проверь команду в alias."
+    MSG_FULL = ("Отчёт есть, но ты звал его полным путём. Нужно коротким именем — просто rep.")
+    MSG_RC = ("rep работает только в этом окне: строки alias нет в ~/.zshrc. Допиши её туда — "
+              "тогда имя будет в каждом новом окне.")
+    MSG_SPACED = ("В строке alias пробел вокруг = — zsh скажет bad assignment и имя не заведёт. "
+                  "Пиши вплотную: alias rep='…'.")
+    MSG_CLOBBER = ("> переписал ~/.zshrc целиком — прежние строки пропали. Дописывают >>. "
+                   "reset вернёт файл.")
+    MSG_NO_DIR = "Папки {target} нет: mkcd должна создать её (mkdir -p) и зайти в неё."
+    MSG_NO_FUNC = ("Функции mkcd нет в ~/.zshrc: набранная в окне живёт до его закрытия. "
+                   "Допиши её строкой в ~/.zshrc и перечитай: source ~/.zshrc.")
+    MSG_NO_CALL = "Папка есть, но mkcd ты не звал. Набери mkcd {target}."
+    MSG_NOT_IN = ("Папка есть, но ты не в ней: функция должна и создать папку, и зайти — "
+                  "mkdir -p \"$1\" && cd \"$1\".")
+
+    def _v(self, state: dict) -> int:
+        return variant_index(state.get("_variant", 0), len(self.variants))
+
+    def setup_variant(self, box: Path, rng, variant: int) -> dict:
+        mode = rng.choice(REPORT_MODES)
+        target = rng.choice(MKCD_DIRS)
+        out = shlex.quote(str(Path(box) / self.OUT))
+        os.chmod(kit.write(kit.home(box) / "tools" / "daily_report.sh",
+                           REPORT_SH.format(out=out)), 0o755)
+        rc = ALIAS_RC_HEAD
+        if variant == 1:
+            rc += _alias_rc(mode).replace("rep=", "rep = ", 1) + "\n"
+        kit.write(Path(box) / self.RC, rc)
+        return {"mode": mode, "target": target}
+
+    @staticmethod
+    def _called(lines, name: str) -> bool:
+        """Звали ли name коротким именем (или через eval name — прогон эталона)."""
+        for _, cmd, args in envkit.commands(lines):
+            if cmd == name or (cmd == "eval" and args[:1] == [name]):
+                return True
+        return False
+
+    def _rc_lines(self, rc: Optional[str]):
+        return [x for x in (rc or "").splitlines() if not x.lstrip().startswith("#")]
+
+    def _check_alias(self, ctx, rc: Optional[str], lines) -> Verdict:
+        st = ctx.state
+        kind, text = envkit.box_text(ctx.box, self.OUT, envkit.TEXT_CAP)
+        bad = envkit.file_problem(kind, self.OUT)
+        if bad:
+            return Verdict(False, bad)
+        rc_lines = self._rc_lines(rc)
+        spaced = any(_ALIAS_SPACED.match(x) for x in rc_lines)
+        if kind == "missing":
+            return Verdict(False, self.MSG_SPACED if spaced and lines else
+                           (self.MSG_NO_REPORT if lines else None))
+        got = envkit.first_line(text)
+        if got != f"report {st['mode']}":
+            return Verdict(False, self.MSG_OTHER.format(got=got, mode=st["mode"]))
+        if not self._called(lines, ALIAS_NAME):
+            return Verdict(False, self.MSG_FULL)
+        if spaced:
+            return Verdict(False, self.MSG_SPACED)
+        if not any((m := _ALIAS_LINE.match(x)) and m.group(1) == ALIAS_NAME
+                   and "daily_report" in m.group(2) for x in rc_lines):
+            return Verdict(False, self.MSG_RC)
+        return Verdict(True)
+
+    def _check_func(self, ctx, rc: Optional[str], lines) -> Verdict:
+        target = ctx.state["target"]
+        p = Path(ctx.box) / target
+        if not p.is_dir() or p.is_symlink():
+            return Verdict(False, self.MSG_NO_DIR.format(target=target) if lines else None)
+        if not any(_FUNC_LINE.match(x) for x in self._rc_lines(rc)):
+            return Verdict(False, self.MSG_NO_FUNC)
+        if not self._called(lines, "mkcd"):
+            return Verdict(False, self.MSG_NO_CALL.format(target=target))
+        if ctx.pwd is not None and Path(ctx.pwd).resolve() != p.resolve():
+            return Verdict(False, self.MSG_NOT_IN)
+        return Verdict(True)
+
+    def check(self, ctx) -> Verdict:
+        kind, rc = envkit.box_text(ctx.box, self.RC, envkit.TEXT_CAP)
+        bad = envkit.file_problem(kind, "~/.zshrc")
+        if bad:
+            return Verdict(False, bad)
+        lines = [c.line for c in ctx.cmds]
+        if "EDITOR=nano" not in (rc or ""):
+            return Verdict(False, self.MSG_CLOBBER)
+        if self._v(ctx.state) == 2:
+            return self._check_func(ctx, rc, lines)
+        return self._check_alias(ctx, rc, lines)
 
 
 # --- FB9b: права — понятия ------------------------------------------------------------------
@@ -1479,6 +1659,141 @@ class ExitCodes(AnswerTask):
         return Verdict(False)
 
 
+# --- FB14: cron — строка расписания ----------------------------------------------------------
+# Курс-карта (раздел 6, «Окружение»): строка «минута час день месяц день_недели команда»,
+# полный путь (у cron короткий PATH). Настоящий crontab владельца не трогаем: в песочнице —
+# учебный (termit_app/cronstub.py, uses_crontab), расписание — в .termit/crontab.
+
+CRON_SCRIPTS = ("backup", "report", "cleanup", "sync")
+CRON_SH = """#!/bin/sh
+# {name}: a job for the schedule. Prints the time it ran.
+date
+"""
+CRON_STEPS = (5, 10, 15, 20, 30)
+_FULL_PATH = re.compile(r"^(?:/|~/|\$HOME/|\$\{HOME\}/)")
+
+
+class CronLine(Task):
+    """crontab ФАЙЛ, crontab -l: строка из пяти полей и команды; */n, a-b; полный путь."""
+    id = "cron_line"
+    track = "env"
+    title = "По расписанию"
+    par = 90
+    uses_crontab = True
+    scroll = ("Строка расписания cron: минута час день_месяца месяц день_недели команда — "
+              "15 3 * * * $HOME/bin/backup.sh: каждый день в 03:15. * — «любое».\n"
+              "crontab my.cron — поставить расписание из файла, crontab -l — list, показать "
+              "его.\n"
+              "PATH по расписанию короткий: команду пиши полным путём.")
+    variants = (
+        Variant("Скрипт ~/bin/{name}.sh должен запускаться каждый день в {hh:02d}:{mm:02d}. "
+                "Напиши строку расписания в my.cron и поставь её: crontab my.cron.",
+                hints=("Пять полей и команда: минута, час, день месяца, месяц, день недели; * — "
+                       "любое.",
+                       "Минута {mm}, час {hh}, остальные три — *. Команда — полным путём: "
+                       "$HOME/bin/{name}.sh.",
+                       "echo '{mm} {hh} * * * $HOME/bin/{name}.sh' > my.cron; crontab my.cron; "
+                       "crontab -l"),
+                solution="echo '{mm} {hh} * * * $HOME/bin/{name}.sh' > my.cron; crontab "
+                         "my.cron; crontab -l",
+                wrong=("echo '{hh} {mm} * * * $HOME/bin/{name}.sh' > my.cron; crontab my.cron",
+                       "echo '{mm} {hh} * * * $HOME/bin/{name}.sh' > my.cron"),
+                alternatives=("echo '{mm} {hh} * * * $HOME/bin/{name}.sh' | crontab - — та же "
+                              "строка без файла: - значит «со входа»",)),
+        Variant("Скрипт ~/bin/{name}.sh нужен по будням (понедельник–пятница) в {hh:02d}:00. "
+                "Напиши строку в my.cron и поставь её: crontab my.cron.",
+                hints=("День недели — пятое поле: 1 — понедельник, 5 — пятница, 0 и 7 — "
+                       "воскресенье.",
+                       "Диапазон пишут через дефис: 1-5. Минута 0, час {hh}.",
+                       "echo '0 {hh} * * 1-5 $HOME/bin/{name}.sh' > my.cron; crontab my.cron; "
+                       "crontab -l"),
+                solution="echo '0 {hh} * * 1-5 $HOME/bin/{name}.sh' > my.cron; crontab "
+                         "my.cron; crontab -l",
+                wrong=("echo '0 {hh} 1-5 * * $HOME/bin/{name}.sh' > my.cron; crontab my.cron",
+                       "echo '0 {hh} * * * $HOME/bin/{name}.sh' > my.cron; crontab my.cron"),
+                alternatives=("echo '0 {hh} * * mon-fri $HOME/bin/{name}.sh' — дни можно и "
+                              "именами",)),
+        Variant("Скрипт ~/bin/{name}.sh должен запускаться каждые {step} минут, круглые сутки. "
+                "Напиши строку в my.cron и поставь её: crontab my.cron.",
+                hints=("«Каждые N» пишут через косую: */N — «каждое N-е значение».",
+                       "Минуты — */{step}, остальные четыре поля — *.",
+                       "echo '*/{step} * * * * $HOME/bin/{name}.sh' > my.cron; crontab my.cron; "
+                       "crontab -l"),
+                solution="echo '*/{step} * * * * $HOME/bin/{name}.sh' > my.cron; crontab "
+                         "my.cron; crontab -l",
+                wrong=("echo '{step} * * * * $HOME/bin/{name}.sh' > my.cron; crontab my.cron",
+                       "echo '*/{step} * * * * {name}.sh' > my.cron; crontab my.cron"),
+                alternatives=("перечислить минуты через запятую (0,15,30,45) — то же, но "
+                              "длиннее",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("cron — служба, которая запускает команды по часам. Строка: минута, час, день "
+               "месяца, месяц, день недели, команда; * — «любое», a-b — диапазон, */n — "
+               "«каждое n-е». Команду пишут полным путём: у cron свой короткий PATH, и "
+               "«руками работает, по расписанию — нет» — чаще всего про это.")
+    spell = "M H * * * /полный/путь — по расписанию; crontab файл — поставить; crontab -l"
+    STORE = ".termit/crontab"
+    MSG_NOT_INSTALLED = ("Строка есть в my.cron, но расписание не поставлено: crontab my.cron "
+                         "(потом crontab -l — проверить).")
+    MSG_NO_LINE = ("В расписании нет строки со скриптом {name}.sh. Проверь: crontab -l.")
+    MSG_PATH = ("Команда без полного пути: у cron короткий PATH (/usr/bin:/bin), {cmd} он не "
+                "найдёт. Пиши $HOME/bin/{name}.sh.")
+    MSG_WHEN = "Строка стоит, но время не то: {why}. Поправь my.cron и снова crontab my.cron."
+    FIELD_NAMES = ("минута", "час", "день месяца", "месяц", "день недели")
+
+    def _v(self, state: dict) -> int:
+        return variant_index(state.get("_variant", 0), len(self.variants))
+
+    def setup_variant(self, box: Path, rng, variant: int) -> dict:
+        name = rng.choice(CRON_SCRIPTS)
+        os.chmod(kit.write(kit.home(box) / "bin" / f"{name}.sh", CRON_SH.format(name=name)),
+                 0o755)
+        return {"name": name, "hh": rng.randint(1, 22), "mm": rng.randint(1, 59),
+                "step": rng.choice(CRON_STEPS)}
+
+    def want(self, state: dict) -> List[set]:
+        from termit_app import cronstub
+        v = self._v(state)
+        allv = [cronstub.field_set("*", lo, hi, names) for _, lo, hi, names in cronstub.FIELDS]
+        if v == 0:
+            return [{state["mm"]}, {state["hh"]}] + allv[2:]
+        if v == 1:
+            return [{0}, {state["hh"]}, allv[2], allv[3], {1, 2, 3, 4, 5}]
+        return [set(range(0, 60, state["step"]))] + allv[1:]
+
+    def _lines(self, text: Optional[str], name: str):
+        from termit_app import cronstub
+        out = []
+        for line in (text or "").split("\n"):
+            sets, cmd, err = cronstub.parse_line(line)
+            if sets and f"{name}.sh" in (cmd or ""):
+                out.append((sets, cmd.strip()))
+        return out
+
+    def check(self, ctx) -> Verdict:
+        st = ctx.state
+        name = st["name"]
+        kind, text = envkit.box_text(ctx.box, self.STORE, envkit.TEXT_CAP)
+        mine = self._lines(text, name)
+        if not mine:
+            _, draft = envkit.box_text(ctx.box, "my.cron", envkit.TEXT_CAP)
+            if self._lines(draft, name):
+                return Verdict(False, self.MSG_NOT_INSTALLED)
+            if kind == "ok":
+                return Verdict(False, self.MSG_NO_LINE.format(name=name))
+            return Verdict(False)
+        sets, cmd = mine[-1]
+        word = cmd.split()[0]
+        if not _FULL_PATH.match(word) or not word.endswith(f"/bin/{name}.sh"):
+            return Verdict(False, self.MSG_PATH.format(cmd=word, name=name))
+        want = self.want(st)
+        for got, exp, field in zip(sets, want, self.FIELD_NAMES):
+            if got != exp:
+                return Verdict(False, self.MSG_WHEN.format(why=f"поле «{field}» не то"))
+        return Verdict(True)
+
+
 # --- E11 ------------------------------------------------------------------------------------
 
 # путь правки варианта: им jq и присваивает (ревью P3, M2 — путь целиком, а не слово ключа)
@@ -1870,6 +2185,242 @@ class ScriptAudit(AnswerTask):
         if not verdict.solved and ctx.answer is None and ran_dirty(ctx.box):
             return Verdict(False, MSG_RAN)
         return verdict
+
+
+# --- FB14: shellcheck — линтер скриптов -----------------------------------------------------
+# Курс-карта (разделы 3 и 6): после script_audit («прочти, потом запускай») — «дай прочитать
+# машине»: shellcheck → код SCxxxx → правка → тишина. shellcheck здесь учебный
+# (termit_app/shellstub.py, uses_shellcheck), настоящий ставится brew install shellcheck.
+# Вариант C — zsh-скрипт: shellcheck его не понимает (SC1071), синтаксис проверяет zsh -n.
+# Решено — по результату (копия, чистка, отчёт) плюс разбор скрипта тем же анализатором, что
+# у заглушки; родитель скрипт не исполняет.
+
+LINT_BACKUP_SH = """#!/bin/sh
+# Copies one file into backup/ and says what it copied.
+src=$1
+mkdir -p backup
+cp $src backup/
+echo "copied: $src"
+"""
+CLEANUP_SH = """#!/bin/sh
+# Removes temporary files from the folder given as the first word.
+cd "$1"
+rm -f ./*.tmp
+echo "cleaned: $1"
+"""
+STATS_ZSH = """#!/bin/zsh
+# Counts csv files in data/ and writes the number into count.txt.
+cd "${0:a:h}" || exit 1
+files=(data/*.csv(N))
+if (( ${#files} > 0 )); then
+  print -r -- "csv files: ${#files}" > count.txt
+else
+  print -r -- "csv files: 0" > count.txt
+"""
+SPACED_NAMES = ("march report.txt", "client list.txt", "old notes.txt", "tax form.txt",
+                "trip plan.txt", "price list.txt")
+CACHE_DIRS = ("cache", "tmp_files", "build_cache", "scratch")
+KEEP_TMP = ("draft.tmp", "letter.tmp", "budget.tmp")
+_FIX_CP = "sed -i '' 's/cp \\$src/cp \"$src\"/' backup.sh"
+_FIX_CD = "sed -i '' 's/^cd \"\\$1\"$/cd \"$1\" || exit/' cleanup.sh"
+
+
+class ShellLint(Task):
+    """shellcheck скрипт.sh → SC-код → правка → тишина; zsh -n для zsh-скриптов."""
+    id = "shell_lint"
+    track = "env"
+    title = "Скрипт на проверке"
+    par = 90
+    uses_shellcheck = True
+    scroll = ("shellcheck скрипт.sh — проверка скрипта sh/bash без запуска: под строкой — ^ и "
+              "код правила, например SC2086 — $имя без кавычек.\n"
+              "Исправил — запусти снова: тишина — замечаний нет.\n"
+              "Здесь shellcheck учебный; настоящий ставится brew install shellcheck.")
+    variants = (
+        Variant("./backup.sh '{name}' должен положить копию файла в backup/, а падает. "
+                "Прогони shellcheck backup.sh, исправь то, на что он покажет, добейся тишины и "
+                "сделай копию этим скриптом.",
+                hints=("shellcheck backup.sh — под строкой с ошибкой будет ^ и код SC.",
+                       "SC2086 — $src без двойных кавычек: имя с пробелом разваливается на два "
+                       "слова. Нужно \"$src\".",
+                       "shellcheck backup.sh; " + _FIX_CP + "; shellcheck backup.sh; "
+                       "./backup.sh '{name}'"),
+                solution="shellcheck backup.sh; " + _FIX_CP + "; shellcheck backup.sh; "
+                         "./backup.sh '{name}'",
+                wrong=("mkdir -p backup; cp '{name}' backup/",
+                       _FIX_CP + "; ./backup.sh '{name}'"),
+                alternatives=("nano backup.sh — поставить \"$src\" в двойные кавычки руками "
+                              "(Ctrl+O, Enter, Ctrl+X)",)),
+        Variant("./cleanup.sh {cache} чистит *.tmp в папке {cache}. Прежде чем доверять ему, "
+                "прогони shellcheck cleanup.sh, исправь замечание, добейся тишины и почисти "
+                "{cache} этим скриптом.",
+                hints=("shellcheck cleanup.sh — прочти код и текст замечания.",
+                       "SC2164 — cd без проверки: не зайдёт в папку — rm удалит *.tmp там, где "
+                       "ты стоишь. Допиши к cd: || exit.",
+                       "shellcheck cleanup.sh; " + _FIX_CD + "; shellcheck cleanup.sh; "
+                       "./cleanup.sh {cache}"),
+                solution="shellcheck cleanup.sh; " + _FIX_CD + "; shellcheck cleanup.sh; "
+                         "./cleanup.sh {cache}",
+                wrong=("rm -f {cache}/*.tmp",
+                       "./cleanup.sh {cache}"),
+                alternatives=("nano cleanup.sh — дописать к строке cd \"$1\" хвост || exit "
+                              "руками",)),
+        Variant("./stats.zsh должен записать в count.txt, сколько CSV в data/, но падает, а "
+                "shellcheck его проверять отказывается. Проверь синтаксис (правила записи) "
+                "через zsh -n, "
+                "исправь и запусти ./stats.zsh.",
+                hints=("shellcheck stats.zsh скажет SC1071: он понимает только sh и bash, а "
+                       "это zsh.",
+                       "zsh -n stats.zsh — проверка без запуска: покажет строку parse error. "
+                       "if без закрывающего fi.",
+                       "zsh -n stats.zsh; echo fi >> stats.zsh; zsh -n stats.zsh; ./stats.zsh"),
+                solution="zsh -n stats.zsh; echo fi >> stats.zsh; zsh -n stats.zsh; ./stats.zsh",
+                wrong=("echo fi >> stats.zsh; ./stats.zsh",
+                       "print -r -- 'csv files: {n}' > count.txt"),
+                alternatives=("nano stats.zsh — дописать fi последней строкой руками",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("shellcheck читает скрипт и называет места, где он сломается, — до запуска. "
+               "Код SC в замечании ищут в справке, правят и прогоняют снова, пока не станет "
+               "тихо. zsh он не понимает: там синтаксис (правила записи) проверяет zsh -n.")
+    spell = "shellcheck f.sh — замечания с кодом SC; тишина = чисто; zsh -n f.zsh — синтаксис"
+    MSG_NO_CHECK = ("Скрипт исправлен и сработал, но shellcheck ты не запускал. Прогони "
+                    "shellcheck {script} — урок в том, чтобы прочитать его замечания.")
+    MSG_ISSUES = ("shellcheck {script} ещё находит замечания ({codes}). Прогони его, исправь "
+                  "строку под ^ и запусти скрипт снова.")
+    MSG_GUTTED = ("В {script} пропала строка с {what} — скрипт больше не делает свою работу. "
+                  "reset вернёт его.")
+    MSG_MANUAL = ("Результат есть, но сделан руками, а не скриптом. Почини {script} и запусти "
+                  "его: ./{script} …")
+    MSG_NO_COPY = "Копии backup/{name} нет: запусти ./backup.sh '{name}' — в кавычках."
+    MSG_COPY_DIFF = "backup/{name} не совпадает с оригиналом: копию делает cp в скрипте."
+    MSG_LEFT = "В {cache} остались .tmp-файлы: запусти ./cleanup.sh {cache}."
+    MSG_WRONG_PLACE = ("Пропали .tmp-файлы не из {cache}: {gone}. Чистка ушла не туда — reset "
+                       "вернёт файлы.")
+    MSG_NO_COUNT = "count.txt нет: его пишет ./stats.zsh, когда синтаксис исправлен."
+    MSG_COUNT = "В count.txt «{got}», а CSV в data/ — {n}. Запусти ./stats.zsh ещё раз."
+    MSG_NO_N = ("count.txt верный, но синтаксис ты не проверял. Прогони zsh -n stats.zsh — "
+                "так zsh-скрипты проверяют без запуска.")
+
+    def _v(self, state: dict) -> int:
+        return variant_index(state.get("_variant", 0), len(self.variants))
+
+    def setup_variant(self, box: Path, rng, variant: int) -> dict:
+        box = Path(box)
+        name = rng.choice(SPACED_NAMES)
+        cache = rng.choice(CACHE_DIRS)
+        n = rng.randint(2, 6)
+        state = {"name": name, "cache": cache, "n": n}
+        if variant == 0:
+            os.chmod(kit.write(box / "backup.sh", LINT_BACKUP_SH), 0o755)
+            kit.write(box / name, " ".join(kit.latin(rng) for _ in range(8)) + "\n")
+        elif variant == 1:
+            os.chmod(kit.write(box / "cleanup.sh", CLEANUP_SH), 0o755)
+            tmps = sorted(rng.sample(("a.tmp", "b.tmp", "run.tmp", "old.tmp", "log.tmp"), 3))
+            for t in tmps:
+                kit.write(box / cache / t, "temp\n")
+            kit.write(box / cache / "keep.txt", "keep me\n")
+            for t in KEEP_TMP:
+                kit.write(box / t, "my work in progress\n")
+            state["tmps"] = tmps
+        else:
+            os.chmod(kit.write(box / "stats.zsh", STATS_ZSH), 0o755)
+            for i in range(n):
+                kit.write(box / "data" / f"part{i + 1}.csv", "id,value\n1,10\n")
+            kit.write(box / "data" / "readme.txt", "csv parts\n")
+        return state
+
+    @staticmethod
+    def _ran_cmd(lines, name: str, flag: Optional[str] = None) -> bool:
+        for _, cmd, args in envkit.commands(lines):
+            if cmd == name and (flag is None or flag in args):
+                return True
+        return False
+
+    def _script_state(self, ctx, script: str, need: str, what: str) -> Optional[str]:
+        """Скрипт цел (строка need на месте) и чист по анализатору заглушки — иначе отклик."""
+        from termit_app import shellstub
+        kind, text = envkit.box_text(ctx.box, script, envkit.TEXT_CAP)
+        bad = envkit.file_problem(kind, script)
+        if bad:
+            return bad
+        if kind == "missing" or need not in (text or ""):
+            return self.MSG_GUTTED.format(script=script, what=what)
+        issues = shellstub.analyze(text or "")
+        if issues:
+            codes = ", ".join(dict.fromkeys(x.code for x in issues))
+            return self.MSG_ISSUES.format(script=script, codes=codes)
+        return None
+
+    def _check_backup(self, ctx, lines) -> Verdict:
+        st = ctx.state
+        name = st["name"]
+        copy = Path(ctx.box) / "backup" / name
+        if not copy.is_file() or copy.is_symlink():
+            if not lines:
+                return Verdict(False)
+            return Verdict(False, self._script_state(ctx, "backup.sh", "cp ", "cp")
+                           or self.MSG_NO_COPY.format(name=name))
+        kind, got = envkit.box_file(ctx.box, f"backup/{name}")
+        _, orig = envkit.box_file(ctx.box, name)
+        if kind != "ok" or got != orig:
+            return Verdict(False, self.MSG_COPY_DIFF.format(name=name))
+        return self._finish(ctx, lines, "backup.sh", "cp ", "cp")
+
+    def _finish(self, ctx, lines, script: str, need: str, what: str) -> Verdict:
+        if not envkit.ran(lines, script, by_name=False):
+            return Verdict(False, self.MSG_MANUAL.format(script=script))
+        slip = self._script_state(ctx, script, need, what)
+        if slip:
+            return Verdict(False, slip)
+        if not self._ran_cmd(lines, "shellcheck"):
+            return Verdict(False, self.MSG_NO_CHECK.format(script=script))
+        return Verdict(True)
+
+    def _check_cleanup(self, ctx, lines) -> Verdict:
+        st = ctx.state
+        box = Path(ctx.box)
+        gone = [t for t in KEEP_TMP if not (box / t).is_file()]
+        if gone:
+            return Verdict(False, self.MSG_WRONG_PLACE.format(cache=st["cache"],
+                                                             gone=", ".join(gone)))
+        left = [t for t in st["tmps"] if os.path.lexists(box / st["cache"] / t)]
+        if left:
+            if not lines:
+                return Verdict(False)
+            return Verdict(False, self._script_state(ctx, "cleanup.sh", "rm ", "rm")
+                           or self.MSG_LEFT.format(cache=st["cache"]))
+        if not (box / st["cache"] / "keep.txt").is_file():
+            return Verdict(False, self.MSG_WRONG_PLACE.format(cache=st["cache"],
+                                                             gone="keep.txt"))
+        return self._finish(ctx, lines, "cleanup.sh", "rm ", "rm")
+
+    def _check_stats(self, ctx, lines) -> Verdict:
+        st = ctx.state
+        kind, text = envkit.box_text(ctx.box, "count.txt", envkit.TEXT_CAP)
+        bad = envkit.file_problem(kind, "count.txt")
+        if bad:
+            return Verdict(False, bad)
+        if kind == "missing":
+            return Verdict(False, self.MSG_NO_COUNT if lines else None)
+        got = envkit.first_line(text)
+        if got != f"csv files: {st['n']}":
+            return Verdict(False, self.MSG_COUNT.format(got=got, n=st["n"]))
+        if not envkit.ran(lines, "stats.zsh", by_name=False):
+            return Verdict(False, self.MSG_MANUAL.format(script="stats.zsh"))
+        if not self._ran_cmd(lines, "zsh", "-n"):
+            return Verdict(False, self.MSG_NO_N)
+        return Verdict(True)
+
+    def check(self, ctx) -> Verdict:
+        lines = [c.line for c in ctx.cmds]
+        v = self._v(ctx.state)
+        if v == 0:
+            return self._check_backup(ctx, lines)
+        if v == 1:
+            return self._check_cleanup(ctx, lines)
+        return self._check_stats(ctx, lines)
 
 
 # --- E14 ------------------------------------------------------------------------------------
@@ -3367,6 +3918,9 @@ class BossEnv(Task):
         return Verdict(False)
 
 
+# FB14: alias_rc — после блока прав и dotenv (FB5 п. 24/26: права идут сразу за
+# export_child, следом dotenv), перед PATH: свой ~/.zshrc рядом с подключением .env
 TASKS = [EnvVars(), ExportChild(), PermBasics(), PermRwx(), ReadLongList(), PermDigits(),
-         Dotenv(), PathWhich(), ShebangRun(), ExitCodes(), JsonConfig(), ScriptAudit(),
+         Dotenv(), AliasRc(), PathWhich(), ShebangRun(), ExitCodes(), CronLine(),
+         JsonConfig(), ScriptAudit(), ShellLint(),
          AvScan(), VenvBasics(), PipOffline(), PipFreeze(), BossEnv()]

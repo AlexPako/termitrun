@@ -3990,6 +3990,601 @@ MSG_SQLB_LEDGER_ID = ("id у ledger сам не ставится: впиши е�
                       "amount, kind), id новой строки — {lid}.")
 
 
+# --- FB14: Vertica без сервера — колоночное хранение, COPY с отбраковкой, MERGE, сегментация
+# Курс-карта (разделы 4 и 6): учим идеи и команды Vertica, практикуем на PostgreSQL 18 игры и
+# в каждом уроке честно пишем «в Vertica так-то». Синтаксис Vertica сверен с документацией
+# docs.vertica.com (25.3): MERGE — только WHEN MATCHED THEN UPDATE и WHEN NOT MATCHED THEN
+# INSERT (с фильтром AND …), COPY … REJECTED DATA AS TABLE … REJECTMAX, SEGMENTED BY HASH(…)
+# ALL NODES. Все четыре — только PostgreSQL (stand): в SQLite нет pg_column_size, ON_ERROR и
+# MERGE.
+
+_CLICKS = dbkit.Extra(
+    cols=("id", "user_id", "city", "amount", "url", "agent"),
+    sqlite="CREATE TABLE clicks (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL, city TEXT NOT "
+           "NULL, amount INTEGER NOT NULL, url TEXT NOT NULL, agent TEXT NOT NULL)",
+    pg="CREATE TABLE ops.clicks (id integer PRIMARY KEY, user_id integer NOT NULL, city text NOT "
+       "NULL, amount integer NOT NULL, url text NOT NULL, agent text NOT NULL)")
+CLICK_PAGES = ("/", "/cart", "/search?q=lamp", "/item/1042", "/help/delivery", "/account/orders",
+               "/promo/autumn-sale", "/blog/how-we-pack-orders")
+CLICK_AGENTS = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_6) AppleWebKit/605.1.15 Safari/605.1",
+                "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) Mobile/15E148",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0 Safari/537.36")
+SHORT_AGENTS = ("curl/8.7.1", "wget/1.24", "httpie/3.2")
+LONG_PAGES = tuple(f"/catalog/{p}?utm_source=newsletter&utm_campaign=autumn-sale-2026"
+                   f"&utm_medium=email" for p in ("lamps", "desks", "rugs", "mugs"))
+CLICK_HOST = "https://shop.example.com"
+_INT4 = 4                                 # pg_column_size(integer)
+
+
+def _text_size(value: str) -> int:
+    """pg_column_size короткого текста из таблицы: байты UTF-8 и байт заголовка (до 126)."""
+    n = len(value.encode("utf-8"))
+    assert n <= 126, value
+    return n + 1
+
+
+def column_bytes(rows: List[dict], col: str) -> int:
+    """sum(pg_column_size(col)) по строкам ops.clicks — как посчитает PostgreSQL."""
+    if col in ("id", "user_id", "amount"):
+        return _INT4 * len(rows)
+    return sum(_text_size(r[col]) for r in rows)
+
+
+MSG_COL_STAR = ("pg_column_size(*) не бывает: функция берёт одну графу — "
+                "sum(pg_column_size(amount)).")
+MSG_COL_NO_SUM = ("pg_column_size без sum даёт вес одного значения в каждой строке. Сложи их: "
+                  "SELECT sum(pg_column_size(графа)) FROM ops.clicks.")
+
+
+class Columnar(SqlAnswer):
+    """Колоночное хранение (идея Vertica): вес столбца — sum(pg_column_size(графа))."""
+    id = "columnar"
+    title = "Таблица по столбцам"
+    par = 90
+    stand = "pg"
+    scroll = ("Колоночная база (Vertica) хранит каждый столбец отдельно: запрос по двум графам "
+              "читает только их.\n"
+              "Размер столбца в байтах: psql -At -c \"SELECT sum(pg_column_size(amount)) FROM "
+              "invoices\" — функции (готовые формулы базы): pg_column_size меряет значение, а "
+              "функция sum складывает.\n"
+              "PostgreSQL хранит строками; здесь мы только считаем, что прочла бы Vertica.")
+    variants = (
+        Variant("Запрос SELECT sum(amount) FROM ops.clicks колоночная база прочтёт по одному "
+                "столбцу amount. Сколько байт весит этот столбец? Ответ: ans ЧИСЛО",
+                hints=("Вес одного значения — pg_column_size(amount), всех — их сумма.",
+                       "SELECT sum(pg_column_size(amount)) FROM ops.clicks — через psql -At "
+                       "-c.",
+                       "psql -At -c \"SELECT sum(pg_column_size(amount)) FROM ops.clicks\""),
+                solution="psql -At -c \"SELECT sum(pg_column_size(amount)) FROM ops.clicks\"",
+                wrong=("psql -At -c \"SELECT sum(amount) FROM ops.clicks\"",
+                       "psql -At -c \"SELECT count(*) FROM ops.clicks\""),
+                alternatives=("psql -At -c \"SELECT count(*) * 4 FROM ops.clicks\" — integer "
+                              "всегда 4 байта",)),
+        Variant("Какой столбец ops.clicks весит больше всех — его колоночная база читала бы "
+                "дольше всего? Сравни city, url и agent. Ответ: ans ГРАФА",
+                hints=("Вес столбца — sum(pg_column_size(графа)); посчитай для каждой из трёх.",
+                       "В одном SELECT можно три суммы через запятую — увидишь их рядом.",
+                       "psql -At -c \"SELECT sum(pg_column_size(city)), sum(pg_column_size(url)), "
+                       "sum(pg_column_size(agent)) FROM ops.clicks\""),
+                solution="psql -At -c \"SELECT sum(pg_column_size(city)), "
+                         "sum(pg_column_size(url)), sum(pg_column_size(agent)) FROM ops.clicks\"",
+                solution_script="psql -At -c \"SELECT c FROM (VALUES ('city', (SELECT "
+                                "sum(pg_column_size(city)) FROM ops.clicks)), ('url', (SELECT "
+                                "sum(pg_column_size(url)) FROM ops.clicks)), ('agent', (SELECT "
+                                "sum(pg_column_size(agent)) FROM ops.clicks))) v (c, n) ORDER BY "
+                                "n DESC LIMIT 1\"",
+                wrong=("psql -At -c \"SELECT max(length(city)) FROM ops.clicks\"",
+                       "psql -At -c \"SELECT sum(pg_column_size(city)) FROM ops.clicks\""),
+                alternatives=("три отдельных запроса sum(pg_column_size(…)) — по одному на "
+                              "графу",)),
+        Variant("Отчёт SELECT city, sum(amount) FROM ops.clicks GROUP BY city колоночная база "
+                "прочтёт по двум столбцам. Сколько байт весят city и amount вместе? Ответ: ans "
+                "ЧИСЛО",
+                hints=("Нужны только два столбца: city и amount.",
+                       "sum(pg_column_size(city)) + sum(pg_column_size(amount)) — одним SELECT.",
+                       "psql -At -c \"SELECT sum(pg_column_size(city)) + "
+                       "sum(pg_column_size(amount)) FROM ops.clicks\""),
+                solution="psql -At -c \"SELECT sum(pg_column_size(city)) + "
+                         "sum(pg_column_size(amount)) FROM ops.clicks\"",
+                wrong=("psql -At -c \"SELECT sum(pg_column_size(city)) FROM ops.clicks\"",
+                       "psql -At -c \"SELECT sum(pg_column_size(amount)) FROM ops.clicks\""),
+                alternatives=("два запроса и сложить числа самому — тоже честно",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("Строковая база кладёт строку целиком и, чтобы сложить amount, листает все графы "
+               "подряд. Колоночная хранит каждый столбец отдельно и читает только нужные — "
+               "поэтому в Vertica SELECT * дорог, а отчёт по двум графам из ста — дёшев.")
+    spell = "sum(pg_column_size(графа)) — вес столбца; колоночная база читает только нужные"
+    kind_answer = "number"
+    trap_messages = {
+        "sum": "Это сумма самих чисел amount, а нужен вес столбца в байтах: "
+               "sum(pg_column_size(amount)).",
+        "count": "Это число строк, а нужен вес столбца в байтах: sum(pg_column_size(…)).",
+        "single": "Это вес одного столбца, а нужны оба — city и amount, сложи их.",
+        "amount": "Это вес одного amount, а нужны оба — city и amount, сложи их.",
+        "length": "Это длина одной самой длинной строки, а нужен вес всего столбца: "
+                  "sum(pg_column_size(графа)).",
+    }
+
+    def extend(self, rng, data):
+        rows = []
+        # тяжёлый столбец — от зерна (ответ варианта B меняется): длинные адреса с метками
+        # рассылки и короткие агенты-программы — или наоборот
+        long_urls = rng.random() < 0.5
+        pages = LONG_PAGES if long_urls else CLICK_PAGES
+        agents = SHORT_AGENTS if long_urls else CLICK_AGENTS
+        for i in range(1, rng.randint(40, 70) + 1):
+            rows.append({"id": i, "user_id": rng.randrange(1, 30),
+                         "city": rng.choice(dbkit.DISTRICTS),
+                         "amount": rng.randrange(1, 900),
+                         "url": CLICK_HOST + rng.choice(pages),
+                         "agent": rng.choice(agents)})
+        data.extra["ops.clicks"] = _CLICKS
+        data.tables["ops.clicks"] = rows
+        return data
+
+    def data_state(self, rng, data, variant):
+        rows = data.tables["ops.clicks"]
+        size = {c: column_bytes(rows, c) for c in _CLICKS.cols}
+        if variant == 1:
+            heavy = max(("city", "url", "agent"), key=lambda c: size[c])
+            return {"answer": heavy, "traps": [["length", "city"]]}
+        if variant == 2:
+            return {"answer": size["city"] + size["amount"],
+                    "traps": [["single", size["city"]], ["amount", size["amount"]]]}
+        return {"answer": size["amount"],
+                "traps": [["sum", sum(r["amount"] for r in rows)], ["count", len(rows)]]}
+
+    def answer_kind(self, state):
+        return "text" if state.get("_variant") == 1 else "number"
+
+    def task_hint(self, line, state):
+        body = db._SQ_LITERAL.sub("''", line)
+        if re.search(r"pg_column_size\s*\(\s*\*", body, re.I):
+            return MSG_COL_STAR
+        if re.search(r"pg_column_size", body, re.I) and not re.search(r"\bsum\s*\(", body, re.I):
+            return MSG_COL_NO_SUM
+        return None
+
+
+# COPY с отбраковкой: строки с мусором в amount PostgreSQL 17+ пропускает (ON_ERROR ignore),
+# PostgreSQL 18 ещё и считает их (REJECT_LIMIT). В Vertica — REJECTED DATA AS TABLE, REJECTMAX.
+_SALES = dbkit.Extra(
+    cols=("id", "city", "amount"),
+    sqlite="CREATE TABLE sales (id INTEGER PRIMARY KEY, city TEXT NOT NULL, amount INTEGER NOT "
+           "NULL)",
+    pg="CREATE TABLE ops.sales (id integer PRIMARY KEY, city text NOT NULL, amount integer NOT "
+       "NULL)")
+BAD_AMOUNTS = ("12O", "n/a", "1 200", "7.5", "—", "abc")   # без запятой: она делит графы
+MSG_REJ_PLAIN = ("Обычный \\copy падает на первой же плохой строке и не грузит ничего. Пропустить "
+                 "плохие — опция ON_ERROR ignore: WITH (FORMAT csv, HEADER, ON_ERROR ignore).")
+MSG_REJ_ROWS = ("В ops.sales не те строки: должны лечь все строки файла, кроме {bad} плохих (в "
+                "amount не число). Очисти таблицу (TRUNCATE ops.sales) и загрузи заново.")
+MSG_REJ_DELIM = ("Файл разделён знаком |, а не запятой: без DELIMITER '|' вся строка — одна "
+                 "графа. Добавь DELIMITER '|' в WITH (…).")
+MSG_REJ_LIMIT = ("Строки легли, но предел не задан: добавь REJECT_LIMIT 2 — тогда при третьей "
+                 "плохой строке загрузка откажется целиком (TRUNCATE ops.sales и заново).")
+MSG_REJ_SERVER = ("COPY без \\ ищет файл на сервере, а учебному это нельзя: \\copy читает файл "
+                  "сам psql.")
+
+
+class CopyRejects(SqlTask):
+    """\\copy … WITH (FORMAT csv, HEADER, ON_ERROR ignore), DELIMITER '|', REJECT_LIMIT."""
+    id = "copy_rejects"
+    title = "Загрузка с отбраковкой"
+    par = 120
+    stand = "pg"
+    scroll = ("Файл с мусором в паре строк обычный \\copy не грузит совсем. ON_ERROR ignore — "
+              "пропустить плохие строки, остальные загрузить:\n"
+              "psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, HEADER, ON_ERROR "
+              "ignore)\" — psql скажет, сколько строк пропущено.\n"
+              "В Vertica то же делает COPY … REJECTED DATA AS TABLE — плохие строки ложатся в "
+              "свою таблицу.")
+    variants = (
+        Variant("В sales.csv (с шапкой) — продажи, но в паре строк amount не число. Загрузи "
+                "в ops.sales все хорошие строки, плохие пропусти.",
+                hints=("Обычный \\copy упадёт на первой плохой строке — нужна опция ON_ERROR "
+                       "ignore.",
+                       "Опции — в WITH (…) через запятую: FORMAT csv, HEADER, ON_ERROR ignore.",
+                       "psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, HEADER, "
+                       "ON_ERROR ignore)\""),
+                solution="psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, HEADER, "
+                         "ON_ERROR ignore)\"",
+                wrong=("psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, "
+                       "HEADER)\"",),
+                alternatives=("psql -At -c \"SELECT count(*) FROM ops.sales\" — после загрузки: "
+                              "сколько легло",)),
+        Variant("Выгрузка пришла в стиле Vertica: sales.txt с шапкой, графы разделены знаком "
+                "|, в паре строк amount не число. Загрузи в ops.sales все хорошие строки.",
+                hints=("Разделитель задаёт опция DELIMITER '|' — рядом с ON_ERROR ignore.",
+                       "WITH (FORMAT csv, HEADER, DELIMITER '|', ON_ERROR ignore).",
+                       "psql -c \"\\copy ops.sales FROM 'sales.txt' WITH (FORMAT csv, HEADER, "
+                       "DELIMITER '|', ON_ERROR ignore)\""),
+                solution="psql -c \"\\copy ops.sales FROM 'sales.txt' WITH (FORMAT csv, HEADER, "
+                         "DELIMITER '|', ON_ERROR ignore)\"",
+                wrong=("psql -c \"\\copy ops.sales FROM 'sales.txt' WITH (FORMAT csv, HEADER, "
+                       "ON_ERROR ignore)\"",),
+                alternatives=("head -n 3 sales.txt — сначала глянуть, чем разделены графы",)),
+        Variant("Загрузи sales.csv (с шапкой) в ops.sales, пропуская плохие строки, но с "
+                "пределом: если плохих окажется больше двух, загрузка должна отказаться "
+                "целиком — как REJECTMAX 2 в Vertica.",
+                hints=("Предел пропусков — опция REJECT_LIMIT, она работает вместе с ON_ERROR "
+                       "ignore.",
+                       "WITH (FORMAT csv, HEADER, ON_ERROR ignore, REJECT_LIMIT 2).",
+                       "psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, HEADER, "
+                       "ON_ERROR ignore, REJECT_LIMIT 2)\""),
+                solution="psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, HEADER, "
+                         "ON_ERROR ignore, REJECT_LIMIT 2)\"",
+                wrong=("psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, HEADER, "
+                       "ON_ERROR ignore)\"",),
+                alternatives=("psql -c \"\\copy ops.sales FROM 'sales.csv' WITH (FORMAT csv, "
+                              "HEADER, ON_ERROR ignore, REJECT_LIMIT 2, LOG_VERBOSITY verbose)\" "
+                              "— ещё и назовёт каждую пропущенную строку",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("COPY грузит файл одной операцией: одна плохая строка — и не ложится ничего. "
+               "ON_ERROR ignore (PostgreSQL 17+) пропускает строки, где значение не подходит к "
+               "типу графы, REJECT_LIMIT (18+) — предел таких пропусков. В Vertica плохие строки "
+               "ещё и сохраняются: REJECTED DATA AS TABLE, предел — REJECTMAX.")
+    spell = ("\\copy t FROM 'f.csv' WITH (FORMAT csv, HEADER, ON_ERROR ignore, REJECT_LIMIT 2); "
+             "DELIMITER '|'")
+
+    def extend(self, rng, data):
+        data.extra["ops.sales"] = _SALES
+        data.tables["ops.sales"] = []
+        return data
+
+    def data_state(self, rng, data, variant):
+        n = rng.randint(6, 10)
+        ids = sorted(rng.sample(range(100, 999), n))
+        bad = set(rng.sample(range(1, n - 1), 2))       # не первая и не последняя строка
+        sep = "|" if variant == 1 else ","
+        lines = [sep.join(_SALES.cols)]
+        good = []
+        for k, i in enumerate(ids):
+            city = rng.choice(dbkit.DISTRICTS)
+            if k in bad:
+                lines.append(sep.join((str(i), city, rng.choice(BAD_AMOUNTS))))
+            else:
+                amount = rng.randrange(100, 9000)
+                good.append([i, city, amount])
+                lines.append(sep.join((str(i), city, str(amount))))
+        name = "sales.txt" if variant == 1 else "sales.csv"
+        return {"spec": variant, "bad": len(bad), "want": good, "file": name,
+                "_files": {name: "\n".join(lines) + "\n"}}
+
+    def judge(self, ctx):
+        st = ctx.state
+        with self.snapshot(ctx) as snap:
+            rows = sorted(list(r) for r in snap.rows("ops.sales", _SALES.cols))
+        if not rows:
+            return Verdict(False)
+        if rows != [list(r) for r in st["want"]]:
+            return Verdict(False, MSG_REJ_ROWS.format(**st))
+        if int(st["spec"]) == 2:
+            lines = [c.line for c in ctx.cmds]
+            if not any(re.search(r"\bREJECT_LIMIT\s+'?2'?", x, re.I) for x in lines):
+                return Verdict(False, MSG_REJ_LIMIT)
+        return Verdict(True)
+
+    def task_hint(self, ctx, line):
+        if re.search(r"(?<!\\)\bCOPY\b[^\"]*\bFROM\s+'", line) and "\\copy" not in line:
+            return MSG_REJ_SERVER
+        if "\\copy" in line and not re.search(r"\bON_ERROR\b", line, re.I):
+            return MSG_REJ_PLAIN
+        pipe_file = ctx.state.get("file") == "sales.txt"
+        if pipe_file and "\\copy" in line and "DELIMITER" not in line.upper():
+            return MSG_REJ_DELIM
+        return None
+
+
+# MERGE: в Vertica и в PostgreSQL 15+ почти одинаков. В Vertica нет ON CONFLICT и нет DELETE в
+# MERGE — поэтому учим именно MERGE, а upsert-ответ называем, но не засчитываем.
+_STOCK = dbkit.Extra(
+    cols=("sku", "qty", "note"),
+    sqlite="CREATE TABLE stock (sku TEXT PRIMARY KEY, qty INTEGER NOT NULL, note TEXT NOT NULL "
+           "DEFAULT '')",
+    pg="CREATE TABLE ops.stock (sku text PRIMARY KEY, qty integer NOT NULL, note text NOT NULL "
+       "DEFAULT '')")
+_STOCK_IN = dbkit.Extra(
+    cols=("sku", "qty"),
+    sqlite="CREATE TABLE stock_in (sku TEXT PRIMARY KEY, qty INTEGER NOT NULL)",
+    pg="CREATE TABLE ops.stock_in (sku text PRIMARY KEY, qty integer NOT NULL)")
+SKU_POOL = tuple(f"{p}-{n}" for p in ("LAMP", "DESK", "MUG", "SOFA", "RUG", "SHELF")
+                 for n in (101, 202, 303))
+MSG_MERGE_UPSERT = ("Таблица верная, но через INSERT … ON CONFLICT. В Vertica ON CONFLICT нет — "
+                    "там это делают MERGE. Верни таблицу (reset) и сделай то же через MERGE INTO "
+                    "ops.stock t USING ops.stock_in s ON t.sku = s.sku ….")
+MSG_MERGE_ROWS = ("ops.stock не совпадает с ожидаемым у {sku}. Сверь ветки MERGE с заданием; "
+                  "вернуть таблицу — reset.")
+MSG_MERGE_TOUCHED = ("Ты обновил {sku}, а в этом задании старые позиции трогать нельзя — только "
+                     "WHEN NOT MATCHED THEN INSERT. Вернуть — reset.")
+MSG_MERGE_NOTE = ("У {sku} количество не менялось, а note стал «changed»: обновляй только где "
+                  "qty другой — WHEN MATCHED AND s.qty <> t.qty THEN UPDATE …. Вернуть — reset.")
+MSG_MERGE_NO_ON = "У MERGE после USING … нужно условие связи: ON t.sku = s.sku."
+
+
+class MergeInto(SqlTask):
+    """MERGE INTO … USING … ON … WHEN MATCHED [AND …] THEN UPDATE / WHEN NOT MATCHED THEN
+    INSERT — как в Vertica; ON CONFLICT называем, но не засчитываем."""
+    id = "merge_into"
+    title = "Слить поставку"
+    par = 120
+    stand = "pg"
+    scroll = ("MERGE INTO цены t USING новые s ON t.code = s.code — сверить две таблицы по "
+              "ключу.\n"
+              "WHEN NOT MATCHED THEN INSERT VALUES (s.code, s.price) — пары нет: вставить.\n"
+              "Так же пишут в Vertica; ON CONFLICT там нет.")
+    variants = (
+        Variant("Из поставки ops.stock_in внеси в ops.stock только новые позиции — тех, что уже "
+                "есть, не трогай. Одним MERGE.",
+                hints=("Нужна одна ветка MERGE — для строк без пары.",
+                       "MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku WHEN NOT "
+                       "MATCHED THEN INSERT ….",
+                       "psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku "
+                       "WHEN NOT MATCHED THEN INSERT (sku, qty) VALUES (s.sku, s.qty)\""),
+                solution="psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = "
+                         "s.sku WHEN NOT MATCHED THEN INSERT (sku, qty) VALUES (s.sku, s.qty)\"",
+                wrong=("psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku "
+                       "WHEN MATCHED THEN UPDATE SET qty = s.qty WHEN NOT MATCHED THEN INSERT "
+                       "(sku, qty) VALUES (s.sku, s.qty)\"",),
+                alternatives=("psql -c \"SELECT s.sku FROM ops.stock_in s LEFT JOIN ops.stock t "
+                              "ON t.sku = s.sku WHERE t.sku IS NULL\" — сначала увидеть новые",)),
+        Variant("Пришла поставка — таблица ops.stock_in (sku, qty). Слей её в ops.stock одним "
+                "MERGE: у позиций, что уже есть, qty станет как в поставке; новых — вставь. "
+                "note не трогай.",
+                hints=("MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku — дальше "
+                       "две ветки.",
+                       "WHEN MATCHED THEN UPDATE SET qty = s.qty WHEN NOT MATCHED THEN INSERT "
+                       "(sku, qty) VALUES (s.sku, s.qty).",
+                       "psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku "
+                       "WHEN MATCHED THEN UPDATE SET qty = s.qty WHEN NOT MATCHED THEN INSERT "
+                       "(sku, qty) VALUES (s.sku, s.qty)\""),
+                solution="psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = "
+                         "s.sku WHEN MATCHED THEN UPDATE SET qty = s.qty WHEN NOT MATCHED THEN "
+                         "INSERT (sku, qty) VALUES (s.sku, s.qty)\"",
+                wrong=("psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku "
+                       "WHEN NOT MATCHED THEN INSERT (sku, qty) VALUES (s.sku, s.qty)\"",
+                       "psql -c \"INSERT INTO ops.stock (sku, qty) SELECT sku, qty FROM "
+                       "ops.stock_in ON CONFLICT (sku) DO UPDATE SET qty = excluded.qty\""),
+                alternatives=("psql -c \"SELECT * FROM ops.stock ORDER BY sku\" — до и после: "
+                              "видно, что изменилось",)),
+        Variant("Слей поставку ops.stock_in в ops.stock: где qty другой — обнови qty и поставь "
+                "note 'changed'; где такой же — не трогай; новые позиции вставь с note 'new'.",
+                hints=("Ветке MATCHED нужен фильтр: WHEN MATCHED AND s.qty <> t.qty THEN UPDATE "
+                       "….",
+                       "UPDATE SET qty = s.qty, note = 'changed'; INSERT VALUES (s.sku, s.qty, "
+                       "'new') — графы по порядку.",
+                       "psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku "
+                       "WHEN MATCHED AND s.qty <> t.qty THEN UPDATE SET qty = s.qty, note = "
+                       "'changed' WHEN NOT MATCHED THEN INSERT VALUES (s.sku, s.qty, 'new')\""),
+                solution="psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = "
+                         "s.sku WHEN MATCHED AND s.qty <> t.qty THEN UPDATE SET qty = s.qty, note "
+                         "= 'changed' WHEN NOT MATCHED THEN INSERT VALUES (s.sku, s.qty, "
+                         "'new')\"",
+                wrong=("psql -c \"MERGE INTO ops.stock t USING ops.stock_in s ON t.sku = s.sku "
+                       "WHEN MATCHED THEN UPDATE SET qty = s.qty, note = 'changed' WHEN NOT "
+                       "MATCHED THEN INSERT (sku, qty, note) VALUES (s.sku, s.qty, 'new')\"",),
+                alternatives=("в Vertica тот же фильтр пишут так же: WHEN MATCHED AND … THEN "
+                              "UPDATE",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("MERGE сверяет две таблицы по ключу и для каждой строки поставки выбирает ветку: "
+               "пара нашлась — UPDATE, нет — INSERT; фильтр AND … сужает ветку. В Vertica "
+               "синтаксис (запись команды) тот же, только без DELETE в MERGE и без ON CONFLICT "
+               "вовсе.")
+    spell = ("MERGE INTO t USING s ON t.k = s.k WHEN MATCHED [AND …] THEN UPDATE SET … WHEN NOT "
+             "MATCHED THEN INSERT (…) VALUES (…)")
+
+    def extend(self, rng, data):
+        pool = list(SKU_POOL)
+        rng.shuffle(pool)
+        have, fresh = pool[:6], pool[6:6 + rng.randint(1, 2)]
+        stock = [{"sku": s, "qty": rng.randrange(1, 60), "note": rng.choice(("", "", "promo"))}
+                 for s in have]
+        old = {r["sku"]: r["qty"] for r in stock}
+        upd = rng.sample(have, 3)
+        same = upd[0]                                   # одна пара с тем же qty (вариант C)
+        incoming = [{"sku": same, "qty": old[same]}]
+        for s in upd[1:]:
+            q = old[s]
+            while q == old[s]:
+                q = rng.randrange(1, 60)
+            incoming.append({"sku": s, "qty": q})
+        incoming += [{"sku": s, "qty": rng.randrange(1, 60)} for s in fresh]
+        data.extra["ops.stock"] = _STOCK
+        data.extra["ops.stock_in"] = _STOCK_IN
+        data.tables["ops.stock"] = stock
+        data.tables["ops.stock_in"] = sorted(incoming, key=lambda r: r["sku"])
+        return data
+
+    # вариант → разновидность (spec): 0 — обе ветки, 1 — только новые, 2 — с фильтром. Ревью
+    # FB14: первым идёт самый простой — одна ветка (spec 1)
+    SPEC_OF = (1, 0, 2)
+
+    def data_state(self, rng, data, variant):
+        variant = self.SPEC_OF[variant % 3]
+        stock = {r["sku"]: [r["sku"], r["qty"], r["note"]] for r in data.tables["ops.stock"]}
+        orig = sorted(stock.values())
+        want = {k: list(v) for k, v in stock.items()}
+        for r in data.tables["ops.stock_in"]:
+            s, q = r["sku"], r["qty"]
+            if s not in stock:
+                want[s] = [s, q, "new" if variant == 2 else ""]
+            elif variant == 0:
+                want[s][1] = q
+            elif variant == 2 and q != stock[s][1]:
+                want[s] = [s, q, "changed"]
+        return {"spec": variant, "want": sorted(want.values()), "marks": {"orig": orig}}
+
+    def judge(self, ctx):
+        st = ctx.state
+        with self.snapshot(ctx) as snap:
+            rows = sorted(list(r) for r in snap.rows("ops.stock", _STOCK.cols))
+        want = [list(r) for r in st["want"]]
+        orig = {r[0]: list(r) for r in st["marks"]["orig"]}
+        if rows == [list(r) for r in st["marks"]["orig"]]:
+            return Verdict(False)
+        lines = [c.line for c in ctx.cmds]
+        if rows == want:
+            if not any(re.search(r"\bMERGE\s+INTO\b", x, re.I) for x in lines):
+                return Verdict(False, MSG_MERGE_UPSERT)
+            return Verdict(True)
+        cur = {r[0]: r for r in rows}
+        exp = {r[0]: r for r in want}
+        kind = int(st["spec"])
+        for sku in sorted(set(cur) | set(exp)):
+            c, w, o = cur.get(sku), exp.get(sku), orig.get(sku)
+            if c == w:
+                continue
+            if kind == 1 and o is not None and c != o:
+                return Verdict(False, MSG_MERGE_TOUCHED.format(sku=sku))
+            if kind == 2 and c and o and c[2] == "changed" and o[1] == c[1]:
+                return Verdict(False, MSG_MERGE_NOTE.format(sku=sku))
+            return Verdict(False, MSG_MERGE_ROWS.format(sku=sku))
+        return Verdict(False)
+
+    def task_hint(self, ctx, line):
+        body = db._SQ_LITERAL.sub("''", line)
+        if re.search(r"\bMERGE\s+INTO\b", body, re.I) and not re.search(r"\bON\b", body, re.I):
+            return MSG_MERGE_NO_ON
+        return None
+
+
+# Сегментация (идея Vertica): строки раскладываются по узлам кластера по хешу ключа;
+# настоящий HASH() у Vertica свой — здесь вместо него остаток от деления, узлов нет — есть
+# номера групп. Проекции и vsql — в уроке словами.
+_ORDERS = dbkit.Extra(
+    cols=("id", "customer_id", "city", "amount"),
+    sqlite="CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, city TEXT "
+           "NOT NULL, amount INTEGER NOT NULL)",
+    pg="CREATE TABLE ops.orders (id integer PRIMARY KEY, customer_id integer NOT NULL, city text "
+       "NOT NULL, amount integer NOT NULL)")
+MSG_SEG_NO_GROUP = ("Без GROUP BY count(*) считает все строки разом. Узлы — группы: SELECT id % "
+                    "3 AS node, count(*) FROM ops.orders GROUP BY node.")
+
+
+class Segments(SqlAnswer):
+    """Сегментация по ключу: остаток от деления вместо HASH, перекос по плохому ключу."""
+    id = "segments"
+    title = "Раскладка по узлам"
+    par = 90
+    stand = "pg"
+    scroll = ("Vertica раскладывает строки таблицы по узлам кластера: SEGMENTED BY HASH(id) ALL "
+              "NODES. Хороший ключ — поровну, плохой — всё на один узел.\n"
+              "Прикинуть на PostgreSQL: остаток от деления вместо хеша — psql -c \"SELECT id % 3 "
+              "AS node, count(*) FROM ops.orders GROUP BY node ORDER BY node\".\n"
+              "Сколько строк на каждом узле — сразу видно.")
+    variants = (
+        Variant("Прикинь сегментацию ops.orders по id на 3 узла (узел — id % 3). Сколько строк "
+                "окажется на самом загруженном узле? Ответ: ans ЧИСЛО",
+                hints=("Номер узла — id % 3, строк на узле — count(*) с GROUP BY по нему.",
+                       "SELECT id % 3 AS node, count(*) … GROUP BY node — возьми наибольшее "
+                       "число.",
+                       "psql -c \"SELECT id % 3 AS node, count(*) FROM ops.orders GROUP BY node "
+                       "ORDER BY node\""),
+                solution="psql -c \"SELECT id % 3 AS node, count(*) FROM ops.orders GROUP BY "
+                         "node ORDER BY node\"",
+                solution_script="psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY id % 3 "
+                                "ORDER BY 1 DESC LIMIT 1\"",
+                wrong=("psql -At -c \"SELECT count(*) FROM ops.orders\"",),
+                alternatives=("psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY id % 3 "
+                              "ORDER BY 1 DESC LIMIT 1\" — сразу наибольшее",)),
+        Variant("А если сегментировать ops.orders по customer_id на 3 узла (узел — customer_id "
+                "% 3)? Сколько строк окажется на самом загруженном узле? Ответ: ans ЧИСЛО",
+                hints=("Узел — customer_id % 3; посчитай строки на каждом.",
+                       "SELECT customer_id % 3 AS node, count(*) … GROUP BY node — возьми "
+                       "наибольшее.",
+                       "psql -c \"SELECT customer_id % 3 AS node, count(*) FROM ops.orders GROUP "
+                       "BY node ORDER BY node\""),
+                solution="psql -c \"SELECT customer_id % 3 AS node, count(*) FROM ops.orders "
+                         "GROUP BY node ORDER BY node\"",
+                solution_script="psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY "
+                                "customer_id % 3 ORDER BY 1 DESC LIMIT 1\"",
+                wrong=("psql -c \"SELECT id % 3 AS node, count(*) FROM ops.orders GROUP BY node "
+                       "ORDER BY node\"",),
+                alternatives=("psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY "
+                              "customer_id % 3 ORDER BY 1 DESC LIMIT 1\" — сразу наибольшее",)),
+        Variant("Кластер расширили до четырёх машин, раскладка — по клиенту: узел — "
+                "customer_id % 4. Найди узел, который почти простаивает: сколько строк "
+                "достанется самому лёгкому? Ответ: ans ЧИСЛО",
+                hints=("Узел — customer_id % 4; посчитай строки на каждом и найди наименьшее.",
+                       "SELECT customer_id % 4 AS node, count(*) … GROUP BY node ORDER BY "
+                       "count(*).",
+                       "psql -c \"SELECT customer_id % 4 AS node, count(*) FROM ops.orders GROUP "
+                       "BY node ORDER BY count(*)\""),
+                solution="psql -c \"SELECT customer_id % 4 AS node, count(*) FROM ops.orders "
+                         "GROUP BY node ORDER BY count(*)\"",
+                solution_script="psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY "
+                                "customer_id % 4 ORDER BY 1 LIMIT 1\"",
+                wrong=("psql -c \"SELECT customer_id % 3 AS node, count(*) FROM ops.orders GROUP "
+                       "BY node ORDER BY count(*)\"",),
+                alternatives=("psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY "
+                              "customer_id % 4 ORDER BY 1 LIMIT 1\" — сразу наименьшее",)),
+    )
+    hints = variants[0].hints
+    solution = variants[0].solution
+    explain = ("Кластер Vertica работает быстро, когда каждый узел тащит свою равную долю. Ключ "
+               "сегментации решает, куда ляжет строка: id раскладывает ровно, а ключ, у "
+               "которого есть «большой» клиент или город, сваливает всё на один узел — он и "
+               "тормозит весь запрос.")
+    spell = "SEGMENTED BY HASH(id) ALL NODES; прикидка: SELECT id % 3, count(*) … GROUP BY 1"
+    kind_answer = "number"
+    trap_messages = {
+        "total": "Это все строки таблицы, а нужно на одном узле: GROUP BY номер узла.",
+        "other": "Это раскладка по другому ключу или числу узлов — сверь с заданием.",
+        "max": "Это самый загруженный узел, а спрашивали самый лёгкий.",
+    }
+
+    def extend(self, rng, data):
+        rows, big = [], rng.randrange(1, 40)
+        n = rng.randint(30, 45)
+        for i in range(1, n + 1):
+            cust = big if rng.random() < 0.45 else rng.randrange(1, 40)
+            rows.append({"id": i, "customer_id": cust, "city": rng.choice(dbkit.DISTRICTS),
+                         "amount": rng.randrange(100, 9000)})
+        # ни один узел не пуст (ответ «самый лёгкий» — не ноль): четыре клиента с остатками
+        # 0–3 от деления на 4 (заодно 0–2 на 3), мимо «большого»
+        fill = (4, 5, 6, 7) if big not in (4, 5, 6, 7) else (16, 17, 18, 19)
+        for row, cust in zip(rng.sample(rows, 4), fill):
+            row["customer_id"] = cust
+        data.extra["ops.orders"] = _ORDERS
+        data.tables["ops.orders"] = rows
+        return data
+
+    @staticmethod
+    def _nodes(rows, col: str, k: int) -> List[int]:
+        out = [0] * k
+        for r in rows:
+            out[r[col] % k] += 1
+        return out
+
+    def data_state(self, rng, data, variant):
+        rows = data.tables["ops.orders"]
+        by_id = max(self._nodes(rows, "id", 3))
+        by_cust = max(self._nodes(rows, "customer_id", 3))
+        four = self._nodes(rows, "customer_id", 4)
+        if variant == 1:
+            ans, traps = by_cust, [["total", len(rows)], ["other", by_id]]
+        elif variant == 2:
+            ans, traps = min(four), [["total", len(rows)], ["max", max(four)]]
+        else:
+            ans, traps = by_id, [["total", len(rows)], ["other", by_cust]]
+        # ловушка, совпавшая с ответом, — не ловушка
+        return {"answer": ans, "traps": [t for t in traps if t[1] != ans]}
+
+    def task_hint(self, line, state):
+        body = db._SQ_LITERAL.sub("''", line)
+        bare_count = (re.search(r"%\s*\d", body) and re.search(r"count\s*\(", body, re.I)
+                      and not re.search(r"\bGROUP\s+BY\b", body, re.I))
+        if bare_count:
+            return MSG_SEG_NO_GROUP
+        return None
+
+
 class BossSql(SqlTask):
     """Страж Хранилища: тихо списать долг одному клиенту. Цель — CTE и окно (A — второй по
     чистому долгу района, ничья — меньший id; B — месяц наибольшего роста через LAG и его
@@ -4443,4 +5038,5 @@ class BossSql(SqlTask):
 
 TASKS = [PsqlNav(), PsqlPipe(), PgDialect(), PgIdentity(), CaseWhen(), Subquery(), CteWith(),
          WindowRank(), WindowLag(), JoinsMore(), ConstraintsFk(), Upsert(), ViewIndex(),
-         JsonbQuery(), CopyDump(), BossSql()]
+         JsonbQuery(), CopyDump(), Columnar(), CopyRejects(), MergeInto(), Segments(),
+         BossSql()]
