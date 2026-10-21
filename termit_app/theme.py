@@ -171,12 +171,29 @@ def _one(val, seed: int) -> Optional[str]:
     return val[seed % len(val)] if val else None
 
 
-def _reaction_pool(track_key: str, outcome: str):
-    """Группа реплик вида outcome; нет группы hard/slow/record — берётся solved."""
+def reaction_group(track_key: str, outcome: str):
+    """(вид, реплики) — группа вида outcome; нет группы hard/slow/record — берётся solved
+    (и вид тогда solved: память без повторов у группы одна, под каким бы видом её ни взяли)."""
     groups = _own("reactions").get(track_key) or {}
     val = groups.get(outcome)
     if not val and outcome in ("hard", "slow", "record"):
-        val = groups.get("solved")
+        return "solved", groups.get("solved")
+    return outcome, val
+
+
+def _reaction_pool(track_key: str, outcome: str):
+    return reaction_group(track_key, outcome)[1]
+
+
+def thought(line: str) -> str:
+    """Мысль реплики (о чём она: скорость, город, байка…) — раздел thoughts темы; нет — ""."""
+    return (_own("thoughts") or {}).get(line, "")
+
+
+def _plain(val):
+    """Без шаблонов ({поля}): запасной выбор по зерну подставить их не может."""
+    if isinstance(val, list):
+        return [x for x in val if "{" not in x] or val
     return val
 
 
@@ -194,7 +211,7 @@ def reaction(track_key: str, outcome: str, seed: int = 0,
     """Реплика персонажа после разбора; None — у темы нет такой. outcome — вид реплики
     (REACTION_KINDS). avoid — недавние реплики трека (строка или список, свежие в конце):
     последние N из этого пула, N — половина пула, снова не звучат (П3.6, FB5)."""
-    val = _reaction_pool(track_key, outcome)
+    val = _plain(_reaction_pool(track_key, outcome))
     if isinstance(val, str) or not val:
         return _one(val, seed)
     window = len(val) // 2

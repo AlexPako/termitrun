@@ -69,7 +69,7 @@ def text(key: str, **kw) -> str:
 def lines(kind: str) -> List[str]:
     """Набор строк (reviews, after). Для reviews первой идёт прежняя строка
     темы tomorrow_reviews — она остаётся одной из формулировок."""
-    pool = list((theme.story("master") or {}).get(kind) or TEXTS[kind])
+    pool = list((theme.story("master") or {}).get(kind) or TEXTS.get(kind) or ())
     if kind == "reviews":
         pool = [theme.msg("tomorrow_reviews")] + [x for x in pool
                                                   if x != theme.msg("tomorrow_reviews")]

@@ -242,7 +242,7 @@ def key_group_rows(index: int, width: int = 78, one_line: bool = False) -> list:
 def task_card(n, total, track, task, state, first_time: bool, mode: str = "train",
               unsolved: bool = False, par: float = None, rehearsal: bool = False,
               urgent: bool = False, owl: bool = False, master: str = None,
-              key_turn: int = 0) -> None:
+              key_turn: int = 0, fresh: bool = True) -> None:
     """Карточка приёмов — при первой встрече, в тренировке и пока задача ни разу не решена.
     master — строка режима круга мастера (рекорд вместо таймера), вместо метки тренировки.
     FB5 п. 43: карточка выше CARD_ROWS строк (длинный урок) — подвал одной строкой, а задание
@@ -283,10 +283,11 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         origin_notes(task.id, cp, tw)
     head = theme.intro(task, state, lore=first_time)   # FB12 (D1): лор — только впервые
     line = f"💬 {theme.speaker(task)}:" + (f" {head}" if head else "")
-    if cp.level == "plain":
+    # FB12-voices: на повторе того же варианта та же реплика не звучит — карточки без неё
+    if fresh and cp.level == "plain":
         say(textwrap.fill(line, 78, subsequent_indent="   ",
                           break_long_words=False, break_on_hyphens=False))
-    else:                       # по экранной ширине: эмодзи в начале — две клетки
+    elif fresh:                 # по экранной ширине: эмодзи в начале — две клетки
         say("\n".join(tui.fill(line, tw, "", "   ")))
     # само задание — жирным: что делать, видно сразу после урока и реплики
     say(tui.style(_wrap(task.text(state), width=wide), "bold", c=cp))
@@ -513,10 +514,12 @@ def review(task, state, outcome, mine, elapsed, stars_n, record_from,
 
 
 def react(track_key: str, outcome: str, seed: int, line: str = None) -> None:
-    """Одна реплика персонажа трека после разбора — если у темы она есть."""
-    line = line or theme.reaction(track_key, outcome, seed)
+    """Одна реплика персонажа трека после разбора — если у темы она есть. line="" — персонаж
+    промолчал (remarks: пул исчерпан или рядовой повтор), запасной выбор не нужен."""
+    if line is None:
+        line = theme.reaction(track_key, outcome, seed)
     if line:
-        say(story_fill(f"💬 {theme.sender(track_key)}: {line}", "   ", "      "))
+        say(story_fill(f"💬 {theme.sender(track_key)}: {line}", "   ", "      ", balance=True))
 
 
 def voice(name: str, line: str) -> None:
@@ -528,13 +531,25 @@ def voice(name: str, line: str) -> None:
 STORY_WIDTH = 76    # сюжетные строки: запас на двойную ширину эмодзи в терминале
 
 
-def story_fill(text: str, first: str = "", rest: str = "   ") -> str:
-    """Абзац по ширине; два последних слова склеены, чтобы одно слово не висело на строке."""
+def story_fill(text: str, first: str = "", rest: str = "   ", balance: bool = False) -> str:
+    """Абзац по ширине; два последних слова склеены, чтобы одно слово не висело на строке.
+    balance — для реплик персонажей и зацепок «Завтра» (FB12-voices: их больше тысячи, и
+    подгонять каждую под ширину нельзя): если последняя строка — обрывок, абзац сужается, пока
+    хвост не станет полноценным (≥ 15 знаков при строках выше ≥ 40). Остальные абзацы — во
+    всю ширину, как раньше."""
     head, sep, tail = text.rstrip().rpartition(" ")
     glued = head + NBSP + tail if sep and head.strip() else text
     glued = glued.replace("./termit ", "./termit" + NBSP)     # команда не рвётся после ./termit
-    return textwrap.fill(glued, STORY_WIDTH, initial_indent=first, subsequent_indent=rest,
-                         break_long_words=False, break_on_hyphens=False).replace(NBSP, " ")
+    out = None
+    for width in range(STORY_WIDTH, STORY_WIDTH - (30 if balance else 1), -1):
+        rows = textwrap.wrap(glued, width, initial_indent=first, subsequent_indent=rest,
+                             break_long_words=False, break_on_hyphens=False)
+        out = out or rows
+        if len(rows) < 2 or (len(rows[-1].strip()) >= 15
+                             and all(len(r.strip()) >= 40 for r in rows[:-1])):
+            out = rows
+            break
+    return "\n".join(out).replace(NBSP, " ")
 
 
 def plural(n: int, one: str, few: str, many: str) -> str:
@@ -653,7 +668,7 @@ def comeback(banner: str, voice: str) -> None:
 
 def tomorrow(text: str, note: Optional[str] = None) -> None:
     """note — сколько старых дел войдёт в завтрашний ран (session.tomorrow_note), не весь хвост."""
-    say(story_fill(f"⏭ Завтра: {text}"))
+    say(story_fill(f"⏭ Завтра: {text}", balance=True))
     if note:
         say(c("2", story_fill(f"({note})", "   ", "   ")))
 

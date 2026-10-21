@@ -14,7 +14,8 @@ from termit_app import book as book_mod
 from termit_app import (contracts, cosmetics, edition, extensions, field, freezes, goal,
                         hideout, hook, implants, inbox, judge, lifehacks,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
-                        repute, sound, story, syserrors, theme, ui, warehouse, weekly)
+                        remarks, repute, sound, story, syserrors, theme, ui, warehouse,
+                        weekly)
 from termit_app.tasks import dbkit, registry
 from termit_app.tasks.base import variant_index
 
@@ -35,6 +36,7 @@ class Options:
     practice: bool = False          # ./termit play ID — тренировка без денег; непобеждённый босс — дело
     real_home: Path = dfield(default_factory=Path.home)
     rehearsal: bool = False         # репетиция стража: тренировка, прогресс не записывается
+    #                                 (кроме памяти сказанных реплик heard — FB12-voices)
     pay_mult: int = 1               # множитель оплаты звезды дела (выгодный ран — ×2)
     comeback_bonus: int = 0         # премия выгодного рана, если в нём что-то решено
     comeback: bool = False          # выгодный ран (М1): тренировка без таймера, за звезду ×2
@@ -381,9 +383,10 @@ def _start_owl(task, state: dict, p: dict, mode: str, box, tally: dict, opts: Op
         return None
 
 
-def _say_alternative(task, state, variant, seed, outcome) -> None:
+def _say_alternative(task, state, variant, seed, outcome, mine: Optional[str] = None) -> None:
     """После разбора — «Можно и так»: одна из альтернатив варианта, по seed. Только когда
-    разбор с решением (решено или сдался), не при skip. Вариант берём родительский."""
+    разбор с решением (решено или сдался), не при skip. Вариант берём родительский.
+    Альтернатива, которую игрок сам и набрал (mine), не предлагается (свод Fable, D2)."""
     if outcome == "skip":
         return
     if variant_index(state.get("_variant"), len(task.variants)) != variant:
@@ -392,6 +395,8 @@ def _say_alternative(task, state, variant, seed, outcome) -> None:
         alts = task.alternatives_for(dict(state, _variant=variant))
     except (KeyError, IndexError, ValueError, AttributeError):
         return
+    own = " ".join(progress.clean_text(mine).split()) if mine else None
+    alts = [a for a in alts if " ".join(progress.clean_text(a).split()) != own]
     if not alts:
         return
     alt = progress.clean_text(alts[random.Random(seed).randrange(len(alts))])   # В4
@@ -469,18 +474,45 @@ def reaction_kind(outcome: str, hints: int, stars: int, job: bool, record: bool)
     return "solved"
 
 
-def pick_reaction(p: dict, track: str, kind, seed: int, remember: bool = True):
-    """Реплика вида kind, которой не было среди недавних у этого трека; память —
-    p["said"][track], список последних реплик (в старом прогрессе — одна строка), на вид
-    не больше половины пула (remember=False — репетиция: прогресс она не трогает)."""
+def is_routine(kind, task, solved: bool, first_win_possible: bool) -> bool:
+    """Рядовой повтор: решено (чисто, с подсказкой или долго), не страж и не первая победа
+    над задачей (first_win_possible — задача ещё ни разу не была решена). Тогда реплика — не
+    каждый раз (remarks.speaks); первая победа, рекорд, сдача и страж — всегда с репликой."""
+    return (kind in ("solved", "slow", "hard") and not task.boss
+            and not (solved and first_win_possible))
+
+
+def pick_reaction(p: dict, track: str, kind, seed: int, remember: bool = True,
+                  routine: bool = False, ctx: Optional[dict] = None):
+    """Реплика вида kind без повторов за всю игру (remarks, FB5 п. 46): память —
+    p["heard"], пул исчерпан — "" (тишина, а не повтор). routine — рядовой повтор задачи:
+    тогда реплика не каждый раз (remarks.speaks). ctx — поля шаблонов (remarks.context).
+    remember=False — посмотреть, не тратя (память и счётчик молчаний не трогаются).
+    None — у этого исхода реплик не бывает (skip); "" — персонаж промолчал."""
     if kind is None:
         return None
-    said = p.get("said") if isinstance(p.get("said"), dict) else {}
-    line = theme.reaction(track, kind, seed, avoid=said.get(track))
-    if line and remember:
-        recent = theme.remember_reaction(track, said.get(track), line)
-        p["said"] = dict(said, **{track: recent})
-    return line
+    group, pool = theme.reaction_group(track, kind)
+    if not pool:
+        return None
+    key = f"{track}.{group}"
+    remarks.migrate_said(p, track, key, pool)
+    if not remarks.speaks(p, routine, seed, update=remember):
+        return ""
+    lines = [(theme.thought(x), x) for x in remarks.texts(pool)]
+    line = remarks.pick(p, key, lines, seed, ctx, who=track, remember_it=remember)
+    return line or ""
+
+
+def _remark_ctx(p: dict, task, cmd, elapsed, gain, today: date) -> dict:
+    """Поля шаблонов реплики (remarks.context): что реально было в этой задаче."""
+    try:
+        near = goal.nearest(p)
+    except Exception:       # noqa: BLE001 — цель не роняет разбор
+        near = None
+    left = near[2] if near and near[0] == task.track else None
+    return remarks.context(cmd=cmd, elapsed=elapsed, gain=gain,
+                           streak=progress.current_streak(p, today),
+                           left_to_boss=left, hour=datetime.now().hour)
 
 
 def _review(task, state, outcome, *args, **kw) -> None:
@@ -587,7 +619,12 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
             tally["warned"] = True          # раз за ран: дальше таймер идёт сразу
             ui.say("\n" + ui.story_fill(COMBAT_WARNING, "", "   "))
             _ask(opts, COMBAT_PROMPT)
+        # FB12-voices: голос задачи — при первой встрече и на новом варианте; реплика карточки
+        # (строка атмосферы одна на задачу) — только при первой встрече (FB5 п. 46)
+        fresh = first or variant not in progress.variant_history(p["tasks"].get(task.id),
+                                                                 len(task.variants))
         ui.task_card(n, total, tr, task, state, first, mode, unsolved=unsolved, par=par,
+                     fresh=first,
                      rehearsal=opts.rehearsal, urgent=urgent,
                      owl=bridge is not None and (not task.boss or opts.rehearsal),
                      master=_master_label(best_before) if in_master else None,
@@ -690,9 +727,13 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
             return "quit"
         if opts.rehearsal:      # репетиция: только разбор — ни расписания, ни звёзд, ни денег
             kind = reaction_kind(outcome, hints + owl_asked, 0, False, False)
+            line = pick_reaction(p, task.track, kind, seed,
+                                 ctx=_remark_ctx(p, task, (_user_cmds(box) or [None])[-1],
+                                                 elapsed, None, today))
+            if line:        # репетиция расписание не трогает, а сказанное помнится (FB5 п. 46)
+                progress.save(opts.progress_path, p)
             _review(task, state, outcome, (_user_cmds(box) or [None])[-1], elapsed, 0, None,
-                    mode="train", rehearsal=True,
-                    reaction=pick_reaction(p, task.track, kind, seed, remember=False))
+                    mode="train", rehearsal=True, reaction=line)
             if opts.linger and outcome in LINGER_AFTER:
                 tally["after"] = _linger(task, box, state, outcome, opts, tally,
                                          prompt, rprompt, seed0)
@@ -741,15 +782,21 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
         if task.boss and job and not solved and contracts.rehearsal_price(p, task.id) == 0:
             after_fail = contracts.text("rehearse_free", id=task.id)
         kind = reaction_kind(outcome, hints + owl_asked, stars, job, record is not None)
-        line = pick_reaction(p, task.track, kind, seed)
-        if line:
+        # FB12-voices: первая победа, рекорд, сдача и страж — всегда с репликой; рядовой
+        # повтор — не каждый раз (remarks.speaks)
+        routine = is_routine(kind, task, solved, first or unsolved)
+        line = pick_reaction(p, task.track, kind, seed, routine=routine,
+                             ctx=_remark_ctx(p, task, mine, elapsed,
+                                             (record - elapsed) if record is not None else None,
+                                             today))
+        if kind is not None:
             progress.save(opts.progress_path, p)
         _review(task, state, outcome, mine, elapsed, stars, record,
                 mode=mode, earned=earned, spent=spent, after_fail=after_fail, reaction=line)
         if master_pay:      # круг мастера: рекорд побит без подсказок — пара монет
             ui.ok(ui.story_fill(master.text("record_paid", pay=master_pay,
                                             cash=theme.word("money")), "   ", "   "))
-        _say_alternative(task, state, variant, seed, outcome)
+        _say_alternative(task, state, variant, seed, outcome, mine)
         for fl in story.found_lines(box, found, _user_cmds(box)):    # без штрафа (E20)
             ui.say(ui.story_fill(fl, "   ", "   "))
         if not nudged:      # об утилите уже сказала карточка этого рана — одной строки хватит
@@ -761,9 +808,10 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
             ui.ok(ui.story_fill(gain, "   ", "   "))
         if record is not None:      # купленная примочка — редкий звук на рекорде
             sound.play(p, "record", tally.setdefault("sounds", set()))
-        said = story.voice(task, outcome, seed, p, tally.get("voice"))
+        said = story.voice(task, outcome, seed, p, tally.get("voice"), fresh=fresh)
         if said:            # редкий внутренний голос — после реплики персонажа
             tally["voice"] = True
+            progress.save(opts.progress_path, p)
             ui.voice(story.voice_name(task.track), said)
         if job:             # срочный заказ: премия при решении, skip оставляет до срока
             bonus = contracts.settle(p, task.id, outcome, stars, today)
@@ -953,15 +1001,25 @@ def _tomorrow(p: dict, today: date) -> None:
              if not any(progress.seen(p, x.id) for x in registry.tasks_of(t.track))]
     bosses = [t.id for t in guards + new if t.boss]
     tracks = [t.track for t in new if not t.boss]
-    text = next((line for line in
-                 [theme.tomorrow("places", k, seed) for k in fresh] +
-                 [theme.tomorrow("bosses", b, seed) for b in bosses] +
-                 [theme.tomorrow("tracks", k, seed) for k in tracks] if line), None)
-    if not text:        # «старые дела» — разными словами, подряд одна не звучит (М2)
-        text = (master.tomorrow_line(p, "after", seed) if master.season_done(p) else
-                master.tomorrow_line(p, "reviews", seed) if due else theme.msg("tomorrow_quiet"))
+    # FB12-voices: каждая зацепка — один раз за игру (remarks); сказать нечего — только счёт
+    tm = theme.story("tomorrow")
+    pools = ([(f"tomorrow.place.{k}", (tm.get("places") or {}).get(k)) for k in fresh] +
+             [(f"tomorrow.boss.{b}", (tm.get("bosses") or {}).get(b)) for b in bosses] +
+             [(f"tomorrow.{k}", (tm.get("tracks") or {}).get(k)) for k in tracks])
+    if master.season_done(p):
+        pools.append(("~after", master.lines("after")))
+    elif due:           # «старые дела» — разными словами (М2)
+        pools.append(("~reviews", master.lines("reviews")))
+    else:
+        pools.append(("~quiet", [theme.msg("tomorrow_quiet")] + master.lines("quiet")))
+    text = next((line for key, pool in pools      # каноническая строка пула — первой
+                 for line in [remarks.pick(p, key, pool, seed, lead=True)] if line), None)
+    note = tomorrow_note(p, nxt)
     ui.say()
-    ui.tomorrow(text, tomorrow_note(p, nxt))
+    if text:
+        ui.tomorrow(text, note)
+    elif note:
+        ui.tomorrow(note)
 
 
 def _summary(p: dict, today: date, tally: dict, streak_before: int, book_before: int) -> None:
@@ -981,7 +1039,8 @@ def _summary(p: dict, today: date, tally: dict, streak_before: int, book_before:
                      book_total=len(p["grimoire"]),
                      book_new=max(0, len(p["grimoire"]) - book_before),
                      freeze_saved=bool(froze.get("free")) and not froze.get("bought"),
-                     milestone=theme.milestone(after) if moved else None,
+                     milestone=(remarks.pick(p, f"milestone.{after}", theme.milestone(after), 0)
+                                if moved else None),
                      milestone_pay=tally.get("milestone_pay", 0), extra=extra,
                      reward_at=progress.next_reward(after), week=progress.activity(p, today))
     # FB10: приём из каталога лайфхаков — по силам игроку, каждый ран следующий
@@ -1305,7 +1364,10 @@ def _dozor(opts: Options, short: bool = False) -> None:
         ui.say("\n".join(master.summary_lines(p)))      # и короткие итоги сезона (P2 Б4)
         progress.save(opts.progress_path, p)
     if warmup:
-        ui.say(ui.story_fill(theme.msg("warmup"), "", ""))
+        # FB12-voices: реплика разминки — один раз; дальше просто объявление круга
+        said = remarks.pick(p, "~warmup", [theme.msg("warmup")] + master.lines("warmup"),
+                            today.toordinal(), lead=True)
+        ui.say(ui.story_fill(said or master.text("start"), "", ""))
     run_queue(queue, p, opts, today, offer_more=not warmup and not back, paydata=not warmup)
 
 

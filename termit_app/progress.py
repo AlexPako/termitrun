@@ -62,6 +62,9 @@ def empty() -> dict:
             "shop_seen": [], "shard_tip": False,
             # последняя реплика персонажа по треку — подряд одна и та же не звучит (П3.6)
             "said": {},
+            # FB12-voices: сказанные строки персонажей — отпечатками по пулам (termit_app/remarks):
+            # точная фраза не звучит дважды за всю игру
+            "heard": {},
             # косметика (часть 7а): завезённое на витрину по порядку и ран последнего завоза
             "stock": [], "stock_run": 0,
             # круг мастера (C2 М3): за какую задачу и в какой день платили за рекорд
@@ -121,7 +124,8 @@ _NESTED = {"field": (("done", list), ("pending", (str, type(None))), ("later", d
            "implants": (("declined", list), ("later", dict), ("offered", dict),
                         ("seen_installed", list), ("compare", dict)),
            "hub": (("tour", bool), ("shown", list))}
-_DICTS = ("settings", "grimoire", "field", "deck", "implants", "said", "master", "hub")
+_DICTS = ("settings", "grimoire", "field", "deck", "implants", "said", "heard", "master",
+          "hub")
 
 
 def _iso_day(d) -> bool:

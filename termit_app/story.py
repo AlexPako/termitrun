@@ -17,7 +17,7 @@ from datetime import date
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-from termit_app import textnorm, theme
+from termit_app import remarks, textnorm, theme
 from termit_app.tasks import kit
 
 # Куда можно класть находку каждого вида, не ломая проверку задачи. Новый хозяин — только
@@ -1086,9 +1086,11 @@ def voice_name(track: str) -> Optional[str]:
     return (theme.story("voices").get("names") or {}).get(track)
 
 
-def voice(task, outcome, seed: int, p: dict, used: bool) -> Optional[str]:
+def voice(task, outcome, seed: int, p: dict, used: bool, fresh: bool = True) -> Optional[str]:
     """Редкая строка внутреннего голоса после разбора: приём или риск, никогда не оценка.
-    Строка задачи — если есть, иначе общая строка трека."""
+    Строки задачи — только при первой встрече или новом варианте (fresh), общие строки трека —
+    у задач без своих (у задачи со своим пулом пул трека не звучит, библия §3). Каждая строка
+    — один раз за игру (remarks); сказать нечего — тишина."""
     v = theme.story("voices")
     if (not v or task.boss or outcome not in VOICE_OUTCOMES or used or p.get("dozors", 0) <= 0
             or not voice_name(task.track)):
@@ -1096,5 +1098,8 @@ def voice(task, outcome, seed: int, p: dict, used: bool) -> Optional[str]:
     rng = random.Random(seed ^ 0xC0FFEE)
     if rng.random() >= VOICE_CHANCE:
         return None
-    lines = (v.get("tasks") or {}).get(task.id) or (v.get("tracks") or {}).get(task.track)
-    return rng.choice(lines) if lines else None
+    own = (v.get("tasks") or {}).get(task.id)
+    if own:
+        return remarks.pick(p, f"voice.{task.id}", own, seed) if fresh else None
+    return remarks.pick(p, f"voice.{task.track}", (v.get("tracks") or {}).get(task.track),
+                        seed)
