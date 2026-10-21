@@ -157,6 +157,9 @@ def _board(p: dict, day: date, cp) -> List[str]:
         cards = ", ".join(hideout.pinned(p)) or "пусто"
         rows.append(_row("Доска:", f"мест {hideout.board_slots(p)}: {cards}", "board"))
     rows.append(_row("Комната:", f"вещей: {len(hideout.owned_items(p))}", "home"))
+    if p.get("money", 0) > 0:           # владелец 21.10: «не было shop»
+        rows.append(_row("Витрина:", f"{theme.word('money')} {ui.balance(p['money'])} — "
+                                     "что купить", "shop"))
     if enter == "master":
         rows.append(_row("Круг:", "знакомые дела на время, против рекорда", "[Enter]"))
     head = header(p, day)
@@ -178,24 +181,45 @@ def tour_shown(p: dict, names: List[str]) -> List[str]:
     return shown + [n for n in names if n not in shown and n not in NEW_IN_RELEASE]
 
 
-def hint_line(p: dict, day: date, fresh: List[str] = ()) -> str:
-    """Строка над приглашением: первым — что сделает ⏎, последним — quit; до 6 пунктов,
-    не шире 78 колонок. Первый визит (знакомства ещё не было) — только ⏎, home, help,
-    quit (UX §8)."""
+HINT_LINES = 4
+TAIL = ["help — подробно", "quit — выйти"]
+
+
+def _wrap(items: List[str], width: int = HINT_WIDTH) -> List[str]:
+    lines, cur = [], ""
+    for item in items:
+        joined = f"{cur} · {item}" if cur else item
+        if cur and tui.vlen(joined) > width:
+            lines.append(cur)
+            cur = item
+        else:
+            cur = joined
+    return lines + [cur] if cur else lines
+
+
+def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = ()) -> str:
+    """Подсказка над приглашением: первым — что сделает ⏎, потом новое, потом все открытые
+    слова (words — в порядке групп help), последними — help и quit. До четырёх строк по 78
+    колонок; не влезло — слова убираются с конца, help и quit остаются (владелец 21.10:
+    «6 команд мало… всё должно быть на виду, особенно первые разы»)."""
     with pyenvs.cache_only():
         line, label = default_action(p, day)
     unread = unread_count(p)
     if line == "inbox next" and unread:
         label = f"{label} ({unread})"           # число — тут же, без второго «inbox»
     items = [f"⏎ {label}"]
-    tail = ["home", "help", "quit — выйти"]
-    if not p.get("hub", {}).get("tour"):
-        return " · ".join(items + tail)
     if unread and line != "inbox next":
         items.append(f"inbox ({unread})")
-    items += [f"{w} — новое" for w in fresh[:2]]
-    items = items[:MAX_HINT - len(tail)]
-    # не влезло — выбрасываем с конца необязательное, quit остаётся
-    while len(items) > 1 and tui.vlen(" · ".join(items + tail)) > HINT_WIDTH:
-        items.pop()
-    return tui.trunc(" · ".join(items + tail), HINT_WIDTH)
+    items += [f"{w} — новое" for w in fresh[:4]]
+    taken = set(fresh) | {line.split()[0]} | ({"inbox"} if unread else set())
+    rest = [w for w in words if w not in taken and w not in SILENT[:4]]
+    while True:
+        lines = _wrap(items + rest + TAIL)
+        if len(lines) <= HINT_LINES:
+            return "\n".join(lines)
+        if rest:
+            rest.pop()
+        elif len(items) > 1:
+            items.pop()
+        else:
+            return "\n".join(tui.trunc(x, HINT_WIDTH) for x in lines[:HINT_LINES])

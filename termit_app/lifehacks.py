@@ -37,6 +37,8 @@ TERM_MENU = "меню Terminal.app 2.15 (MainMenu.nib из бандла), наж
 MAN = "man и запуск на этом Mac"
 MAN_ONLY = "man на этом Mac; не запускалось (звук или окно)"
 DOCS = "документация; без GUI нажатием не проверить"
+# FB15: программы кластера и облака (pyspark, airflow, boto3) на этом Mac не ставились
+DOCS_CLI = "документация; на этом Mac не ставилось — нужен кластер или облако"
 GUI_HOW = (ITERM_MENU, ITERM_KEYMAP, TERM_MENU, DOCS)
 
 LEARN_CATALOG = "catalog"        # учится только здесь: keys hacks, совет дня, итог рана
@@ -81,6 +83,7 @@ SECTIONS: Dict[str, str] = {
     "iterm": "iTerm2: окно, панели, метки",
     "terminal": "Terminal.app",
     "config": "Свой zsh (только объяснение: ~/.zshrc игра не трогает)",
+    "cluster": "Данные за пределами Mac (только совет)",
 }
 
 Z, I, T, M = (ZSH,), (ITERM,), (TERMINAL,), (MACOS,)
@@ -479,6 +482,15 @@ CATALOG: Dict[str, List[Hack]] = {
         _h("source ~/.zshrc", "применить правку настроек без нового окна",
            "дописал alias — включи его сразу", "source — «источник»: прочитать файл как "
            "набранные команды", LEARN_CATALOG, Z, PTY, 3, "env_vars"),
+    ],
+    # FB15 (FB5 п. 49): pyspark, airflow и boto3 в игре не ставим — им нужен кластер или
+    # облако; здесь только совет, как их запускают из терминала
+    "cluster": [
+        _h("spark-submit job.py", "задачу pyspark — на кластер, а не на свой Mac",
+           "pyspark, airflow и boto3 живут на сервере: заходят туда по ssh и запускают "
+           "spark-submit job.py, airflow dags list, aws s3 ls — дома pip install не нужен",
+           "submit — «отправить»: считает кластер, а терминал только отдаёт ему задачу",
+           LEARN_CATALOG, Z, DOCS_CLI, 3, "boss_pylib"),
     ],
 }
 

@@ -1,6 +1,7 @@
-"""Трек «Аналитика» (часть 10, Q4–Q6): pandas — установка по requirements.txt, чтение CSV,
-фильтры, группировка, пропуски (задачи 1–5, Q4); даты, merge, сводные, SQL, JSON и requests
-(Q5); страж boss_pylib (Q6).
+"""Трек «Аналитика» (часть 10, Q4; FB15): pandas — установка по requirements.txt, чтение CSV,
+фильтры, группировка, пропуски (задачи 1–5, здесь); даты, склейка, сводные, map/apply,
+сохранение, SQL из pandas и requests — termit_app/tasks/pdmore.py; страж boss_pylib —
+termit_app/tasks/pdboss.py.
 
 Задачи — запас full (pyenvs: эталонный venv с pandas и requests из склада колёс); pd_install —
 запас third (колёса склада и light: pandas она ставит сама). Без склада трек виден, но задачи честно отказывают через missing() с командой
@@ -634,6 +635,8 @@ class PdMissing(PdAnswer):
     id = "pd_missing"
     title = "Дыры в таблице"
     par = 90
+    # FB15: текст в числах (pd.to_numeric, errors="coerce") — шаг стража boss_pylib
+    practice_variant = 2
     scroll = ("Пустая ячейка в pandas — NaN: df[\"amount\"].isna().sum() — сколько их в "
               "колонке.\n"
               "Пропуск как 0: df[\"amount\"].fillna(0); среднее — .mean(), а пустые оно молча "
@@ -698,3 +701,18 @@ class PdMissing(PdAnswer):
 
 
 TASKS = [PdInstall(), PdRead(), PdFilter(), PdGroupby(), PdMissing()]
+
+
+def add_tasks(more) -> None:
+    """FB15: дописать задачи модуля в TASKS (без повторов); страж трека — всегда последним.
+    Модули pdmore и pdboss берут отсюда базу задач и дописывают себя сами, поэтому порядок их
+    импорта не важен: сортировка устойчивая, обычные задачи идут в порядке модулей."""
+    have = {t.id for t in TASKS}
+    TASKS.extend(t for t in more if t.id not in have)
+    TASKS.sort(key=lambda t: bool(getattr(t, "boss", False)))
+
+
+# FB15: вторая половина pandas — termit_app/tasks/pdmore.py (после пропусков), страж —
+# termit_app/tasks/pdboss.py
+from termit_app.tasks import pdmore  # noqa: E402,F401
+from termit_app.tasks import pdboss  # noqa: E402,F401  (страж — последним)

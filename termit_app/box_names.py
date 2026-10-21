@@ -165,6 +165,13 @@ TOPICS = {
     "pd_filter": "pd-filter",
     "pd_groupby": "pd-leaders",
     "pd_missing": "pd-gaps",
+    "pd_dates": "pd-dates",
+    "pd_merge": "pd-join",
+    "pd_pivot": "pd-pivot",
+    "pd_apply": "pd-rules",
+    "pd_save": "pd-export",
+    "pd_sql": "pd-sql",
+    "rq_get": "rq-rates",
 }
 
 _TOPIC = re.compile(r"^[a-z][a-z0-9-]*$")

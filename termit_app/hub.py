@@ -203,6 +203,32 @@ class Action:
     text: str = ""
 
 
+CHAIN_STOP = "Дальше по цепочке не иду: прошлое слово не получилось (после && — только при успехе)."
+CHAIN_OPS = ("&&", ";")
+
+
+def split_chain(text: str) -> List[Tuple[str, str]]:
+    """«shop a && shop b; stats» → [("", "shop a"), ("&&", "shop b"), (";", "stats")]: связки
+    вне кавычек, как в zsh; пустые куски (хвостовое &&) выбрасываются."""
+    parts, buf, op, quote, k = [], "", "", "", 0
+    while k < len(text):
+        ch = text[k]
+        if quote:
+            quote = "" if ch == quote else quote
+        elif ch in "'\"":
+            quote = ch
+        else:
+            sep = next((s for s in CHAIN_OPS if text.startswith(s, k)), "")
+            if sep:
+                parts.append((op, buf.strip()))
+                buf, op, k = "", sep, k + len(sep)
+                continue
+        buf += ch
+        k += 1
+    parts.append((op, buf.strip()))
+    return [(o, t) for o, t in parts if t]
+
+
 def _split(text: str) -> List[str]:
     try:
         return shlex.split(text)
@@ -213,7 +239,7 @@ def _split(text: str) -> List[str]:
 def _terminal_like(parts: List[str], text: str) -> bool:
     head = parts[0]
     return (head in TERMINAL or "/" in head or head.startswith("-")
-            or any(ch in text for ch in "|><;&$`"))
+            or any(ch in text for ch in "|><&$`"))
 
 
 def parse_line(line: str, p: dict) -> Action:
@@ -270,6 +296,17 @@ def _book_lines(p: dict, name: str) -> List[str]:
     return [BOOK_HEAD.format(word=name)] + [line.lstrip("\n") for line in found]
 
 
+CLOSED_HEAD = "  Закрыто:"
+CLOSED_TAIL = "help СЛОВО — когда откроется."
+
+
+def closed_words(p: dict) -> List[Word]:
+    """Закрытые слова, которые ещё откроются: без тех, что в этой теме или копии игры
+    не появятся никогда (владелец 21.10: «не все команды в хабе указаны»)."""
+    return [w for w in WORDS if not is_open(w, p) and closed_text(w) != NO_STORY
+            and not (w.rule == "report" and not edition.ISSUES_URL)]
+
+
 def help_lines(p: dict, name: str = "") -> List[str]:
     """help — открытые слова по группам (не больше 20 строк); help СЛОВО — подробно об одном
     (закрытое объясняет, когда откроется); не слово, но есть в книге — строки книги."""
@@ -292,6 +329,10 @@ def help_lines(p: dict, name: str = "") -> List[str]:
         names = [w.name for w in words if w.group == group]
         if names:
             out += _group_rows("  " + (title + ":").ljust(12), names)
+    closed = [w.name for w in closed_words(p)]
+    if closed:
+        out += _group_rows(CLOSED_HEAD.ljust(14), closed)
+        out.append(" " * 14 + CLOSED_TAIL)
     return [tui.trunc(line, 78) for line in out]
 
 
@@ -391,6 +432,8 @@ class Hub:
         # первый запуск сам открывает задачу только в настоящем терминале: из трубы zsh бессмыслен
         self.autostart = tty if autostart is None else autostart
         self.last_day = None
+        self.ok = True              # удалось ли прошлое слово — для цепочки через &&
+        self.board_above = False    # пульт только что показан: слова уже на экране
 
     def load(self) -> dict:
         p = progress.load(paths.PROGRESS_FILE)
@@ -457,6 +500,21 @@ class Hub:
         return False
 
     def step(self, line: str) -> bool:
+        """Строка убежища; цепочка через && и ; — слова по очереди, как в терминале
+        (владелец 21.10). False — выйти из убежища."""
+        chain = split_chain(line)
+        if len(chain) < 2:
+            return self.step_one(line)
+        for op, part in chain:
+            if op == "&&" and not self.ok:
+                ui.say(CHAIN_STOP)
+                break
+            if not self.step_one(part):
+                return False
+        return True
+
+    def step_one(self, line: str) -> bool:
+        self.ok = True
         p = self.load()
         act = parse_line(line, p)
         if act.note:
@@ -466,6 +524,7 @@ class Hub:
         if act.kind == "empty":
             return self.enter()
         elif act.kind == "say":
+            self.ok = False
             ui.say(act.text)
         elif act.kind == "own":
             self.own(act)
@@ -475,6 +534,7 @@ class Hub:
             code = 1
             try:
                 code = self.run_word(act.argv)
+                self.ok = code == 0
             finally:
                 # даже если слово упало: терминал и музыка дома приходят в порядок
                 if run:
@@ -497,6 +557,10 @@ class Hub:
         day = hubview.today()
         for line in hubview.board(p, day):
             ui.say(line)
+        ui.say()
+        for line in help_lines(p):          # владелец 21.10: все слова — на виду
+            ui.say(line)
+        self.board_above = True
         self.last_day = day         # пульт уже на сегодняшнюю дату: «новый день» не повторять
 
     def mark_shown(self, names, tour=None) -> None:
@@ -526,10 +590,14 @@ class Hub:
             self.show_board()
         self.last_day = day
         p = self.load()
-        fresh = hubview.fresh_words(p, [w.name for w in open_words(p)])
-        ui.say(ui.c("36", hubview.hint_line(p, day, fresh)))
+        names = [w.name for w in open_words(p)]
+        fresh = hubview.fresh_words(p, names)
+        # пульт прямо над приглашением уже перечислил слова — тогда только ⏎, новое и quit
+        words = () if self.board_above else names
+        self.board_above = False
+        ui.say(ui.c("36", hubview.hint_line(p, day, fresh, words)))
         if fresh and p["hub"]["tour"]:
-            self.mark_shown(fresh[:2])
+            self.mark_shown(fresh[:4])
 
     def enter(self) -> bool:
         line, _ = hubview.default_action(self.load(), hubview.today())

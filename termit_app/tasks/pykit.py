@@ -30,7 +30,7 @@ HEREDOC = "PYEOF"
 TRACEBACK_TYPES = ("NameError", "TypeError", "KeyError", "IndexError", "ValueError",
                    "FileNotFoundError", "ModuleNotFoundError", "SyntaxError",
                    "IndentationError", "ZeroDivisionError", "JSONDecodeError",
-                   "AttributeError")
+                   "AttributeError", "HTTPError")
 _ERROR_LINE = re.compile(r"^(?:[A-Za-z_][\w]*\.)*([A-Za-z]+Error)(?::|$)")
 # как зовут интерпретатор в строке оболочки
 PYTHONS = ("python3", "python", "python3.9")
