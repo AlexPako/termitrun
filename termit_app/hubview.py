@@ -197,7 +197,8 @@ def _wrap(items: List[str], width: int = HINT_WIDTH) -> List[str]:
     return lines + [cur] if cur else lines
 
 
-def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = ()) -> str:
+def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = (),
+              shorts: Optional[dict] = None) -> str:
     """Подсказка над приглашением: первым — что сделает ⏎, потом новое, потом все открытые
     слова (words — в порядке групп help), последними — help и quit. До четырёх строк по 78
     колонок; не влезло — слова убираются с конца, help и quit остаются (владелец 21.10:
@@ -210,9 +211,14 @@ def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = ()) 
     items = [f"⏎ {label}"]
     if unread and line != "inbox next":
         items.append(f"inbox ({unread})")
-    items += [f"{w} — новое" for w in fresh[:4]]
+    shorts = shorts or {}
+
+    def said(w: str) -> str:            # владелец 21.10: везде хотя бы короткая расшифровка
+        return f"{w} — {shorts[w]}" if w in shorts else w
+
+    items += [f"{said(w)} (новое)" for w in fresh[:4]]
     taken = set(fresh) | {line.split()[0]} | ({"inbox"} if unread else set())
-    rest = [w for w in words if w not in taken and w not in SILENT[:4]]
+    rest = [said(w) for w in words if w not in taken and w not in SILENT[:4]]
     while True:
         lines = _wrap(items + rest + TAIL)
         if len(lines) <= HINT_LINES:

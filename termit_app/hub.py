@@ -83,6 +83,53 @@ HUB_SKIP = {
     "play": "синоним train в убежище (спека 2.2)",
 }
 
+# короткая расшифровка слова — на пульте и в help рядом со словом (владелец 21.10:
+# «не хватает расшифровки команд»); подробно — help СЛОВО
+SHORT = {
+    "run": "ран дня, ~10 минут",
+    "short": "короткий ран",
+    "new": "ещё урок сверх нормы",
+    "train": "отработать слабое",
+    "master": "знакомое на время",
+    "rehearse": "репетиция стража",
+    "home": "твоя комната и вещи",
+    "look": "осмотреть вещь",
+    "board": "доска подсказок",
+    "prompt": "своё приглашение zsh",
+    "palette": "цвет приглашения",
+    "callsign": "твой позывной",
+    "shop": "витрина: купить",
+    "deck": "модули деки",
+    "case": "доска дела",
+    "dossier": "досье персонажей",
+    "memory": "осколки памяти",
+    "diary": "уроки и разборы",
+    "map": "карта мест",
+    "fence": "тайник: продать хабар",
+    "inbox": "сообщения на деке",
+    "book": "выученные команды",
+    "keys": "клавиши терминала",
+    "ext": "расширения файлов",
+    "stats": "звание, серия, счёт",
+    "list": "все задачи",
+    "intro": "вступление ещё раз",
+    "feedback": "твои замечания",
+    "report": "карточка замечания",
+    "style": "рамки и стиль",
+    "music": "музыка",
+    "sound": "звуки",
+    "theme": "тема оформления",
+    "owl": "Сова-подсказчица",
+    "coach": "подсказчик привычек",
+    "implants": "утилиты",
+    "wheels": "пакеты Python",
+    "update": "обновить игру",
+    "hub": "показать пульт",
+    "help": "все слова подробно",
+    "clear": "очистить экран",
+    "quit": "выйти из игры",
+}
+
 # группы help: порядок групп и заголовки (слово — в группе из Word.group)
 GROUPS: Tuple[Tuple[str, str], ...] = (
     ("play", "Играть"),
@@ -307,15 +354,20 @@ def closed_words(p: dict) -> List[Word]:
             and not (w.rule == "report" and not edition.ISSUES_URL)]
 
 
-def help_lines(p: dict, name: str = "") -> List[str]:
-    """help — открытые слова по группам (не больше 20 строк); help СЛОВО — подробно об одном
-    (закрытое объясняет, когда откроется); не слово, но есть в книге — строки книги."""
+HELP_HEAD = "Слова убежища (Enter — то, что отмечено ⏎; help СЛОВО — подробно):"
+
+
+def help_lines(p: dict, name: str = "", width: Optional[int] = None) -> List[str]:
+    """help — открытые слова по группам, у каждого короткая расшифровка (в две колонки, если
+    окно позволяет); закрытые — именами; help СЛОВО — подробно об одном (закрытое объясняет,
+    когда откроется); не слово, но есть в книге — строки книги."""
+    width = width or tui.caps().width
     if name:
         word = find(name.lower())
         if word is None:
             book = _book_lines(p, name)
             if book:
-                return [tui.trunc(line, 78) for line in book]
+                return [tui.trunc(line, width) for line in book]
             return [UNKNOWN.format(word=name) + HELP_TAIL]
         if not is_open(word, p):
             return [closed_text(word)]
@@ -324,16 +376,34 @@ def help_lines(p: dict, name: str = "") -> List[str]:
             out.append("  то же: " + ", ".join(word.aliases))
         return out
     words = open_words(p)
-    out = ["Слова убежища (Enter — то, что отмечено ⏎; help СЛОВО — подробно):"]
+    out = tui.fill(HELP_HEAD, width)
+    longest = max(tui.vlen(_cell(w.name)) for w in words)     # одна сетка на все группы
     for group, title in GROUPS:
         names = [w.name for w in words if w.group == group]
         if names:
-            out += _group_rows("  " + (title + ":").ljust(12), names)
+            out += _short_rows("  " + (title + ":").ljust(12), names, width, longest)
     closed = [w.name for w in closed_words(p)]
     if closed:
-        out += _group_rows(CLOSED_HEAD.ljust(14), closed)
+        out += _group_rows(CLOSED_HEAD.ljust(14), closed, width)
         out.append(" " * 14 + CLOSED_TAIL)
-    return [tui.trunc(line, 78) for line in out]
+    return [tui.trunc(line, width) for line in out]
+
+
+def _cell(name: str) -> str:
+    return f"{name.ljust(9)} {SHORT[name]}"
+
+
+def _short_rows(head: str, names: List[str], width: int, longest: int) -> List[str]:
+    """Группа слов с расшифровкой: «слово  что делает» ячейками общей ширины; ячеек в строке —
+    сколько влезает в окно (у последней хвостовой отступ не нужен)."""
+    step = longest + 3
+    per_row = max(1, (width - len(head) - longest) // step + 1)
+    rows = []
+    for k in range(0, len(names), per_row):
+        part = [_cell(n) for n in names[k:k + per_row]]
+        line = "".join(tui.pad(c, step) for c in part[:-1]) + part[-1]
+        rows.append((head if k == 0 else " " * len(head)) + line)
+    return rows
 
 
 def _group_rows(head: str, names: List[str], width: int = 78) -> List[str]:
@@ -595,7 +665,7 @@ class Hub:
         # пульт прямо над приглашением уже перечислил слова — тогда только ⏎, новое и quit
         words = () if self.board_above else names
         self.board_above = False
-        ui.say(ui.c("36", hubview.hint_line(p, day, fresh, words)))
+        ui.say(ui.c("36", hubview.hint_line(p, day, fresh, words, SHORT)))
         if fresh and p["hub"]["tour"]:
             self.mark_shown(fresh[:4])
 

@@ -303,9 +303,12 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     hint = (f"hint — {theme.word('soft_label')} за {theme.word('money')}" if job
             else "hint — бесплатно")
     tall = card_rows(task, state, shown_lesson) + CARD_TAIL > CARD_ROWS
-    keys = (f"task — задание снова · {hint} · ans ОТВЕТ · quit" if tall else
-            f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ · reset · giveup · "
-            "skip · quit · bug — замечание")
+    # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
+    keys = (f"task — задание снова · {hint} · ans ОТВЕТ — сдать ответ · quit — выйти из задачи"
+            if tall else
+            f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ — сдать ответ · "
+            "reset — собрать заново · giveup — сдаться, разбор · skip — на завтра · "
+            "quit — выйти из задачи · bug — замечание")
     if cp.level == "plain":     # Н3.8: в 80 колонок — переносом, таймер не отрывается
         items = (keys + timer.replace("   ", " · ", 1)).split(" · ")
         # по экранной ширине: 💳 и ⏱ — две клетки (textwrap считал их за одну)
