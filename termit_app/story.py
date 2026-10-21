@@ -51,6 +51,15 @@ SAFE_HOSTS: Dict[str, Tuple[str, ...]] = {
              "head_tail", "grep_count", "pipe_count", "redirect_report", "cut_uniq",
              "top_values", "awk_sum", "log_period", "join_parts", "stderr_split",
              "tee_log", "sed_fix", "jq_field", "jq_deep", "curl_api",
+             # владелец 22.10: «в ране доступа к досье нет» — новые задачи Основ, Инструментов,
+             # Вместо Finder и Данных (FB12–FB21) тоже держат ~/drop (проверено test_extras_hosts)
+             "meet_terminal", "line_edit", "cursor_clip", "cut_paste", "history_recall",
+             "file_ext", "deep_dig", "deep_rm", "screen_scroll", "screen_find", "quick_fix",
+             "cp_dir", "fzf_pick", "z_jump", "flag_use", "job_control", "json_check",
+             "bat_lines", "disk_sweep", "dup_sort", "rg_hunt", "fd_hunt", "csv_by_hand",
+             "csv_top", "csv_sum", "regex_mask", "regex_anchor", "regex_class", "regex_repeat",
+             "regex_group", "grep_only", "flag_review", "sed_groups", "regex_clean",
+             "curl_post", "curl_pages",
              # Картотека: records.db и файлы корня песочницы, дом не трогают
              "sqlite_open", "select_where", "order_limit", "distinct_like", "in_between",
              "null_coalesce", "group_count", "group_having", "join_inner", "join_left",

@@ -186,8 +186,13 @@ TERMINAL = frozenset((
     "ls", "cd", "pwd", "cat", "mkdir", "rmdir", "rm", "mv", "cp", "echo", "open", "git",
     STUB_NAME, "python", "python3", "pip", "pip3", "touch", "less", "head", "tail", "grep",
     "find", "sudo", "man", "chmod", "nano", "vim", "code", "ln", "du", "df", "ps", "kill",
-    "top", "which", "wc", "sort", "tree", "zsh", "bash", "exit()",
+    "top", "which", "wc", "sort", "tree", "zsh", "bash", "exit()", "gunzip", "zcat", "tar",
+    "unzip",
 ))
+# владелец 22.10: открыть страницу досье в убежище — нельзя, а куда идти, не сказано
+DROP_IN_TASK = ("Страницы досье и находки открывают в задании, а не в убежище: набери run "
+                "(или train), и уже в задании — команду со страницы досье, например "
+                "gunzip -c ~/drop/voron_2.txt.gz. Прочитанное сохранится в dossier.")
 
 
 def find(name: str) -> Optional[Word]:
@@ -312,6 +317,8 @@ def parse_line(line: str, p: dict) -> Action:
         return Action("say", text=TASK_ONLY[head])
     if word is None:
         if _terminal_like(parts, text):
+            if "drop/" in text or head in ("gunzip", "zcat", "tar", "unzip"):
+                return Action("say", text=DROP_IN_TASK)
             return Action("say", text=NOT_TERMINAL)
         near = difflib.get_close_matches(head, [w.name for w in open_words(p)], n=1,
                                          cutoff=0.6)
