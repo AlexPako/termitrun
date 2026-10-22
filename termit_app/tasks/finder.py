@@ -188,7 +188,7 @@ class FindName(AnswerTask):
     scroll = ("find ГДЕ -name 'маска' — искать файлы по имени во всех вложенных папках; -iname "
               "— insensitive name: то же без учёта больших и маленьких букв.\n"
               "Маску бери в кавычки: без них * раскроет сам zsh (или скажет no matches found), "
-              "а она нужна find. Путь сразу в ответ: ans $(find storage -iname 'маска')")
+              "а она нужна find. Путь сразу в ответ: ans $(find папка -iname 'маска')")
     variants = (
         Variant("Файл потерялся где-то в storage/. Имя начинается на license, но неизвестно, "
                 "большими буквами или маленькими. Расширение — .dat. Где он? "
@@ -502,7 +502,7 @@ class LsNewest(AnswerTask):
     id = "ls_newest"
     track = "finder"
     title = "По времени изменения"
-    scroll = ("ls -t — свежие файлы сверху (t — time, по времени); ls -ltr — свежие внизу; | "
+    scroll = ("ls -t — свежие файлы сверху (t — time, по времени); ls -tr — наоборот, старые сверху (r — reverse); | "
               "head -1 — только первая строка (| передаёт вывод следующей команде).\n"
               "Сразу в ответ: ans $(ls -t | head -1)")
     variants = (
@@ -580,8 +580,8 @@ class RecentMove(Task):
     track = "finder"
     title = "Разбор по датам"
     scroll = ("В zsh у маски бывают уточнения в скобках: ls *(.m-3) — обычные файлы, изменённые "
-              "меньше 3 дней назад. Переносимый способ: find . -maxdepth 1 -type f -mtime -3 "
-              "(mtime — modification time, время изменения).")
+              "меньше 3 дней назад (m — от modified, «изменён»). Плюс вместо минуса — старше: "
+              "*(.m+30); h после m — в часах: *(.mh-5).")
     variants = (
         Variant("Всё, что появилось за последние 3 дня, — в fresh/. Старое не трогать.",
                 wrong=("mv * fresh/",),
@@ -688,9 +688,9 @@ class BatchRename(Task):
     title = "Пакетное переименование"
     scroll = ('for f in *.JPEG; do echo "$f"; done — команда между do и ; повторится для '
               'каждого файла, $f — его имя. "${f%.JPEG}" — имя без хвоста .JPEG. Кавычки "$f" '
-              'спасают имена с пробелами; без кавычек перед пробелом ставят \\ (экранируют).\n'
+              'спасают имена с пробелами.\n'
               'Проверь без риска: поставь echo перед mv — цикл только напечатает команды.\n'
-              "Опытные в zsh берут zmv: autoload zmv; zmv '(*).JPEG' '$1.jpg'")
+              "В zsh есть и zmv: autoload zmv, потом zmv '(*).JPEG' '$1.jpg'")
     variants = (
         Variant("Ко всем .txt здесь допиши спереди 2725_: «report march.txt» → «2725_report "
                 "march.txt». Другие файлы не трогай. Новое имя склеивается прямо в кавычках: "
@@ -1489,7 +1489,7 @@ class DupSort(Task):
     id = "dup_sort"
     track = "finder"
     title = "Дубли и снимки"
-    scroll = ("Скобки и пробел в имени для zsh особые — экранируй их \\ или бери в кавычки: "
+    scroll = ("Скобки и пробел в имени для zsh особые — экранируй (поставь \\ перед знаком) или бери в кавычки: "
               "rm *\\ \\(1\\).* или rm *' (1).'*\n"
               "(a|b) в маске — «a или b»: ls *.(pdf|docx). Без учёта регистра: setopt "
               "extendedglob, потом ls *.(#i)(jpg|png).\n"
@@ -1832,9 +1832,8 @@ class FdHunt(AnswerTask):
     start_dir = PROJ
     scroll = ("find . -name '*.sql' -not -path '*/node_modules/*' -not -path '*/.*' — мимо "
               "node_modules и скрытого (имена с точки). find . -size +0 — только непустые.\n"
-              "Утилита fd: fd -e sql — extension, по расширению, сама мимо скрытого и "
-              ".gitignore; fd -H -e sql — Hidden, со скрытыми; fd -g 'имя' — glob, точное имя; "
-              "fd -S +1b -e sql — Size, от одного байта.")
+              "fd -e sql — то же утилитой: по расширению (e — extension), сама мимо скрытого и "
+              "служебного.")
     variants = (
         Variant("Сколько в проекте proj/ файлов .sql? Чужой скачанный код в node_modules и всё "
                 "скрытое (файлы и папки, чьё имя начинается с точки) не считаются. "
@@ -1954,7 +1953,7 @@ class BossFinder(Task):
     title = "Уборка Загрузок"
     boss = True
     par = 360
-    scroll = ("Пробел и скобки в имени экранируй \\ или бери в кавычки: rm Downloads/*\\ \\(1\\).* "
+    scroll = ("Пробел и скобки в имени экранируй (поставь \\ перед знаком) или бери в кавычки: rm Downloads/*\\ \\(1\\).* "
               "или rm Downloads/*' (1).'*\n"
               "find папка -type f -empty -delete — удалить пустые файлы, -type d -empty — папки. ls -S — тяжёлые сверху. команда > файл — вывод в файл.\n"
               "Без учёта регистра (zsh): setopt extendedglob, потом *.(#i)(jpg|png) — "
@@ -1968,7 +1967,7 @@ class BossFinder(Task):
         Variant("Папка Downloads разрослась: пустые файлы, дубли «(1)», всё вперемешку. "
                 "Картинки (jpg, jpeg, png, heic — любым регистром) — в pictures, документы "
                 "(pdf, docx, txt) — в documents, таблицы (csv, xlsx) — в tables, остальное — "
-                "в other.",
+                "в other. Имя самого тяжёлого файла запиши в biggest.txt рядом с Downloads.",
                 wrong=("rm Downloads/*(1)*",),
                 alternatives=("ls -S Downloads/**/*(.) | head -1 — тяжёлый ищется по всем "
                               "вложенным папкам разом",)),

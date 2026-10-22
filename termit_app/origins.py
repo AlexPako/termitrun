@@ -280,12 +280,13 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "z_jump": ("dirs", "setopt"),
     # «Инструменты»
     "man_flag": ("man",),
-    "flag_use": ("head", "jq", "tldr"),
     "less_search": ("less", "tail"),
     "nano_config": ("nano",),
     "vim_trap": ("vim",),
     "brew_lesson": (STUB_NAME, "which", "rg"),
-    "tldr_tar": ("tar",),
+    "flag_use": ("head",),
+    "tldr_tar": ("tar", "tldr"),
+    "json_check": ("jq",),
     "bat_lines": ("bat", "sed"),
     "job_control": ("Ctrl+Z", "fg", "bg", "kill"),
     # «Свалка»
@@ -299,8 +300,8 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "top_hog": ("top",),
     "rg_hunt": ("rg", "xargs"),
     "fd_hunt": ("fd",),
-    "csv_by_hand": ("cut", "tr"),
-    "csv_top": ("uniq", "awk", "qsv"),
+    "csv_by_hand": ("tr",),
+    "csv_top": ("cut", "uniq", "awk", "qsv"),
     "csv_sum": ("duckdb",),
     # «Данные», базы
     "curl_api": ("curl",),

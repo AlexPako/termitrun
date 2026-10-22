@@ -247,11 +247,9 @@ class CsvByHand(_Sheet):
     title = "Выгрузка без Excel"
     after = ("boss_finder",)
     scroll = ("head -3 orders.csv — заголовок и первые строки; head -1 orders.csv | tr , '\\n' "
-              "| grep -n city — какая по счёту колонка city.\n"
-              "cut -d, -f3 orders.csv — третья колонка (d — delimiter, f — fields); tail -n +2 "
-              "— без заголовка (n — number).\n"
+              "| grep -n имя_колонки — какая она по счёту (n — number).\n"
               "grep -c ',Kazan,' orders.csv — count строк с ячейкой ровно Kazan (не "
-              "Kazanskaya). \"ul. Mira, 5\" в кавычках — одна ячейка, а cut режет и её.")
+              "Kazanskaya). \"ul. Mira, 5\" в кавычках — одна ячейка, хоть в ней и есть запятая.")
     variants = (
         Variant("Выгрузка заказов orders.csv — десятки тысяч строк, глазами не пересчитать. "
                 "Сколько в ней заказов из города {city}? Ответ — число: ans ЧИСЛО",
@@ -357,11 +355,10 @@ class CsvTop(_Sheet):
     after = ("csv_by_hand", "boss_finder")
     kinds = ("text", "number", "text")
     scroll = ("sort | uniq -c | sort -n | tail -1 — самое частое: uniq -c (count) считает "
-              "одинаковые строки подряд, поэтому сначала sort; sort -n — numeric, sort -u — "
-              "unique.\n"
-              "Кавычки с запятой ломают cut — считай справа: awk -F, '{ print $NF }' — "
-              "последнее поле (F — Field separator), $(NF-1) — предпоследнее. Утилита qsv "
-              "понимает кавычки сама: qsv frequency -s city orders.csv (s — select)")
+              "повторы подряд, потому сначала sort; sort -n — numeric, как числа; sort -u — unique.\n"
+              "Колонка: cut -d, -f5 orders.csv (d — delimiter, f — fields); tail -n +2 срежет шапку "
+              "(n — number). Запятые в кавычках ломают cut — тогда справа: awk -F, "
+              "'{ print $(NF-1) }' (F — Field separator).")
     variants = (
         Variant("В orders.csv — заказы за полгода. Из какого города заказывают чаще всего? "
                 "Ответ — название, как в таблице: ans ГОРОД",

@@ -27,7 +27,7 @@ from termit_app import tui
 LESSON_WIDTH = tui.MAX_WIDTH
 LESSON_LINES = 14
 LESSON_TRICKS = 4
-STRICT_TRACKS = ("basics",)
+STRICT_TRACKS = ("basics", "finder", "tools")
 
 # приём — голова команды в `…`: слово и первый флаг (буквы склеенных флагов по алфавиту:
 # -rv и -vr — один приём) или знак оболочки. Не приёмы: голый флаг (`-a` — расшифровка
