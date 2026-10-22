@@ -865,9 +865,19 @@ def _scroll_pairs(task, lesson: str) -> List[Tuple[str, str, str]]:
     return out
 
 
+# владелец 22.10: «идея — не перегружать, жёстких лимитов я не ставил»: длина шпаргалки —
+# мягкое предупреждение (как F001 у уроков), а не запрет
+SCROLL_LINES = 6
+
+
 def _check_scroll(task, add) -> None:
     if not task.scroll:
         return
+    from termit_app import ui
+    lines = len(ui._wrap(task.scroll).split("\n"))
+    if lines > SCROLL_LINES:
+        add("S010", "warn", f"шпаргалка — {lines} строк, длиннее {SCROLL_LINES}: проверь, всё ли "
+                            "нужно (не запрет — лишь бы не перегружать)")
     lesson = _lesson(task)
     if not lesson:
         add("S001", "error", "у задачи со scroll нет урока в теме по умолчанию")

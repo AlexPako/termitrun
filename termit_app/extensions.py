@@ -93,10 +93,29 @@ def ext_of(name: str) -> str:
     return m.group(0) if m else ""
 
 
+def _noise_paths(box: Path) -> set:
+    """Файлы «шума» (FB5 п. 70, termit_app/noise.py) из .termit/extras.json: копилка учит на
+    файлах задачи, а не на чужих Documents и Downloads — иначе на одном уроке вывалилось бы
+    полтора десятка расширений разом."""
+    import json
+    try:
+        items = json.loads((box / ".termit" / "extras.json").read_text("utf-8"))
+    except (OSError, ValueError, UnicodeDecodeError):
+        return set()
+    roots = {"box": box, "home": box / ".termit" / "home"}
+    out = set()
+    for e in items if isinstance(items, list) else ():
+        if isinstance(e, dict) and e.get("noise") and e.get("root") in roots:
+            out.add(str(roots[e["root"]] / str(e.get("path", ""))))
+    return out
+
+
 def scan(box) -> List[str]:
     """Расширения файлов песочницы (и её дома), известные копилке, — по алфавиту.
-    Служебная .termit (кроме дома) не смотрится: там файлы игры, а не задания."""
+    Служебная .termit (кроме дома) не смотрится: там файлы игры, а не задания; файлы «шума» —
+    тоже (_noise_paths)."""
     box = Path(box)
+    noise = _noise_paths(box)
     found = set()
     count = 0
     for root, dirs, files in os.walk(box):
@@ -110,6 +129,8 @@ def scan(box) -> List[str]:
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for name in files:
             count += 1
+            if noise and os.path.join(root, name) in noise:
+                continue
             ext = ext_of(name)
             if ext in EXTENSIONS:
                 found.add(ext)

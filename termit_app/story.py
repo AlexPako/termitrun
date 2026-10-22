@@ -69,6 +69,68 @@ SAFE_HOSTS: Dict[str, Tuple[str, ...]] = {
              # проверить (tests/test_extras_hosts)
              "case_when", "subquery", "cte_with", "window_rank", "window_lag",
              "joins_more", "constraints_fk", "upsert", "view_index"),
+    # «шум» (FB5 п. 70): правдоподобное окружение — termit_app/noise.py. Хозяева отобраны
+    # прогоном (без действий не решено, эталон с шумом решает); нет в списках: первые три урока
+    # «Основ», стражи и задачи pandas/линтеров без склада колёс (их без ~/wheels не проверить,
+    # fb16-wheels). В папку задачи — без ls_newest: посторонняя папка «свежее» файлов задачи
+    "noise_home": (
+             "cursor_clip", "cut_paste", "climb_down", "back_up", "home_tilde",
+             "history_recall", "hidden_cache", "mkdir_p", "copy_move", "file_ext",
+             "star_mask", "question_mask", "run_script", "deep_dig", "deep_rm",
+             "screen_scroll", "screen_find", "quick_fix", "cp_dir", "fzf_pick",
+             "z_jump", "man_flag", "flag_use", "less_search", "nano_config", "vim_trap",
+             "vim_escape", "vim_purge", "job_control", "brew_lesson", "tldr_tar",
+             "json_check", "bat_lines", "open_gui", "find_name", "grep_r", "du_heavy",
+             "ls_newest", "recent_move", "batch_rename", "zip_pack", "pbcopy_list",
+             "kill_frozen", "top_hog", "disk_sweep", "dup_sort", "rg_hunt", "fd_hunt",
+             "csv_by_hand", "csv_top", "csv_sum", "head_tail", "grep_count",
+             "pipe_count", "redirect_report", "cut_uniq", "top_values", "regex_mask",
+             "regex_anchor", "regex_class", "regex_repeat", "regex_group", "grep_only",
+             "flag_review", "awk_sum", "log_period", "join_parts", "stderr_split",
+             "tee_log", "sed_fix", "sed_groups", "regex_clean", "jq_field", "jq_deep",
+             "curl_api", "curl_post", "curl_pages", "sqlite_open", "select_where",
+             "order_limit", "distinct_like", "in_between", "null_coalesce",
+             "group_count", "group_having", "join_inner", "join_left", "sql_pipe",
+             "import_csv", "create_insert", "backup_update", "tx_delete", "csv_sql",
+             "psql_nav", "psql_pipe", "pg_dialect", "pg_identity", "case_when",
+             "subquery", "cte_with", "window_rank", "window_lag", "joins_more",
+             "constraints_fk", "upsert", "view_index", "jsonb_query", "copy_dump",
+             "columnar", "copy_rejects", "merge_into", "segments", "env_vars",
+             "export_child", "perm_basics", "perm_rwx", "read_long_list", "perm_digits",
+             "dotenv", "alias_rc", "path_which", "shebang_run", "exit_codes",
+             "cron_line", "json_config", "script_audit", "shell_lint", "av_scan",
+             "venv_basics", "pip_offline", "pip_freeze", "py_run", "py_vars", "py_loop",
+             "py_dict", "py_func", "py_repl", "py_json", "py_csv_json", "py_files",
+             "py_stats", "py_regex", "py_urllib"),
+    "noise_box": (
+             "cursor_clip", "cut_paste", "climb_down", "back_up", "home_tilde",
+             "history_recall", "hidden_cache", "mkdir_p", "copy_move", "file_ext",
+             "star_mask", "question_mask", "run_script", "deep_dig", "deep_rm",
+             "screen_scroll", "screen_find", "quick_fix", "cp_dir", "fzf_pick",
+             "z_jump", "man_flag", "flag_use", "less_search", "nano_config", "vim_trap",
+             "vim_escape", "vim_purge", "job_control", "brew_lesson", "tldr_tar",
+             "json_check", "bat_lines", "open_gui", "find_name", "grep_r", "du_heavy",
+             "recent_move", "batch_rename", "zip_pack", "pbcopy_list", "kill_frozen",
+             "top_hog", "disk_sweep", "dup_sort", "rg_hunt", "fd_hunt", "csv_by_hand",
+             "csv_top", "csv_sum", "head_tail", "grep_count", "pipe_count",
+             "redirect_report", "cut_uniq", "top_values", "regex_mask", "regex_anchor",
+             "regex_class", "regex_repeat", "regex_group", "grep_only", "flag_review",
+             "awk_sum", "log_period", "join_parts", "stderr_split", "tee_log",
+             "sed_fix", "sed_groups", "regex_clean", "jq_field", "jq_deep", "curl_api",
+             "curl_post", "curl_pages", "sqlite_open", "select_where", "order_limit",
+             "distinct_like", "in_between", "null_coalesce", "group_count",
+             "group_having", "join_inner", "join_left", "sql_pipe", "import_csv",
+             "create_insert", "backup_update", "tx_delete", "csv_sql", "psql_nav",
+             "psql_pipe", "pg_dialect", "pg_identity", "case_when", "subquery",
+             "cte_with", "window_rank", "window_lag", "joins_more", "constraints_fk",
+             "upsert", "view_index", "jsonb_query", "copy_dump", "columnar",
+             "copy_rejects", "merge_into", "segments", "env_vars", "export_child",
+             "perm_basics", "perm_rwx", "read_long_list", "perm_digits", "dotenv",
+             "alias_rc", "path_which", "shebang_run", "exit_codes", "cron_line",
+             "json_config", "script_audit", "shell_lint", "av_scan", "venv_basics",
+             "pip_offline", "pip_freeze", "py_run", "py_vars", "py_loop", "py_dict",
+             "py_func", "py_repl", "py_json", "py_csv_json", "py_files", "py_stats",
+             "py_regex", "py_urllib"),
     # хабар данных в скрытой .cache/.pd корня песочницы (E17). Без задач, где свежая
     # папка в корне или её вес могут сбить игрока: ls_newest, recent_move, du_heavy
     "paydata": ("where_am_i", "climb_down", "back_up", "home_tilde", "hidden_cache",
@@ -105,8 +167,13 @@ def extra(root: str, path: str, data, mtime: float = None, mode: int = None) -> 
 
 
 def extras_for(task, state: dict, p: dict, seed: int) -> list:
-    """Все подложенные файлы рана для этой задачи (осколок, найденный скрипт, досье)."""
+    """Все подложенные файлы рана для этой задачи («шум», осколок, найденный скрипт, досье)."""
+    from termit_app import noise
     out = []
+    if task.id in SAFE_HOSTS["noise_home"]:
+        out += noise.home(seed)
+    if task.id in SAFE_HOSTS["noise_box"]:
+        out += noise.box(seed)
     shard = shard_for(task, p, seed)
     if shard:
         out += shard_extras(shard, state, seed, have=len(p.get("shards", [])))
@@ -1056,6 +1123,9 @@ def sample_extras(kind: str, host: str, seed: int) -> list:
                              seed) +
                 found_extras({"kind": "useful", "name": sorted(envkit.USEFUL)[0],
                               "tip": FOUND_TIP}, seed))
+    if kind in ("noise_home", "noise_box"):     # «шум» (FB5 п. 70) — как в игре
+        from termit_app import noise
+        return noise.home(seed) if kind == "noise_home" else noise.box(seed)
     if kind == "paydata":     # настоящая раскладка хабара (E17)
         from termit_app import loot
         return loot.extras(loot.plan(seed))

@@ -358,7 +358,8 @@ class CsvTop(_Sheet):
               "повторы подряд, потому сначала sort; sort -n — numeric, как числа; sort -u — unique.\n"
               "Колонка: cut -d, -f5 orders.csv (d — delimiter, f — fields); tail -n +2 срежет шапку "
               "(n — number). Запятые в кавычках ломают cut — тогда справа: awk -F, "
-              "'{ print $(NF-1) }' (F — Field separator).")
+              "'{ print $(NF-1) }' (F — Field separator).\n"
+              "Утилита qsv понимает кавычки сама: qsv frequency -s city orders.csv (s — select)")
     variants = (
         Variant("В orders.csv — заказы за полгода. Из какого города заказывают чаще всего? "
                 "Ответ — название, как в таблице: ans ГОРОД",
