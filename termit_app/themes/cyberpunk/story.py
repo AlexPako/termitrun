@@ -575,6 +575,7 @@ CHARACTERS = {
     "raven": "Ворон",
     "gaika": "Гайка",
     "shnyr": "Шнырь",
+    "rabbit": "Белый Кролик",
     "marina": "Марина",
     "agata": "Агата",
     "plomba": "Пломба",

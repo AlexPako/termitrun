@@ -18,7 +18,7 @@ THEME = {
         "fight": "⚔ ВЗЛОМ",
         "beaten": "Взломаны",
         "field": "Заказ в реале",
-        "field_icon": "📡",
+        "field_icon": "🐇",
         "artifact": "имплант",
         "money": "💳",
         "money_name": "кредиты",

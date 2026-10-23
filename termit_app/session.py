@@ -1355,7 +1355,8 @@ def _questions_to_inbox(p: dict, today: date) -> None:
             if imp_id:
                 box["key"] = f"implant:{imp_id}"
                 box["ask"] = {"kind": "implant", "id": imp_id}
-    with inbox.collect(p, "field", "raven", "field", today) as box:
+    # владелец 23.10: задания в реале шлёт Белый Кролик («следуй за белым кроликом»)
+    with inbox.collect(p, "field", "rabbit", "field", today) as box:
         field.give(p, today)
         pend = p["field"].get("pending")
         if pend:

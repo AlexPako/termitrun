@@ -18,7 +18,8 @@ from termit_app.textnorm import YES
 KEEP = 30
 MAX_TEXT = 2000
 NAME_MAX = 12
-SENDERS = {"raven": "Ворон", "gift": "Подарок", "shop": "Витрина", "system": "Система"}
+SENDERS = {"raven": "Ворон", "gift": "Подарок", "shop": "Витрина", "system": "Система",
+           "rabbit": "Связной"}
 # Отправитель — gift/shop/system или ключ персонажа темы (raven и др.). Тему при загрузке
 # не импортируем, поэтому ключ — любой короткий ascii-ключ; имя для экрана — sender_name.
 SENDER_KEY = re.compile(r"[a-z][a-z0-9_]{0,23}")
