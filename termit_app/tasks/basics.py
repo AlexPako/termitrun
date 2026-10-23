@@ -1450,7 +1450,8 @@ class LineEdit(Task):
     scroll = ("↑ — прошлая команда. Ctrl+A / Ctrl+E — в начало / в конец строки, Option+← → "
               "— через слово (вне игры — если в iTerm2 стоит пресет Natural Text Editing или "
               "Option как Esc+).\n"
-              "Ctrl+W — стереть слово слева (W — Word), Ctrl+K — до конца строки (K — Kill), "
+              "Ctrl+W — стереть слово слева (W — Word); точка, _, / и - тоже могут обрывать "
+              "слово — тогда жми ещё. Ctrl+K — до конца строки (K — Kill), "
               "Ctrl+U — всю строку (в zsh; в bash — до курсора).")
     variants = (
         Variant("Последнюю команду в истории набрали с опечаткой в самом начале — mkdri "
@@ -1476,13 +1477,14 @@ class LineEdit(Task):
                               "outbox/",)),
         Variant("Последняя команда в истории переносит в archive/ четыре файла (mv — move, "
                 "«перенеси»: сначала что, последним словом — куда), но фото {photo} должно "
-                "остаться в inbox. Достань строку (↑), доберись до фото прыжками Option+←, "
-                "сотри его Ctrl+W и нажми Enter.",
+                "остаться в inbox. Достань строку (↑), прыжками Option+← встань сразу за именем "
+                "фото, стирай его Ctrl+W, пока оно не исчезнет целиком, и нажми Enter.",
                 hints=("Строка — в истории: ↑. Перепечатывать её не нужно.",
-                       "Option+← прыгает через слово влево. Встань сразу за именем фото — "
-                       "Ctrl+W сотрёт его.",
-                       "↑, Option+← дважды, Ctrl+W, Enter"),
-                solution="↑, Option+← дважды, Ctrl+W, Enter",
+                       "Option+← прыгает через слово влево. Встань сразу за именем фото и жми "
+                       "Ctrl+W, пока имя не исчезнет: точка и _ обрывают слово, за раз "
+                       "уходит кусок.",
+                       "↑, Option+← до конца имени фото, Ctrl+W — пока имя не исчезнет, Enter"),
+                solution="↑, Option+← до конца имени фото, Ctrl+W — пока имя не исчезнет, Enter",
                 solution_script=("mv inbox/report_{year}.txt inbox/budget_{year}.csv "
                                  "inbox/contacts.txt archive/"),
                 wrong=("mv inbox/report_{year}.txt inbox/budget_{year}.csv inbox/{photo} "
@@ -1653,21 +1655,29 @@ class CutPaste(Task):
               "Ctrl+Y — вставить из кармана, где курсор (Y — Yank), хоть много раз.\n"
               "Карман — не буфер обмена Mac: Cmd+V его не видит.")
     variants = (
-        Variant("Последняя команда в истории не доделана: cp (copy — «скопируй»: сначала "
-                "что, потом куда) знает, что копировать, но не знает куда. Нужна копия рядом "
-                "— то же имя с хвостом .bak. Имя не перепечатывай: ↑, Ctrl+W — имя ушло в "
-                "карман, Ctrl+Y — вернулось, пробел, ещё раз Ctrl+Y, допиши .bak и Enter.",
+        Variant("Сделай запасную копию отчёта quarterly_report_{year}.txt в этой же папке под "
+                "именем quarterly_report_{year}.txt.bak. Хвост .bak (от backup — «запасная "
+                "копия») — обычная пометка: это копия на всякий случай, оригинал можно "
+                "править смело.\n"
+                "Команда уже начата и лежит в истории: cp quarterly_report_{year}.txt. cp "
+                "(copy — «скопируй») ждёт два слова: что копировать и куда. Второго нет — его "
+                "и допиши. Длинное имя не перепечатывай, возьми из кармана: ↑, Ctrl+W — имя "
+                "ушло в карман, Ctrl+Y — вернулось, пробел, ещё раз Ctrl+Y, допиши .bak и "
+                "Enter.\n"
+                "Ctrl+W рвёт имя на точке и _ — жми, пока оно не сотрётся целиком: куски, "
+                "стёртые подряд, лягут в карман одним именем.",
                 wrong=("cp quarterly_report_{year}.txt copy.txt",),
                 alternatives=("↑, пробел и набрать имя заново с .bak — верно, но долго",)),
         Variant("Последняя команда в истории переносит отчёт в outbox/ (mv — move, "
                 "«перенеси»: сначала что, потом куда), но слова перепутаны: сначала папка, "
-                "потом файл. Переставь их через карман: ↑, Ctrl+W — вырезать имя файла, "
+                "потом файл. Переставь их через карман: ↑, Ctrl+W — вырезать имя файла (жми, "
+                "пока не уйдёт целиком), "
                 "Option+← — к началу outbox/, Ctrl+Y — вставить, пробел, Enter.",
                 hints=("Строка — в истории: ↑. Порядок у mv такой: что переносим, потом куда.",
                        "Ctrl+W вырезает слово слева и кладёт его в карман zsh; Ctrl+Y вставляет "
                        "его там, где курсор.",
-                       "↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter"),
-                solution="↑, Ctrl+W, Option+←, Ctrl+Y, пробел, Enter",
+                       "↑, Ctrl+W до конца имени, Option+←, Ctrl+Y, пробел, Enter"),
+                solution="↑, Ctrl+W до конца имени, Option+←, Ctrl+Y, пробел, Enter",
                 solution_script="mv report_{year}.txt outbox/",
                 wrong=("mv outbox/ report_{year}.txt",),
                 alternatives=("набрать mv report_{year}.txt outbox/ заново — верно, но "
@@ -1687,10 +1697,11 @@ class CutPaste(Task):
     )
     par = 40
     hints = ("Строка уже набрана — она в истории: ↑ вернёт её целиком.",
-             "Ctrl+W кладёт стёртое слово в карман, а Ctrl+Y выкладывает его — хоть два раза "
-             "подряд.",
-             "↑, Ctrl+W, Ctrl+Y, пробел, Ctrl+Y, допиши .bak и Enter")
-    solution = "↑, Ctrl+W, Ctrl+Y, пробел, Ctrl+Y, допиши .bak, Enter"
+             "Ctrl+W кладёт стёртое в карман, а Ctrl+Y выкладывает его — хоть два раза "
+             "подряд. Имя уходит кусками (точка и _ обрывают слово) — жми Ctrl+W, пока "
+             "не сотрётся всё: куски лягут в карман одним целым.",
+             "↑, Ctrl+W до конца имени, Ctrl+Y, пробел, Ctrl+Y, допиши .bak и Enter")
+    solution = "↑, Ctrl+W до конца имени, Ctrl+Y, пробел, Ctrl+Y, допиши .bak, Enter"
     solution_script = "cp quarterly_report_{year}.txt quarterly_report_{year}.txt.bak"
     explain = ("Стёртое Ctrl+W, Ctrl+U, Ctrl+K не пропадает: оно в кармане zsh, Ctrl+Y "
                "вставляет его, где курсор, хоть десять раз. Буфер Mac (Cmd+C, Cmd+V) — "
@@ -1769,8 +1780,10 @@ class HistoryRecall(Task):
     hints = ("Команда уже есть в истории — набирать её заново не нужно.",
              "Ctrl+R и кусок команды (templates) найдут её; → — поправить, а не выполнить "
              "сразу.",
-             "Ctrl+R и набери кусок templates, затем →, Ctrl+W, допиши clients/{new}/ и Enter")
-    solution = "Ctrl+R и кусок templates, стрелка →, Ctrl+W, допиши clients/{new}/, Enter"
+             ("Ctrl+R и набери кусок templates, затем →, Ctrl+W — пока старый путь clients/… не "
+              "сотрётся целиком, допиши clients/{new}/ и Enter"))
+    solution = ("Ctrl+R и кусок templates, стрелка →, Ctrl+W до конца старого пути, допиши "
+                "clients/{new}/, Enter")
     solution_script = ("cp templates/invoice_base.txt templates/letter_base.txt "
                        "templates/report_base.txt clients/{new}/")
     explain = ("История помнит всё: Ctrl+R ищет по куску, history показывает номера (!N), "
