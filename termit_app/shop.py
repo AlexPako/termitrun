@@ -38,6 +38,10 @@ DOSSIERS = {"voron": "basics", "gaika": "tools", "shnyr": "finder", "marina": "d
             "plomba": "db", "dubrov": "sql", "frosya": "env"}
 DOSSIER_PRICES = (30, 60, 120)
 DOSSIER_PAGE2_SOLVED = 5        # стр. 2 — решено задач трека не меньше
+# FB5 п. 69: что лежит в tar.gz (досье, стр. 3; фрагмент 2), продаём после урока tar — иначе
+# игрок купит то, что открыть ещё не умеет
+TAR_LESSON = "tldr_tar"
+TAR_FRAGMENTS = (2,)
 FRAGMENT_PRICES = (100, 150, 200, 250, 300, 350, 400, 500)
 FRAGMENTS_ON_SALE = 7           # продаются фрагменты 1–7 (7-й — Фабрика, после 7-го стража)
 # цена вне лестницы: фрагмент 6 — 300 по плану части 9 (B5). 9б B6 проверил ступень лестницы
@@ -153,13 +157,19 @@ def _dossier_rule(who: str, k: int) -> Callable[[dict, date], bool]:
             return False
         if k == 2:
             return _solved_in(p, track) >= DOSSIER_PAGE2_SOLVED
-        return _beaten(p, track_boss(track))
+        return _beaten(p, track_boss(track)) and _knows(p, TAR_LESSON)
     return rule
+
+
+def _knows(p: dict, task_id: str) -> bool:
+    """Урок пройден: задача решена хоть раз."""
+    return p["tasks"].get(task_id, {}).get("solved", 0) > 0
 
 
 def _fragment_rule(k: int) -> Callable[[dict, date], bool]:
     return lambda p, today: (len(p.get("bosses", ())) >= k and
-                             (k == 1 or owned(p, f"half{k - 1}")))
+                             (k == 1 or owned(p, f"half{k - 1}")) and
+                             (k not in TAR_FRAGMENTS or _knows(p, TAR_LESSON)))
 
 
 def _shnyr_rule(k: int) -> Callable[[dict, date], bool]:

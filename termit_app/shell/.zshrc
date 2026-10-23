@@ -27,6 +27,22 @@ mkdir -p $ZDOTDIR $ZSH_CACHE_DIR/completions 2>/dev/null
 if [[ -z $TERMIT_BARE && -r $HOME/.zshrc ]]; then
   source $HOME/.zshrc
 fi
+# zsh-autosuggestions оборачивает Ctrl+W и Ctrl+Y — и стёртое подряд перестаёт склеиваться в
+# кармане: Ctrl+Y возвращает лишь последний кусок (владелец 23.10, урок cut_paste). Плагину —
+# не трогать стирание и вставку; свои обёртки гасят серую подсказку (иначе она съезжает) и
+# помечают себя как kill/yank (zle -f) — так склейка и Ctrl+Y дважды работают.
+# Уже починено в ~/.zshrc игрока (backward-kill-word в списке) — не трогаем: его обёртки главнее.
+if (( ${+ZSH_AUTOSUGGEST_IGNORE_WIDGETS} && ! ${ZSH_AUTOSUGGEST_IGNORE_WIDGETS[(Ie)backward-kill-word]} )); then
+  ZSH_AUTOSUGGEST_IGNORE_WIDGETS+=(backward-kill-word kill-word kill-line backward-kill-line
+    kill-whole-line yank)
+  for _tr_kw in backward-kill-word kill-word kill-line backward-kill-line kill-whole-line; do
+    eval "_tr_clear_$_tr_kw() { POSTDISPLAY=; zle .$_tr_kw; zle -f kill }"
+    zle -N $_tr_kw _tr_clear_$_tr_kw
+  done
+  _tr_clear_yank() { POSTDISPLAY=; zle .yank; zle -f yank }
+  zle -N yank _tr_clear_yank
+  unset _tr_kw
+fi
 # Ctrl+R, Ctrl+T и Alt+C в игре — штатные, даже если ~/.zshrc владельца подключил fzf напрямую
 # (наш ~/.config/termit/shell.zsh внутри игры выходит сам). Виджеты fzf-* снимаем и возвращаем
 # штатные: Ctrl+R — поиск по истории (в vicmd — redo), Ctrl+T и Alt+C в emacs — transpose-chars

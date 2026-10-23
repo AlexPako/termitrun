@@ -68,6 +68,55 @@ def _boss_progress(box, task, ctx, marks=None):
         ui.say(f"   {'✓' if m else '·'} {step}")
 
 
+PARTS_BASE = "parts0"       # отметки частей на старте: сделанное до игрока не в счёт
+PARTS_SHOWN = 3             # сколько несделанных частей назвать, остальное — «…»
+
+
+def _part_marks(task, ctx):
+    """(названия, отметки) частей обычной задачи или None (FB5 п. 68)."""
+    labels = task.parts_for(ctx.state)
+    if not labels or task.boss:
+        return None
+    marks = task.progress(ctx)
+    if not marks or len(marks) != len(labels):
+        return None
+    return labels, [bool(m) for m in marks]
+
+
+def _parts_baseline(box) -> None:
+    """Первое приглашение: что из частей уже выполнено раскладкой (оригинал на месте) — это
+    не заслуга игрока, в «сделано k из n» не считается."""
+    try:
+        task, state = _load(box)
+        if _hidden(box):
+            return
+        got = _part_marks(task, sandbox.make_ctx(box, state))
+    except (KeyError, OSError, ValueError):
+        return
+    if got:
+        sandbox.write_box_file(box, ".termit/" + PARTS_BASE,
+                               "".join("1" if m else "0" for m in got[1]))
+
+
+def _part_progress(box, task, ctx) -> None:
+    """Владелец 21.10 (open_gui): сделал половину — игра молчала. Задача с частями говорит,
+    сколько сделано и что осталось; одно и то же сообщение — один раз (_say_once)."""
+    got = _part_marks(task, ctx)
+    if not got:
+        return
+    labels, marks = got
+    base = sandbox._read(box, PARTS_BASE) or ""
+    todo = [i for i in range(len(labels)) if base[i:i + 1] != "1"]
+    done = [i for i in todo if marks[i]]
+    if not done or len(done) == len(todo):
+        return
+    left = [labels[i] for i in todo if not marks[i]]
+    more = "…" if len(left) > PARTS_SHOWN else ""
+    _say_once(f"Сделано {len(done)} из {len(todo)}: ✓ "
+              + ", ".join(labels[i] for i in done)
+              + " · осталось: " + ", ".join(left[:PARTS_SHOWN]) + more, box)
+
+
 # Команды, которые без файла ждут ввода с клавиатуры: игроку кажется, что всё зависло
 WAITERS = ("cat", "sort", "uniq", "wc", "head", "tail", "tr")
 _SUBST_CAT = re.compile(r"\s*cat\s+\"?\$\(.*\)\"?\s*")
@@ -133,6 +182,7 @@ def precmd(box, rc, pwd) -> int:
         return EXIT_SHELL
     cmds = sandbox.read_cmds(box)
     if not cmds:
+        _parts_baseline(box)
         return 0          # первое приглашение — владелец ещё ничего не делал
     fresh = len(cmds) > sandbox.counter(box, "seen_cmds")     # не пустой Enter после команды
     _interrupted(box, rc, cmds)
@@ -188,6 +238,8 @@ def precmd(box, rc, pwd) -> int:
                 ui.say("   Застрял? Набери hint — подскажу.")
     elif verdict.message:
         _say_once(verdict.message, box)
+    elif not task.boss and not _hidden(box):
+        _part_progress(box, task, ctx)
     if fresh:               # FB13: подсказчик привычек — не чаще совета за задачу
         tip = coach.advise(box, cmds, SERVICE)
         if tip:

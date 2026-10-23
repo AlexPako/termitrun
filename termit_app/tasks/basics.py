@@ -787,6 +787,16 @@ class CopyMove(Task):
     MSG_LEFT = ("{names} {verb} на месте: {pron} нужно было перенести (mv), а не скопировать. "
                 "Копия уже лежит где надо — лишнее убери: rm {args}")
 
+    def parts_for(self, state):
+        """FB5 п. 68: «сделал копию — игра молчит». Каждый нужный файл и каждое убранное имя."""
+        return ([f"{rel} на месте" for rel in state["want"]]
+                + [f"{rel} убран со старого места" for rel in state["gone"]])
+
+    def progress(self, ctx):
+        b, s = ctx.box, ctx.state
+        return ([kit.sha_in_box(b, rel) == h for rel, h in s["want"].items()]
+                + [not (b / rel).exists() for rel in s["gone"]])
+
     def _mixed_up(self, b, s):
         """FB6: перепутал cp и mv — без отклика игрок не видел, почему не засчитано.
         Только тупики: оригинала нет, а его текст лежит лишь там, куда шла копия (mv вместо
@@ -1742,8 +1752,9 @@ class HistoryRecall(Task):
     scroll = ("↑ ↓ — прошлые команды. Ctrl+R и кусок — поиск: ещё Ctrl+R — постарше; Enter — "
               "выполнить, ← или → — поправить, Ctrl+G — отмена.\n"
               "history — свежие с номерами, вся — history 1; !N — команда номер N: !42.\n"
-              "!! — последняя команда целиком: набери !! и Enter — zsh покажет подстановку и "
-              "выполнит. Не в той папке: cd папка && !! — сначала войти, потом та команда.")
+              "!! — последняя команда целиком: набери !! и Enter — zsh подставит её; встала в "
+              "строку и ждёт (настройка hist_verify) — Enter ещё раз. Не в той папке: "
+              "cd папка && !! — сначала войти, потом та команда.")
     variants = (
         Variant("Когда-то ты уже копировал три шаблона из templates в папку клиента {old}: "
                 "команда лежит в истории. Теперь те же шаблоны нужны клиенту {new} — папка "
@@ -2053,7 +2064,7 @@ class QuickFix(Task):
     hints = ("Путь — последнее слово прошлой команды. Набирать его не нужно.",
              "Esc, отпусти, потом точка — вставит последнее слово прошлой команды. Или !$ — то "
              "же набором.",
-             "cd !$ (или cd, пробел, Esc . и Enter)")
+             "cd !$ и Enter (встало в строку — Enter ещё раз) или cd, пробел, Esc . и Enter")
     solution = "cd, пробел, Esc ., Enter"
     solution_script = "cd projects/{client}/drafts/{year}/final"
     explain = ("Что уже набрано, не набирают снова: Esc . и !$ берут последнее слово прошлой "
@@ -2484,24 +2495,40 @@ class ZJump(Task):
         movers = [s for s in self._segments(line) if s.split()[0] in self._MOVERS]
         return movers[-1] if movers else ""
 
+    @staticmethod
+    def _same(home, p, rel):
+        try:
+            return Path(p).resolve() == (home / rel).resolve()
+        except (OSError, RuntimeError):
+            return False
+
+    def _went(self, home, line, rel):     # cd/pushd с путём папки: через ~ или полностью
+        return any(seg.split()[:1] in (["cd"], ["pushd"]) and
+                   (f"~/{rel}" in seg or str(home / rel) in seg)
+                   for seg in self._segments(line))
+
+    def _seen(self, ctx):
+        home = kit.home(ctx.box)
+        return [any(self._same(home, c.pwd, d) or self._went(home, c.line, d) for c in ctx.cmds)
+                for d in ctx.state["dirs"]]
+
+    def parts_for(self, state):
+        """FB5 п. 68: маршрут из четырёх папок и прыжок — сколько пройдено."""
+        return [f"папка {Path(d).name}" for d in state["dirs"]] + ["прыжок назад"]
+
+    def progress(self, ctx):
+        return self._seen(ctx) + [self.check(ctx).solved]
+
     def check(self, ctx):
         st = ctx.state
         home = kit.home(ctx.box)
 
         def same(p, rel):
-            try:
-                return Path(p).resolve() == (home / rel).resolve()
-            except (OSError, RuntimeError):
-                return False
-
-        def went(line, rel):        # cd/pushd с путём папки: через ~ или полностью
-            return any(seg.split()[:1] in (["cd"], ["pushd"]) and
-                       (f"~/{rel}" in seg or str(home / rel) in seg)
-                       for seg in self._segments(line))
+            return self._same(home, p, rel)
 
         if ctx.pwd is None or not same(ctx.pwd, st["target"]):
             return Verdict(False)
-        seen = [any(same(c.pwd, d) or went(c.line, d) for c in ctx.cmds) for d in st["dirs"]]
+        seen = self._seen(ctx)
         if not all(seen):
             # честный проход через цель посреди маршрута — не повод одёргивать (P2 Б10):
             # говорим, только если игрок уже был дальше цели по маршруту и вернулся

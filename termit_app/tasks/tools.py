@@ -1635,6 +1635,20 @@ class JobControl(Task):
             'echo "build.sh: built, see build.log"\n'))
         return {"mode": mode, "log": "build.log", "want": f"build {mode} ok"}
 
+    def parts_for(self, state):
+        """FB5 п. 68: вариант со сборкой — файл сделан, сборка доделала."""
+        if state.get("spam") or state.get("log") != "build.log":
+            return []
+        return ["config.txt сделан", "сборка доделала (fg)"]
+
+    def progress(self, ctx):
+        s, box = ctx.state, ctx.box
+        try:
+            done = (box / s["log"]).read_text("utf-8").strip() == s["want"]
+        except OSError:
+            done = False
+        return [(box / "config.txt").is_file(), done]
+
     def check(self, ctx):
         s, box = ctx.state, ctx.box
         if s.get("spam"):
