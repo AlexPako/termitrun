@@ -191,20 +191,26 @@ class WhereAmI(AnswerTask):
     title = "Где я стою"
     kind_answer = "path"
     # первая минута (П3.4): один способ сдать; $PWD и буфер — в «можно и так» и дальше
-    scroll = ("pwd — полный путь текущей папки.\n"
-              "Путь не перепечатывай: ans $(pwd) — $( ) выполнит команду и подставит её вывод "
-              "(то, что она напечатала) прямо в ответ.\n"
+    # владелец 23.10 (Р4): первая задача — без $( ): путь копируют мышью, $( ) — «быстрее так»
+    scroll = ("pwd — полный путь текущей папки. Путь — её вывод: то, что команда напечатала.\n"
+              "Путь не перепечатывай: трижды щёлкни по нему — выделится вся строка, Cmd+C; "
+              "потом ans, пробел, Cmd+V и Enter.\n"
               "Путь выйдет длинным: задание идёт в песочнице — отдельной папке игры, "
               "настоящие файлы она не трогает.")
     # «ans .» засчитывается в любом варианте (путь относительно текущей папки) — не wrong
     variants = (
         Variant("Назови полный путь папки, в которой ты сейчас стоишь. Набери pwd и нажми "
-                "Enter — терминал напечатает путь. Сдай его: ans $(pwd) и Enter — путь "
-                "подставится в ответ сам.",
+                "Enter — терминал напечатает путь. Не перепечатывай его: трижды щёлкни по "
+                "строке с путём, нажми Cmd+C, потом набери ans и пробел, вставь Cmd+V и нажми "
+                "Enter.",
+                hints=("Путь печатает команда pwd.",
+                       "Тройной щелчок выделит всю строку с путём, Cmd+C скопирует.",
+                       "pwd, тройной щелчок по пути, Cmd+C, затем ans, пробел, Cmd+V, Enter"),
+                solution="pwd, тройной щелчок по пути, Cmd+C, затем ans, пробел, Cmd+V, Enter",
+                solution_script="pwd",
                 wrong=("echo $HOME",),
-                alternatives=("ans $PWD — в $PWD терминал всегда держит путь текущей папки",
-                              "мышью — выдели путь, что напечатал pwd, и нажми Cmd+C; потом "
-                              "набери ans и пробел, вставь путь Cmd+V и нажми Enter")),
+                alternatives=("ans $(pwd) — быстрее: $( ) выполнит pwd и подставит путь сам",
+                              "ans $PWD — в $PWD терминал всегда держит путь текущей папки")),
         Variant("Тебя забросило в незнакомую глубину, и откуда ты пришёл — неизвестно. "
                 "Где ты? Сдай полный путь: ans ПУТЬ",
                 wrong=("echo src", "echo {name}/src"),
@@ -224,10 +230,10 @@ class WhereAmI(AnswerTask):
     hints = ("Путь печатает команда pwd. Перепечатывать его не нужно — вывод можно подставить.",
              "$( ) выполняет команду внутри и подставляет её вывод в строку: ans $(pwd)",
              "ans $(pwd) — $( ) подставит вывод pwd прямо в ответ")
-    solution = "ans $(pwd)"
+    solution = "ans $(pwd)"     # варианты B и C; A — копированием (свой solution)
     solution_script = "pwd"
-    explain = ("pwd печатает полный путь текущей папки. Вывод не перепечатывают — пальцы врут: "
-               "ans $(pwd) подставит его сам, а в $PWD текущий путь лежит всегда.")
+    explain = ("pwd печатает полный путь текущей папки. Вывод — то, что команда напечатала, — "
+               "не перепечатывают: пальцы врут. Копируют мышью, а позже — подставляют сам.")
     spell = "pwd — где я стою (полный путь текущей папки)"
     trap_messages = {"here": "Это путь текущей папки, а нужна папка на уровень выше: "
                              "поднимись cd .. и спроси pwd там."}
@@ -255,23 +261,22 @@ class ClimbDown(AnswerTask):
     title = "Записка в глубине"
     # FB5-plain: «в чём отличие cat от echo?» — сравнение там, где игрок видит обе команды
     # FB12 (N2): && — в уроке back_up, здесь — только поясняется в подсказке и разборе
-    scroll = ("cd ПАПКА — войти (можно по пути a/b/c); ls — что в папке; cat ФАЙЛ — что в "
-              "файле: echo notes.txt печатает само слово, а cat notes.txt — то, что внутри.\n"
+    scroll = ("cd ПАПКА — войти (можно по пути a/b/c); ls — что в папке; cat ФАЙЛ — что "
+              "внутри файла: cat notes.txt.\n"
               "Две-три буквы имени и Tab — терминал допишет.\n"
-              "ans $(cat note.txt) подставит слово. Повисло (cat ждёт ввода) — Ctrl+C.")
+              "Слово сдай: двойной щелчок по нему, Cmd+C, ans, пробел, Cmd+V. Повисло (cat ждёт "
+              "ввода) — Ctrl+C.")
     variants = (
         Variant("Глубоко в {path} лежит файл note.txt. Зайди туда и прочти, "
                 "какое слово в нём написано. Ответ: ans СЛОВО",
                 wrong=("cat note.txt",),
-                alternatives=("cat {path}/note.txt — прочесть, не заходя внутрь",
-                              "ans $(cat {path}/note.txt) — cat прочтёт записку, а $( ) "
-                              "подставит её слово прямо в ответ")),
+                alternatives=("cat {path}/note.txt — прочесть, не заходя внутрь",)),
         Variant("Записка note.txt лежит в «{path}» — в имени папки есть пробелы. "
                 "Доберись до неё и назови слово: ans СЛОВО",
                 hints=("Пробел cd считает границей: имя из трёх слов нужно склеить.",
                        "Возьми путь в кавычки — или набери cd Old и жми Tab: он сам поставит \\ "
                        "перед каждым пробелом.",
-                       'cd "{path}" && cat note.txt — потом ans $(cat note.txt)'),
+                       'cd "{path}" && cat note.txt — потом ans СЛОВО'),
                 solution='cd "{path}" && cat note.txt',
                 wrong=("cd Old Projects 2719/{sub} && cat note.txt", "cat note.txt"),
                 alternatives=("cd Old\\ Projects\\ 2719/{sub} — пробелы через \\ (так их "
@@ -280,17 +285,17 @@ class ClimbDown(AnswerTask):
                 "сказано в readme.txt. Найди её и сдай слово: ans СЛОВО",
                 hints=("Начни с cat readme.txt — там сказано, куда идти.",
                        "Потом cd в названную папку и cat note.txt; чужие записки — обманки.",
-                       "cat readme.txt, затем cd {target} && cat note.txt — и ans $(cat note.txt)"),
+                       "cat readme.txt, затем cd {target} && cat note.txt — и ans СЛОВО"),
                 solution="cat readme.txt && cd {target} && cat note.txt",
                 solution_script="cd {target} && cat note.txt",
                 wrong=("cd {decoy} && cat note.txt", "cat note.txt"),
-                alternatives=("ans $(cat {target}/note.txt) — когда папка уже известна",)),
+                alternatives=("cat {target}/note.txt — когда папка уже известна",)),
     )
     par = 40
     hints = ("Сначала войди в папку командой cd, потом прочти файл командой cat.",
              "Имена длинные — набери cd old и жми Tab.",
              "cd {path} && cat note.txt (&& пустит cat, только если cd удался) — потом "
-             "ans $(cat note.txt)")
+             "ans СЛОВО")
     solution = "cd {path} && cat note.txt"
     explain = ("cd меняет текущую папку, cat печатает файл. Длинные имена за тебя добьёт Tab, а "
                "&& пускает вторую команду, только если первая удалась.")
@@ -493,7 +498,7 @@ class HiddenCache(AnswerTask):
                        "ls -la покажет её: у папки строка начинается с буквы d. Имя с "
                        "точкой, например .stash, — это имя папки, а не команда; что внутри, "
                        "покажет ls -la .stash",
-                       "ls -la, затем cat .stash/note.txt — и ans $(cat .stash/note.txt)"),
+                       "ls -la, затем cat .stash/note.txt — и ans СЛОВО"),
                 solution="ls -la && cat .stash/note.txt",
                 solution_script="cat .stash/note.txt",
                 wrong=("cat .secret",),
@@ -512,7 +517,7 @@ class HiddenCache(AnswerTask):
     par = 30
     hints = ("Скрытые файлы начинаются с точки, обычный ls их не показывает.",
              "ls -la покажет всё.",
-             "ls -la, затем cat .secret — и ans $(cat .secret)")
+             "ls -la, затем cat .secret — и ans СЛОВО")
     solution = "ls -la && cat .secret"
     solution_script = "cat .secret"
     explain = "Файлы с точкой в начале скрыты; флаг -a показывает их, -l — подробности."
@@ -2826,10 +2831,13 @@ class BossBasics(Task):
 # сразу за первыми командами (pwd); история — когда в ней уже есть свои cd и ls; прокрутка и
 # поиск по экрану — к первому длинному выводу (за ls -R в задачах на глубину), быстрая правка
 # — за ними.
-TASKS = [MeetTerminal(), WhereAmI(), LineEdit(), CursorClip(), CutPaste(),
-         ClimbDown(), BackUp(), HomeTilde(), HistoryRecall(), HiddenCache(),
+# Владелец 23.10 (разбор геймдизайнера, Р4): сначала действие — где я, войти, прочесть, выйти,
+# дом, скрытое; потом оболочка и $, кавычки; клавиши строки — после первых шести дел.
+TASKS = [WhereAmI(), ClimbDown(), BackUp(), HomeTilde(), HiddenCache(),
+         MeetTerminal(), Quotes(),
+         LineEdit(), CursorClip(), CutPaste(), HistoryRecall(),
          MkdirP(), CopyMove(), FileExt(), StarMask(), QuestionMask(),
          RunScript(), DeepDig(), DeepRm(),
          ScreenScroll(), ScreenFind(), QuickFix(),
-         CopyDir(), Quotes(),
+         CopyDir(),
          FzfPick(), ZJump(), BossBasics()]

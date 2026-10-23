@@ -267,13 +267,14 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Основы»
     "meet_terminal": ("echo",),
     "where_am_i": ("pwd",),
-    "climb_down": ("cd", "ls", "cat", "Ctrl+C"),
+    # владелец 23.10 (Р4): клавиши строки — советами с первых задач, уроки клавиш — позже
+    "climb_down": ("cd", "ls", "cat", "Ctrl+C", "Ctrl+A", "Ctrl+E"),
+    "home_tilde": ("bash", "Ctrl+U"),
     "hidden_cache": ("mkdir",),
     "copy_move": ("cp", "mv", "find"),
     "file_ext": ("file",),
     "star_mask": ("rm",),
     "run_script": ("chmod",),
-    "line_edit": ("bash", "Ctrl+A", "Ctrl+E", "Ctrl+U"),
     "history_recall": ("history", "!!", "zsh"),
     "screen_scroll": ("clear",),
     "fzf_pick": ("fzf", "grep"),
