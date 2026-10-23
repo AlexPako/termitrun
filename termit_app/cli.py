@@ -88,8 +88,8 @@ def usage(p: dict = None) -> str:
     places = "basics" if edition.closed() else "basics, tools, finder"
     themes = f": {', '.join(theme.available())} (сейчас: {theme.current()})"
     later = LATER if any(not v and exists.get(k, True) for k, v in on.items()) else ""
-    play_lines = (cmd("run", "", " — разово, без убежища") + cmd("short") + cmd("new")
-                  + master_line + train_line + cmd("track", "МЕСТО", f" ({places})"))
+    play_lines = (cmd("run", "", " — разово, без убежища") + cmd("short") + cmd("grind")
+                  + cmd("new") + master_line + train_line + cmd("track", "МЕСТО", f" ({places})"))
     return f"""TermitRun — тренажёр терминала ({theme.tagline()})
 
   ./termit                 убежище: всё внутри, слова — help там же
@@ -1357,7 +1357,7 @@ def remember_seen(seen) -> None:
     progress.save(paths.PROGRESS_FILE, q)
 
 
-GAME_CMDS = {"dozor", "run", "short", "track", "play", "more", "new", "rehearse", "master",
+GAME_CMDS = {"dozor", "run", "short", "grind", "track", "play", "more", "new", "rehearse", "master",
              "train"}
 BUSY = "TermitRun уже запущен в другом окне. Доиграй там или закрой то окно — и запусти снова."
 
@@ -1435,6 +1435,8 @@ def _dispatch(cmd, args, opts) -> int:
         session.dozor(opts)
     elif cmd == "short":
         session.dozor(opts, short=True)
+    elif cmd == "grind":
+        session.dozor(opts, grind=True)
     elif cmd == "track" and len(args) > 1:
         session.run_track(args[1], opts)
     elif cmd == "play" and len(args) > 1:

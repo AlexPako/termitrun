@@ -481,6 +481,23 @@ HUNT_FLAGS = {"shard_hint": "hidden_cache", "nol_hint": "grep_count",
               "db_hint": "distinct_like", "script_hint": "script_audit"}
 
 
+# карточка доски «охота» (hideout, card hunt): по строке на каждую услышанную подсказку
+HUNT_CARD = {
+    "paydata_hint": "хабар *.pd в скрытой .cache/.pd — find . -name '*.pd', сдать: loot ПУТЬ",
+    "shard_hint": "осколки памяти — лишний файл в песочнице: прочитал — сохранится сам",
+    "nol_hint": "метка NOL: в ~/old_logs — grep NOL",
+    "db_hint": "метка NOL: в ~/archive, таблица notes — LIKE 'NOL:%'",
+    "script_hint": "метка NOL: в downloads/ — grep -n NOL downloads/* (не запускать!)",
+}
+HUNT_PIN_TIP = "Чтобы не забыть, что искать, приколи к доске напоминание: {cmd}"
+
+
+def hunt_card(p: dict) -> str:
+    flags = p.get("flags") or ()
+    items = [text for flag, text in HUNT_CARD.items() if flag in flags]
+    return ("🧩 Ищи по дороге: " + " · ".join(items)) if items else ""
+
+
 def hunt_hints(p: dict) -> List[str]:
     """Одноразовые реплики «охота существует»: каждая — один раз, после своего урока.
     Текста в теме нет — молчим (и флаг не ставим)."""

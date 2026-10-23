@@ -35,6 +35,7 @@ class Word:
 WORDS = (
     Word("run", ("dozor",), "play"),
     Word("short", ("short",), "play"),
+    Word("grind", ("grind",), "play"),
     Word("new", ("new",), "play", aliases=("more",)),
     Word("train", ("train",), "play", "[ТЕМА|ID|exam|keys]", aliases=("play",)),
     Word("master", ("master",), "play", rule="master"),
@@ -88,6 +89,7 @@ HUB_SKIP = {
 SHORT = {
     "run": "ран дня, ~10 минут",
     "short": "короткий ран",
+    "grind": "только знакомое",
     "new": "ещё урок сверх нормы",
     "train": "отработать слабое",
     "master": "знакомое на время",
@@ -125,12 +127,34 @@ SHORT = {
     "wheels": "пакеты Python",
     "update": "обновить игру",
     "hub": "показать пульт",
-    "help": "все слова подробно",
+    "help": "все слова",
     "clear": "очистить экран",
-    "quit": "выйти из игры",
+    "quit": "выйти",
 }
 
 # группы help: порядок групп и заголовки (слово — в группе из Word.group)
+# Владелец 23.10: рядом со словом игры — что оно даёт. Карма — значок здесь, кредиты — значок
+# денег темы. master платит только за побитый рекорд, rehearse — ничего (репетиция).
+KARMA_ICON = "✦"
+REWARDS = {"run": "karma money", "short": "karma money", "grind": "money", "new": "karma",
+           "train": "karma", "master": "money"}
+
+
+def reward_icons(name: str) -> str:
+    kinds = REWARDS.get(name, "").split()
+    return "".join(KARMA_ICON if k == "karma" else theme.word("money") for k in kinds)
+
+
+def short_text(name: str) -> str:
+    """Короткая расшифровка слова с наградой: «ран дня, ~10 минут ✦💳»."""
+    icons = reward_icons(name)
+    return f"{SHORT[name]} {icons}" if icons else SHORT[name]
+
+
+def reward_legend() -> str:
+    return f"{KARMA_ICON} карма, {theme.word('money')} {theme.word('money_name')}"
+
+
 GROUPS: Tuple[Tuple[str, str], ...] = (
     ("play", "Играть"),
     ("home", "Дом"),
@@ -394,6 +418,14 @@ def help_lines(p: dict, name: str = "", width: Optional[int] = None, dense: bool
             out += _flow_rows("  " + (title + ":").ljust(12), names, width)
         elif names:
             out += _short_rows("  " + (title + ":").ljust(12), names, width, longest)
+        if names and any(n in REWARDS for n in names):
+            # расшифровка значков — в хвост последней строки группы, если влезает (пульт не
+            # выше SCREEN_LINES), иначе своей строкой
+            tail = f"  ({reward_legend()})"
+            if tui.vlen(out[-1] + tail) <= width:
+                out[-1] += tail
+            else:
+                out.append(" " * 14 + reward_legend())
     closed = [w.name for w in closed_words(p)]
     if closed:
         rows = _group_rows(CLOSED_HEAD.ljust(14), closed, width)
@@ -418,7 +450,7 @@ def _flow_rows(head: str, names: List[str], width: int) -> List[str]:
     """Группа слов потоком: «слово — что делает · слово — …», перенос целой парой."""
     rows, line = [], head
     for i, name in enumerate(names):
-        piece = f"{name} — {SHORT[name]}" + (" ·" if i < len(names) - 1 else "")
+        piece = f"{name} — {short_text(name)}" + (" ·" if i < len(names) - 1 else "")
         if line.strip() and line != head and tui.vlen(line) + 1 + tui.vlen(piece) > width:
             rows.append(line)
             line = " " * len(head)
@@ -453,7 +485,7 @@ def board_screen(p: dict, day=None, cp=None) -> List[str]:
 
 
 def _cell(name: str) -> str:
-    return f"{name.ljust(9)} {SHORT[name]}"
+    return f"{name.ljust(9)} {short_text(name)}"
 
 
 def _short_rows(head: str, names: List[str], width: int, longest: int) -> List[str]:
@@ -545,7 +577,7 @@ BROKE = ("Что-то пошло не так, но убежище цело. По
 CLEAR = "\033[H\033[2J"
 BACK = "в убежище: Enter "
 # слова, после которых игрок был в задачах: терминал и музыку приводим в порядок
-RUN_WORDS = frozenset(("run", "short", "new", "master", "rehearse", "train"))
+RUN_WORDS = frozenset(("run", "short", "grind", "new", "master", "rehearse", "train"))
 
 
 class Hub:

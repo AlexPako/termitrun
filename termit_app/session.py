@@ -140,6 +140,19 @@ def today_reviews(p: dict, today: date, short: bool = False) -> List[str]:
     return guards + rest[:REVIEWS_SHORT if short else REVIEWS_PER_RUN]
 
 
+def grind_queue(p: dict, today: date) -> List[str]:
+    """Владелец 23.10: «зарабатывать кредиты и отрабатывать изученное без продвижения вперёд».
+    grind — только знакомые дела, которым пора на повтор (тот же срез, что взял бы ран дня),
+    без новых уроков и без стражей: денег за день столько же, сколько дал бы обычный ран.
+    Сверх расписания не платим — иначе ферма кредитов (экономика считана на повторы по сроку)."""
+    tasks = registry.all_tasks()
+    return [i for i in today_reviews(p, today) if not tasks[i].boss]
+
+
+GRIND_EMPTY = ("На сегодня знакомых дел нет: всё пройденное повторять ещё рано. Новое — new, "
+               "рекорды за кредиты — master.")
+
+
 def build_queue(p: dict, today: date, short: bool = False, rng=None) -> List[str]:
     rng = rng or random.Random()
     tasks = registry.all_tasks()
@@ -1256,10 +1269,13 @@ def _close_day_ritual(p: dict, opts: Options, today: date, tally: dict, streak_b
             ui.say(ui.story_fill(cosmetics.stock_line(stocked), "", "   "))
     with inbox.collect(p, "hunt", "raven", f"hunt:{today.isoformat()}", today, on=opts.hub,
                        by_text=True):
-        for hint in story.hunt_hints(p) + [loot.hint(p)]:   # один раз: охота существует
-            if hint:
-                ui.say()
-                ui.say(ui.story_fill(hint, "", "   "))
+        hints = [h for h in story.hunt_hints(p) + [loot.hint(p)] if h]   # один раз
+        for hint in hints:
+            ui.say()
+            ui.say(ui.story_fill(hint, "", "   "))
+        if hints and hideout.has_board(p) and "hunt" not in hideout.pinned(p):
+            ui.say(ui.story_fill(story.HUNT_PIN_TIP.format(
+                cmd=hideout.board_cmd("pin hunt")), "", "   "))
     # склад pandas/requests (часть 10, A3): трек «Python» открыт, склада нет — один
     # вопрос в день, качает только родитель и только по y. Вопрос в конце рана — один на
     # всех (M1 ревью Q4): склад или имплант, другой ждёт следующего рана
@@ -1336,20 +1352,23 @@ def more_batch(p: dict) -> List[str]:
 
 
 @_rooted
-def dozor(opts: Options, short: bool = False) -> None:
+def dozor(opts: Options, short: bool = False, grind: bool = False) -> None:
     """Ран. С music run on — своя кассета на время рана; стоп в finally (и по Ctrl+C)."""
+    if grind and not grind_queue(progress.load(opts.progress_path), opts.today or date.today()):
+        ui.say(GRIND_EMPTY)
+        return
     with music.in_run(progress.load(opts.progress_path)):
-        _dozor(opts, short)
+        _dozor(opts, short, grind)
 
 
-def _dozor(opts: Options, short: bool = False) -> None:
+def _dozor(opts: Options, short: bool = False, grind: bool = False) -> None:
     p = progress.load(opts.progress_path)
     today = opts.today or date.today()
     first_run = _intro_once(p, opts)
     sandbox.cleanup_stale(opts.sandbox_root)
     if not opts.hub:        # в убежище «Сделал?» ждёт на деке
         field.ask_pending(p, opts.ask, today)
-    back = contracts.comeback(p, today)
+    back = None if grind else contracts.comeback(p, today)
     queue = contracts.comeback_queue(p) if back else []
     if queue:       # выгодный ран: сильные знакомые дела + одно новое, тренировкой, ×2 (М1)
         contracts.expire(p, today)
@@ -1357,12 +1376,13 @@ def _dozor(opts: Options, short: bool = False) -> None:
                                    comeback_bonus=back["bonus"], comeback=True)
     else:
         back = None
-        queue = contracts.inject(p, build_queue(p, today, short), today)  # срочный — делом
+        queue = (grind_queue(p, today) if grind else
+                 contracts.inject(p, build_queue(p, today, short), today))  # срочный — делом
     warmup = not queue
     if warmup:                 # пустых дней нет: круг мастера по знакомому (М3), без расписания
         queue = warmup_queue(p)
         opts = dataclasses.replace(opts, practice=True, master=frozenset(queue))
-    elif not back and not any(not progress.seen(p, t) for t in queue):
+    elif not back and not grind and not any(not progress.seen(p, t) for t in queue):
         extra = master.fill(p, queue, short=short)  # сезон закрыт, нового нет: добор кругом
         if extra:
             queue = queue + extra

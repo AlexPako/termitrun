@@ -1009,7 +1009,7 @@ def prompt_lines(p: dict) -> List[str]:
 
 BOARD = "board"
 BOARD_SLOTS = ("board2", "board3")
-CARDS = ("keys-line", "keys-history", "keys-screen", "game", "rotate")
+CARDS = ("keys-line", "keys-history", "keys-screen", "game", "rotate", "hunt")
 DEFAULT_CARDS = ["keys-line"]
 GAME_CARD = "game"          # сама висит над приглашением, пока не взят страж «Основ»
 BASICS_BOSS = "boss_basics"
@@ -1021,7 +1021,11 @@ CARD_NAMES = {"keys-line": "клавиши правки строки",
               "keys-history": "история команд",
               "keys-screen": "экран: прокрутка и очистка",
               "game": "команды игры в задаче",
-              "rotate": "совет дня: приём терминала, каждую задачу новый"}
+              "rotate": "совет дня: приём терминала, каждую задачу новый",
+              "hunt": "охота: что искать в песочницах, кроме задания"}
+# владелец 23.10: «прочитал про хабар раз — и забыл, что мы вообще ищем»: карточка открыта,
+# как только кто-то рассказал про охоту (флаги story.HUNT_FLAGS и подсказка хабара loot)
+HUNT_OPEN = ("paydata_hint", "shard_hint", "nol_hint", "db_hint", "script_hint")
 
 
 def has_board(p: dict) -> bool:
@@ -1042,6 +1046,8 @@ def basics_on(p: dict) -> bool:
 
 
 def card_open(p: dict, card: str) -> bool:
+    if card == "hunt":
+        return any(f in (p.get("flags") or ()) for f in HUNT_OPEN)
     need = CARD_OPEN.get(card, "")
     if need is None:
         return True
@@ -1094,6 +1100,9 @@ def card_text(p: dict, card: str) -> str:
     if card == "rotate":
         tips = _rotate_tips(p)
         return tips[_turn(p) % len(tips)] if tips else ""
+    if card == "hunt":
+        from termit_app import story
+        return story.hunt_card(p)
     from termit_app import theme
     return ui.BOARD_CARDS[card].replace("{money}", theme.word("money_name"))
 

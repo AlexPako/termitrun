@@ -376,7 +376,7 @@ if [[ -n $TERMIT_HUB ]]; then
   command_not_found_handler() {
     _termit_layout_hint "$1" && return 127
     case $1 in
-      board|callsign|clear|coach|deck|diary|dossier|feedback|fence|help|home|hub|implants|inbox|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|train|update|wheels)
+      board|callsign|clear|coach|deck|diary|dossier|feedback|fence|grind|help|home|hub|implants|inbox|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|train|update|wheels)
         print -r -- "$1 — слово убежища. quit — и ты в убежище, там набери $1."
         return 127 ;;
     esac
