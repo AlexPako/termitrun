@@ -100,6 +100,8 @@ SHOWN_RULES: Dict[str, Tuple[str, Optional[str], str]] = {
                                    "эталонов идёт без него (zsh -f)"),
     "climb_down": ("read", None, "cat печатает записку, слово из неё игрок сдаёт сам"),
     "home_tilde": ("read", None, "cat печатает записку, слово из неё игрок сдаёт сам"),
+    "quotes:0": ("read", None, "cat печатает файл, слово из него игрок сдаёт сам"),
+    "quotes:1": ("look", None, "ls показывает файлы папки, число игрок считает сам"),
     "hidden_cache": ("read", None, "ls -la && cat печатает тайник, ответ игрок сдаёт сам"),
     "file_ext": ("read", None, "ls печатает имена, cat — записку, file — что внутри: ответ "
                            "игрок сдаёт сам"),

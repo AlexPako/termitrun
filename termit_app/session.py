@@ -120,8 +120,28 @@ def next_new(p: dict, limit: int) -> List[str]:
     return out
 
 
-REVIEWS_PER_RUN = 4         # столько старых дел берёт обычный ран (build_queue, tomorrow_note)
-REVIEWS_SHORT = 2           # и короткий (./termit short)
+REVIEWS_PER_RUN = 4         # потолок старых дел в обычном ране (build_queue, tomorrow_note)
+REVIEWS_SHORT = 2           # и в коротком (./termit short)
+# владелец 23.10: новое — первым и основой рана, повторов «не больше трети»: ран — RUN_SIZE
+# задач, сколько можно нового, остальное — повторы (не меньше REVIEWS_MIN); нового нет — ран
+# снова из повторов. Остальные просроченные — в grind.
+RUN_SIZE = 4
+RUN_SIZE_SHORT = 3
+REVIEWS_MIN = 1
+GRIND_SIZE = 5
+
+
+def new_count(p: dict, today: date, short: bool = False) -> int:
+    """Сколько новых уроков возьмёт ран: лимит дня (короткий — на один меньше, но хоть один)."""
+    limit = progress.new_limit(p, today)
+    return max(1, limit - 1) if short else limit
+
+
+def review_slots(p: dict, today: date, short: bool = False) -> int:
+    new = len(next_new(p, new_count(p, today, short)))
+    size = RUN_SIZE_SHORT if short else RUN_SIZE
+    cap = REVIEWS_SHORT if short else REVIEWS_PER_RUN
+    return min(cap, max(REVIEWS_MIN, size - new))
 
 
 def today_reviews(p: dict, today: date, short: bool = False) -> List[str]:
@@ -137,16 +157,18 @@ def today_reviews(p: dict, today: date, short: bool = False) -> List[str]:
     # вечно вытесняет его из рана, а новое в его месте не откроется, пока он не взломан
     guards = [i for i in reviews if tasks[i].boss and i not in p["bosses"]]
     rest = [i for i in reviews if i not in guards]
-    return guards + rest[:REVIEWS_SHORT if short else REVIEWS_PER_RUN]
+    return guards + rest[:review_slots(p, today, short)]
 
 
 def grind_queue(p: dict, today: date) -> List[str]:
     """Владелец 23.10: «зарабатывать кредиты и отрабатывать изученное без продвижения вперёд».
-    grind — только знакомые дела, которым пора на повтор (тот же срез, что взял бы ран дня),
+    grind — только знакомые дела, которым пора на повтор (все просроченные, по GRIND_SIZE за заход),
     без новых уроков и без стражей: денег за день столько же, сколько дал бы обычный ран.
     Сверх расписания не платим — иначе ферма кредитов (экономика считана на повторы по сроку)."""
     tasks = registry.all_tasks()
-    return [i for i in today_reviews(p, today) if not tasks[i].boss]
+    due = [i for i in progress.due(p, today)
+           if i in tasks and available(tasks[i]) and after_done(p, tasks[i]) and not tasks[i].boss]
+    return due[:GRIND_SIZE]
 
 
 GRIND_EMPTY = ("На сегодня знакомых дел нет: всё пройденное повторять ещё рано. Новое — new, "
@@ -156,7 +178,7 @@ GRIND_EMPTY = ("На сегодня знакомых дел нет: всё пр�
 def build_queue(p: dict, today: date, short: bool = False, rng=None) -> List[str]:
     rng = rng or random.Random()
     tasks = registry.all_tasks()
-    queue = today_reviews(p, today, short) + next_new(p, progress.new_limit(p, today))
+    queue = today_reviews(p, today, short) + next_new(p, new_count(p, today, short))
     rng.shuffle(queue)
     # сначала тренировки (новое), потом дела (повторения), схватка — в конце
     queue.sort(key=lambda i: (tasks[i].boss,
@@ -421,7 +443,24 @@ def _say_alternative(task, state, variant, seed, outcome, mine: Optional[str] = 
     if not alts:
         return
     alt = progress.clean_text(alts[random.Random(seed).randrange(len(alts))])   # В4
-    ui.say(f"   Можно и так: {alt}")
+    ui.say(f"   Можно и так: {alt}{new_in_alt(task, alt)}")
+
+
+NEW_IN_ALT = " (новая команда: {words} — пока для кругозора)"
+
+
+def new_in_alt(task, alt: str) -> str:
+    """Владелец 23.10: «про dirname до этого не было информации — так и задумано?» В «Можно
+    и так» бывает приём из будущего: так и говорим. Новая — настоящая команда (есть в системе),
+    которой не было в карточках по пути игрока к этой задаче (та же мера, что S009 линтера)."""
+    import shutil
+    from termit_app.tasks import lint, lint_lessons
+    try:
+        fresh = sorted(w for w in lint.command_words(alt) - lint_lessons.path_taught(task)
+                       if shutil.which(w))
+    except Exception:       # noqa: BLE001 — пометка необязательна, разбор не роняем
+        return ""
+    return NEW_IN_ALT.format(words=", ".join(fresh)) if fresh else ""
 
 
 def _note_review(task, state, variant, rec: dict, today: date) -> None:

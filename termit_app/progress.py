@@ -34,7 +34,9 @@ STREAK_MILESTONES = {7: 30, 14: 50, 30: 100, 60: 150, 90: 200, 180: 300}
 SLOT_KARMA = {2: 1500, 3: 4000}  # карма открывает слоты деки, сама не тратится
 TRAIN_XP = 5
 NEW_FIRST_WEEK = 2              # новых задач в ране первые 7 дней игры
-NEW_LATER = 1                   # дальше — по одной
+# владелец 23.10: «мы прошли порядочно, а нам всё подсовывают элементарный уровень» — ран был
+# 4 повтора + 1 новое; теперь новое — основа рана (session.RUN_SIZE), повторы — остаток и grind
+NEW_LATER = 3                   # дальше — по три
 FIRST_WEEK_DAYS = 7
 # Сова (локальная Ollama): вопрос на деле = −1 ★ и OWL_BASE × ярус; в тренировке —
 # OWL_FREE_TRAIN бесплатно за ран; не больше OWL_PER_TASK на задачу и OWL_PER_RUN за ран
@@ -462,6 +464,10 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         if drill:
             rec["drill_day"] = today.isoformat()
         if outcome == "solved":
+            # первое решение нового урока платит, как дело: доход рана держится, хотя повторов
+            # в нём меньше (владелец 23.10, econ_sim); повторная тренировка — нет
+            if not rec["solved"] and not practice and not drill:
+                p["money"] += stars * pay_per_star
             rec["solved"] += 1
             if not drill or not hints:
                 _note_best(rec, elapsed)
@@ -488,7 +494,10 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
             p["bosses"].append(task_id)
             p["money"] += BOSS_MONEY.get(task_id, 100)
     if outcome == "solved" and stars == 3:
-        rec["level"] = min(rec["level"] + 1, len(INTERVALS))
+        # ★★★ второй раз подряд — знает твёрдо: через ступень (владелец 23.10: «нам всё
+        # подсовывают элементарный уровень»)
+        step = 2 if rec.get("last_stars") == 3 else 1
+        rec["level"] = min(rec["level"] + step, len(INTERVALS))
         rec["due"] = (today + timedelta(days=INTERVALS[rec["level"] - 1])).isoformat()
     elif outcome == "solved" and stars == 2 and hints == 0:
         # верно и без подсказок, но позже таймера: это не провал (П3.7). Уровень растёт

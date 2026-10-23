@@ -2272,6 +2272,95 @@ PICK_MONTHS = ("january", "february", "march", "april", "june", "july", "august"
 PICK_KINDS = ("final", "draft", "review", "backup", "summary")
 
 
+class Quotes(AnswerTask):
+    """Владелец 23.10 (fzf_pick): «про кавычки надо отдельно рассказывать — когда их применять,
+    зачем и почему тут двойные, а в других командах одинарные». Пробел режет строку на слова;
+    "…" склеивает и пускает $ внутрь; '…' — всё буквально; \\ — один знак (так пишет Tab)."""
+    id = "quotes"
+    track = "basics"
+    title = "Кавычки"
+    scroll = ("Пробел режет строку на отдельные слова: cat march report.txt — два файла, «march» "
+              "и «report.txt».\n"
+              "\"…\" — двойные кавычки: всё внутри — одно слово, но $ и $(…) срабатывают: "
+              "cat \"march report.txt\".\n"
+              "'…' — одинарные: всё буквально, $ остаётся долларом. \\ перед пробелом — то же для "
+              "одного знака (так пишет Tab).")
+    variants = (
+        Variant("В этой папке лежит файл «{name}» — с пробелом в имени. Прочти его и сдай "
+                "слово, что в нём записано: ans СЛОВО",
+                hints=("Без кавычек cat получит два имени — {a} и {b}.txt — и не найдёт ни "
+                       "одного.",
+                       "Возьми имя в кавычки целиком: «{name}» в \"…\" — одно слово.",
+                       "cat \"{name}\", затем ans СЛОВО"),
+                solution="cat \"{name}\"",
+                solution_script="cat \"{name}\"",
+                wrong=("cat {name}",),
+                alternatives=("cat {a}\\ {b}.txt — пробел через \\, так его пишет Tab",
+                              "cat '{name}' — одинарные тоже подходят: в имени нет $")),
+        Variant("Папка «{dir}» — с пробелом в имени. Сколько в ней файлов? Ответ — число: "
+                "ans ЧИСЛО",
+                hints=("ls покажет, что внутри папки, — но имя с пробелом zsh разрежет на два.",
+                       "Склей имя папки кавычками: ls \"{dir}\".",
+                       "ls \"{dir}\", посчитай файлы и ans ЧИСЛО"),
+                solution="ls \"{dir}\"",
+                solution_script="ls \"{dir}\" | wc -l",
+                wrong=("ls {dir} | wc -l",),
+                alternatives=("ls {d1}\\ {d2} — то же через \\",)),
+        Variant("Клиент в сером диктует пароль: {code} — буквы, знак доллара и цифра. Сдай его "
+                "ответом ровно так, со знаком доллара: ans ПАРОЛЬ",
+                hints=("Сдай как есть и посмотри, что дошло: $ с цифрой zsh считает "
+                       "подстановкой и подменяет пустотой.",
+                       "Двойные кавычки $ не спасут — внутри них подстановка работает. Нужны "
+                       "одинарные '…': в них всё буквально.",
+                       "ans '{code}'"),
+                solution="ans '{code}'",
+                solution_script="echo '{code}'",
+                wrong=("echo {code}", "echo \"{code}\""),
+                alternatives=("ans {head}\\${digit} — \\ перед $ тоже спасает один знак",)),
+    )
+    par = 30
+    hints = ("Без кавычек zsh режет строку по пробелам.",
+             "Имя с пробелом бери в кавычки целиком.",
+             "cat \"ИМЯ С ПРОБЕЛОМ\", затем ans СЛОВО")
+    solution = "cat \"ИМЯ С ПРОБЕЛОМ\""
+    explain = ("Пробел делит строку на слова. \"…\" склеивает и пускает внутрь $ и $(…); '…' — "
+               "всё буквально; \\ — один знак.")
+    spell = "\"…\" — одно слово, $ работает; '…' — буквально; \\ — один знак"
+    trap_messages = {
+        "eaten": "Доллар с цифрой пропал: без кавычек и в \"…\" $ с цифрой — подстановка, и "
+                 "она пустая. Одинарные '…' берут текст буквально: ans '…'.",
+        "split": "Это кусок имени до пробела. Возьми имя в кавычки целиком.",
+    }
+    kinds = ("text", "number", "text")
+
+    def answer_kind(self, state):
+        return self.kinds[variant_index(state.get("_variant"), 3)]
+
+    def setup_variant(self, box, rng, variant):
+        if variant == 1:
+            d1, d2 = rng.sample(("Client", "Old", "Shared", "Team", "Tax", "Photo"), 2)
+            folder = f"{d1} {d2}"
+            n = rng.randint(3, 6)
+            for name in rng.sample(kit.LATIN, n):
+                kit.write(Path(box) / folder / f"{name}.txt", f"{kit.word(rng)}\n")
+            return {"dir": folder, "d1": d1, "d2": d2, "answer": n}
+        if variant == 2:
+            head = "".join(rng.choice("abdfghkmnpqrstvxz") for _ in range(2))
+            digit = rng.randint(1, 9)
+            return {"code": f"{head}${digit}", "head": head, "digit": digit,
+                    "answer": f"{head}${digit}", "traps": [["eaten", head]]}
+        a, b = rng.sample(("march", "budget", "client", "final", "team", "notes"), 2)
+        name = f"{a} {b}.txt"
+        w = kit.word(rng)
+        kit.write(Path(box) / name, f"{w}\n")
+        decoy = kit.word(rng)
+        while decoy == w:
+            decoy = kit.word(rng)
+        kit.write(Path(box) / f"{a}.txt", f"{decoy}\n")       # приманка: кусок имени до пробела
+        return {"name": name, "a": a, "b": b, "answer": w, "traps": [["split", decoy]],
+                "sources": sources(box, name)}
+
+
 class FzfPick(AnswerTask):
     id = "fzf_pick"
     track = "basics"
@@ -2742,5 +2831,5 @@ TASKS = [MeetTerminal(), WhereAmI(), LineEdit(), CursorClip(), CutPaste(),
          MkdirP(), CopyMove(), FileExt(), StarMask(), QuestionMask(),
          RunScript(), DeepDig(), DeepRm(),
          ScreenScroll(), ScreenFind(), QuickFix(),
-         CopyDir(),
+         CopyDir(), Quotes(),
          FzfPick(), ZJump(), BossBasics()]
