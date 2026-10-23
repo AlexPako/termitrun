@@ -483,7 +483,7 @@ HUNT_FLAGS = {"shard_hint": "hidden_cache", "nol_hint": "grep_count",
 
 # карточка доски «охота» (hideout, card hunt): по строке на каждую услышанную подсказку
 HUNT_CARD = {
-    "paydata_hint": "хабар *.pd в скрытой .cache/.pd (кэш — склад временных копий) — "
+    "paydata_hint": "хабар *.pd в скрытой .cache/.pd (кэш — склад временных заготовок) — "
                     "find . -name '*.pd', сдать: loot ПУТЬ",
     "shard_hint": "осколки памяти — лишний файл в песочнице: прочитал — сохранится сам",
     "nol_hint": "метка NOL: в ~/old_logs — grep NOL",
