@@ -8,6 +8,16 @@ from termit_app.tasks import registry
 
 # пороги реплик: при скольких оставшихся задачах звучит реплика (0 — страж ждёт)
 STEPS = (5, 2, 0)
+# Владелец 23.10: «счётчик до стража убрать, страж приходит внезапно; потом купим расширение
+# деки, которое сигнализирует об атаках извне — видно, что скоро страж, но без счётчика».
+# Пока такого модуля нет — цель и реплики на подходе молчат; модуль включит их (SENSOR).
+SENSOR = "attack_sensor"
+
+
+def sensed(p: dict) -> bool:
+    """Игрок чует приближение стража: стоит модуль деки SENSOR (появится позже)."""
+    deck = p.get("deck") if isinstance(p.get("deck"), list) else []
+    return SENSOR in deck or SENSOR in (p.get("owned") or ())
 
 
 def _counts(p: dict, task) -> bool:
@@ -38,7 +48,9 @@ def nearest(p: dict) -> Optional[Tuple[str, str, int]]:
 
 def line(p: dict) -> Optional[str]:
     """«Цель — Убежище «Ноль»: до стража 4 задачи» или «…: страж ждёт». Все стражи открытых мест
-    взяты — None."""
+    взяты — None. Без модуля SENSOR — None: страж приходит внезапно (владелец 23.10)."""
+    if not sensed(p):
+        return None
     goal = nearest(p)
     if goal is None:
         return None
@@ -92,6 +104,8 @@ def say_lines(p: dict) -> List[Tuple[str, str, str]]:
     """Реплика нового порога: [(вид, кто, строка)] и отметка в сохранении. Вид "say" —
     персонаж (кто — имя), "voice" — внутренний голос места (story.voice_name). Нет реплики в
     теме — пусто, но порог отмечается: иначе он «догонял» бы игрока после смены темы."""
+    if not sensed(p):
+        return []
     step = due_step(p)
     if step is None:
         return []

@@ -158,11 +158,8 @@ def place_text(p: dict, cp) -> Optional[str]:
     if state is None:
         return None
     key, solved, total = state
-    left = total - solved
-    bar = tui.bar(solved, total, BAR_CELLS, cp)
-    count = f"{solved} из {total}" if bar else f"решено {solved} из {total}"
-    tail = f"до стража {left}" if left else "дальше — страж"
-    return " ".join(x for x in (theme.place(key), bar, count) if x) + f" · {tail}"
+    # владелец 23.10: ни полоски, ни «из M», ни «до стража N» — страж приходит внезапно
+    return f"{theme.place(key)} · решено задач: {solved}"
 
 
 def week_marks(p: dict, day: date, cp) -> Tuple[str, int]:

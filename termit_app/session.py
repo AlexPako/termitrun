@@ -131,16 +131,27 @@ REVIEWS_MIN = 1
 GRIND_SIZE = 5
 
 
+# владелец 23.10: «на основах, если реально сидеть не отвлекаясь, 12 задач — это 10 минут, а
+# практики больше» — пока идут «Основы» (их страж не взят), ран вдвое больше
+BASICS_SCALE = 2
+
+
+def run_scale(p: dict) -> int:
+    return 1 if "boss_basics" in (p.get("bosses") or ()) else BASICS_SCALE
+
+
 def new_count(p: dict, today: date, short: bool = False) -> int:
-    """Сколько новых уроков возьмёт ран: лимит дня (короткий — на один меньше, но хоть один)."""
-    limit = progress.new_limit(p, today)
+    """Сколько новых уроков возьмёт ран: лимит дня (короткий — на один меньше, но хоть один);
+    на «Основах» — вдвое (run_scale)."""
+    limit = progress.new_limit(p, today) * run_scale(p)
     return max(1, limit - 1) if short else limit
 
 
 def review_slots(p: dict, today: date, short: bool = False) -> int:
     new = len(next_new(p, new_count(p, today, short)))
-    size = RUN_SIZE_SHORT if short else RUN_SIZE
-    cap = REVIEWS_SHORT if short else REVIEWS_PER_RUN
+    scale = run_scale(p)
+    size = (RUN_SIZE_SHORT if short else RUN_SIZE) * scale
+    cap = (REVIEWS_SHORT if short else REVIEWS_PER_RUN) * scale
     return min(cap, max(REVIEWS_MIN, size - new))
 
 
@@ -569,7 +580,8 @@ def _remark_ctx(p: dict, task, cmd, elapsed, gain, today: date) -> dict:
         near = goal.nearest(p)
     except Exception:       # noqa: BLE001 — цель не роняет разбор
         near = None
-    left = near[2] if near and near[0] == task.track else None
+    # владелец 23.10: без модуля-сенсора реплики не считают задачи до стража
+    left = near[2] if near and near[0] == task.track and goal.sensed(p) else None
     return remarks.context(cmd=cmd, elapsed=elapsed, gain=gain,
                            streak=progress.current_streak(p, today),
                            left_to_boss=left, hour=datetime.now().hour)
