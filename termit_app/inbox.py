@@ -13,6 +13,7 @@ from datetime import date
 from typing import Callable, Dict, List, Optional
 
 from termit_app import tui
+from termit_app.textnorm import YES
 
 KEEP = 30
 MAX_TEXT = 2000
@@ -27,6 +28,13 @@ NO_NEW = "Новых сообщений нет. Весь список — inbox.
 NO_SUCH = "Сообщения {n} нет. Весь список — inbox."
 WAITS = "ждёт ответа"
 ASK_PROMPT = "   Ответ (y — да, n — нет; Enter — решу потом): "
+# заказ в реале обещает команду «когда спрошу „Сделал?“» — значит, ? в вопросе назван (23.10)
+FIELD_PROMPT = "   Сделал? (y — да, n — нет, ? — показать команду; Enter — решу потом): "
+
+
+def ask_prompt(msg: dict) -> str:
+    ask = msg.get("ask")
+    return FIELD_PROMPT if isinstance(ask, dict) and ask.get("kind") == "field" else ASK_PROMPT
 LIST_TAIL = "  inbox N — открыть · inbox next — следующее новое"
 WHEN_COLUMN = 16
 SUMMARY = "✉ На деке {n} {word} — прочтёшь в убежище: inbox."
@@ -266,6 +274,8 @@ def _answer_field(p, fid, reply, day, opts) -> bool:
     if reply == "?":
         field.show_command(fid)
         return False
+    if reply.strip().lower() in YES:      # владелец 23.10: сделал — а как делают, не увидел
+        field.show_command(fid)
     field.answer(p, fid, reply, day)
     return True
 

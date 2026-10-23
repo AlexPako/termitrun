@@ -278,6 +278,10 @@ class Task:
     def shown_solution(self, state: dict) -> str:
         return self._solution(self.variant(state)).format(**state)
 
+    def display_solution(self, state: dict) -> str:
+        """Эталон для экрана разбора и дневника; у задач с ответом — со сдачей (AnswerTask)."""
+        return self.shown_solution(state)
+
     def allowed_variants(self, box: Path) -> Tuple[int, ...]:
         """Какие варианты можно выдать в этой песочнице (по умолчанию — все). Задача, чьему
         варианту нужно то, чего здесь нет, сужает список; родитель ротирует только по нему
@@ -439,6 +443,11 @@ MSG_LOST_SOURCE = ("Файл, где лежал ответ, пропал или 
                    "заново, с теми же данными.")
 
 
+# эталон словами, а не командой: клавиши и стрелки, русская фраза вне кавычек
+_PROSE = re.compile(r"[↑↓←→]|\b(?:Ctrl|Cmd|Option|Enter|Esc)\b|(?:^|[\s,])[а-яё]{3,}(?=[\s,]|$)",
+                    re.I)
+
+
 class AnswerTask(Task):
     """Поручение «найди и назови»: решено, когда ans совпал с ответом.
 
@@ -460,6 +469,23 @@ class AnswerTask(Task):
 
     def expected(self, state: dict) -> str:
         return str(state["answer"])
+
+    def display_solution(self, state: dict) -> str:
+        """Владелец 23.10: «в эталоне cat путь к файлу, а в задании — назвать слово». На экране
+        эталон задачи с ответом кончается сдачей: команда поиска, потом ans и сам ответ.
+        shown_solution не трогаем: его гоняет D005 и с ним сравнивает «Разница»."""
+        sol = self.shown_solution(state)
+        if not self.takes_answer(state) or re.search(r"\bans\b", sol):
+            return sol
+        try:
+            exp = self.expected(state)
+        except (KeyError, TypeError, ValueError):
+            return sol
+        # эталон-команду игрок копирует, и D005 гоняет его в zsh: сдача — тем же звеном; эталон
+        # словами (клавиши, «исправь …») — словами
+        if _PROSE.search(sol):
+            return f"{sol}, потом ans {exp}"
+        return f"{sol} && ans {exp}"
 
     def answer_kind(self, state: dict) -> str:
         """Вид ответа этого варианта (text | number | path); по умолчанию — kind_answer."""

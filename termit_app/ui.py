@@ -517,7 +517,7 @@ def review(task, state, outcome, mine, elapsed, stars_n, record_from,
         cp = _framed()
         if mine:
             say(f"   Ты:     {tui.style(clean(mine), 'code', c=cp)}")
-        say(f"   Эталон: {tui.style(clean(task.shown_solution(state)), 'code', c=cp)}")
+        say(f"   Эталон: {tui.style(clean(task.display_solution(state)), 'code', c=cp)}")
         if mine:        # FB20: верно, но иначе — чем отличается (таблица alt_answer)
             diff = alt_answer.difference(clean(mine), clean(task.shown_solution(state)),
                                          seed=state.get("_seed", 0))
@@ -525,7 +525,7 @@ def review(task, state, outcome, mine, elapsed, stars_n, record_from,
                 say(story_fill(f"Разница: {diff}", "   ", "   "))
     else:
         bad("Сдался — не беда. Вот решение:")
-        say(f"   {tui.style(clean(task.shown_solution(state)), 'code', c=_framed())}")
+        say(f"   {tui.style(clean(task.display_solution(state)), 'code', c=_framed())}")
     if spent:
         say(paid)
     say(story_fill(f"Почему: {task.explain_for(state)}", "   ", "   "))     # Н3.8: по ширине

@@ -1272,6 +1272,10 @@ class JsonCheck(AnswerTask):
     def answer_kind(self, state):
         return "number" if variant_index(state.get("_variant"), 3) == 0 else "text"
 
+    def takes_answer(self, state):
+        """Вариант C — «почини файл»: ans там не промах, а лишний шаг (hook.stray_answer)."""
+        return variant_index(state.get("_variant"), len(self.variants)) != 2
+
     def matches(self, given, ctx):
         v = variant_index(ctx.state.get("_variant"), len(self.variants))
         if v == 0:

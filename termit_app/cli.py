@@ -1404,7 +1404,9 @@ def inbox_cmd(args, opts) -> int:
         if msg is None:
             return 0
         if msg["ask"]:
-            reply = session._ask(opts, inbox_mod.ASK_PROMPT)
+            reply = session._ask(opts, inbox_mod.ask_prompt(msg))
+            if reply.strip() == "?" and inbox_mod.answer(p, msg, reply, today, opts) is False:
+                reply = session._ask(opts, inbox_mod.ASK_PROMPT)     # команда показана — ответ
             inbox_mod.answer(p, msg, reply, today, opts)
         else:
             msg["read"] = True

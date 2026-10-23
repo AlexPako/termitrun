@@ -18,7 +18,8 @@ from typing import Iterable, List, Optional
 BOX_KNOWN = ".termit/errors_known"
 BOX_SEEN = ".termit/errors_seen"
 
-KINDS = ("not_found", "no_such_file", "is_dir", "permission", "root_walk", "two_paths")
+KINDS = ("not_found", "no_such_file", "is_dir", "permission", "root_walk", "two_paths",
+         "quoted_space")
 
 TEXT = {
     "not_found": ("command not found", "такой команды нет: опечатка в имени или программа не "
@@ -36,7 +37,13 @@ TEXT = {
     # владелец 21.10: cp **/plan_final.txt(D) без «куда» — cp печатает свою справку
     "two_paths": ("usage: cp / mv", "команде нужны два адреса: что и куда. «Сюда, в эту "
                                     "папку» — точка: cp notes/**/plan.txt ."),
+    # владелец 23.10: cat " $(ls | grep …)" — пробел после кавычки стал частью имени
+    "quoted_space": ("пробел внутри кавычек", "внутри кавычек пробел — часть имени: \" $(…)\" "
+                                             "ищет файл, чьё имя начинается с пробела. Кавычку "
+                                             "ставь вплотную: \"$(…)\"."),
 }
+# пробел между кавычкой и $(…) или после ) перед кавычкой: имя с лишним пробелом
+_QUOTED_SPACE = re.compile(r'"\s+\$\(|\)\s+"')
 
 # команды, чьи аргументы — пути (у grep первый аргумент — шаблон)
 PATH_CMDS = ("cat", "cd", "ls", "cp", "mv", "rm", "head", "tail", "less", "wc", "file", "nano",
@@ -117,6 +124,8 @@ def detect(line: str, rc, pwd, home: Optional[str] = None) -> Optional[str]:
         return "root_walk"
     if code == 0:
         return None
+    if _QUOTED_SPACE.search(line):
+        return "quoted_space"
     if _one_path(line):
         return "two_paths"
     if code == 127:

@@ -418,7 +418,7 @@ def _note_review(task, state, variant, rec: dict, today: date) -> None:
         return
     try:
         st = dict(state, _variant=variant)
-        progress.note_review(rec, variant, task.shown_solution(st),
+        progress.note_review(rec, variant, task.display_solution(st),
                              task.alternatives_for(st), today)
     except (KeyError, IndexError, ValueError, AttributeError, TypeError):
         return

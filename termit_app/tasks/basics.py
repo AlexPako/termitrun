@@ -2137,7 +2137,9 @@ class CopyDir(Task):
               "cp -r -n папка копия — no clobber: не затирать то, что уже лежит в копии; -v — "
               "verbose: печатать каждый скопированный файл.\n"
               "Флаги пишут порознь или вместе и в любом порядке: cp -r -v, cp -rv и cp -vr — "
-              "одно и то же.")
+              "одно и то же.\n"
+              "Слеш в конце имени папки стирай: на Mac cp -r папка/ копия возьмёт не папку, а то, "
+              "что внутри (Tab дописывает / сам).")
     variants = (
         Variant("Сделай копию папки {proj} целиком — рядом с ней, под именем {proj}_backup.",
                 wrong=("mkdir {proj}_backup",),
@@ -2206,7 +2208,29 @@ class CopyDir(Task):
         if kit.lost(b, want.values()):
             return Verdict(False, "Нужный файл стёрт или затёрт — его текста больше нет ни в "
                                   "одном файле. " + kit.RESET_TAIL)
-        return self._moved(b, want) or Verdict(False)
+        return self._spilled(b, want) or self._moved(b, want) or Verdict(False)
+
+    MSG_SPILLED = ("В {dest}/ легло содержимое папок, а не сами папки: на Mac слеш в конце "
+                   "(cp -r {name}/ …) значит «скопируй то, что внутри». Набери reset — песочница "
+                   "вернётся как была, — и снова, без слеша: cp -r {names} {dest}/")
+
+    def _spilled(self, b, want):
+        """Владелец 23.10: cp -r drafts/ notes/ archive — BSD cp со слешем в конце копирует
+        содержимое, и игра молчала. Файл ждали в dest/папка/…, а он лежит в dest/… ."""
+        names = []
+        for rel, h in want.items():
+            parts = Path(rel).parts
+            if len(parts) < 3 or kit.sha_in_box(b, rel) == h:
+                continue
+            if kit.sha_in_box(b, str(Path(parts[0], *parts[2:]))) == h and parts[1] not in names:
+                names.append(parts[1])
+        if not names:
+            return None
+        deep = [Path(r).parts for r in want if len(Path(r).parts) >= 3]
+        dest = deep[0][0]
+        all_names = sorted({parts[1] for parts in deep if parts[0] == dest})
+        return Verdict(False, self.MSG_SPILLED.format(dest=dest, name=names[0],
+                                                      names=" ".join(all_names)))
 
     def _moved(self, b, want):
         """FB6: папку перенесли (mv), а не скопировали — раньше молчали. Оригинала нет на
@@ -2257,7 +2281,8 @@ class FzfPick(AnswerTask):
     start_dir = "{start}"
     scroll = ("ls | grep слово — только строки со словом; grep -i — ignore case, без учёта "
               "регистра. Цепочкой через трубу | (вывод левой — на вход правой): | grep a | grep b.\n"
-              "cat \"$(команда)\" — подставит найденное имя. Пусто — cat ждёт ввода: Ctrl+C.\n"
+              "cat \"$(команда)\" — подставит найденное имя; двойные кавычки — чтобы имя с "
+              "пробелом не развалилось на куски. Пусто — cat ждёт ввода: Ctrl+C.\n"
               "Утилита (маленькая отдельная программа) fzf — выбор кусками имени: ls | fzf.")
     variants = (
         Variant("Тут, в reports, под три сотни отчётов с похожими именами. Нужен тот, в "
