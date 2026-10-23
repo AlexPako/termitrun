@@ -114,7 +114,7 @@ THEME = {
         "bosses": {
             "boss_basics": "Страж Хонипот. Ворон: «Он тебя знает. Теперь узнай его».",
             "boss_tools": "Страж — Сбойный дрон. Гайка: «В его чёрном ящике — та ночь».",
-            "boss_finder": "Страж — Рой спам-ботов. Шнырь: «В мусоре что-то пищит, сука».",
+            "boss_finder": "Страж — Рой спам-ботов. Шнырь: «В мусоре что-то пищит, чёрт».",
             "boss_data": "Страж — Призрак в логах. Марина: «Под твоим именем кто-то ходит. Найди, когда именно».",
         },
     },
@@ -572,6 +572,8 @@ from termit_app.themes.cyberpunk import retention as _retention  # noqa: E402  (
 THEME.update(_retention.SECTIONS)
 from termit_app.themes.cyberpunk import lore as _lore  # noqa: E402  (FB3: ответы порциями)
 _lore.merge(THEME)
+from termit_app.themes.cyberpunk import stage as _stage  # noqa: E402  (FB5 п. 67: ремарки)
+_stage.merge(THEME)
 
 # работа сверх расписания: репетиция стража, срочные заказы, выгодный ран
 THEME["contracts"] = {

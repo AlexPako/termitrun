@@ -4,7 +4,7 @@ import os
 import re
 import sys
 import textwrap
-from typing import Optional
+from typing import List, Optional
 
 from termit_app import (commands, diagrams, icons, lifehacks, origins, progress, textnorm, theme,
                         tui, zsh_only)
@@ -270,6 +270,11 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             say(row)
     mark = "▸ " if cp.level == "rich" else "> " if cp.level == "basic" else ""
     wide, tw = tui.text_width(cp), tui.story_width(cp)     # FB17: текст — по окну, до 100
+    # FB5 п. 67: ремарка — что происходит в сцене, до урока и реплики; только при первой встрече
+    scene = theme.stage(task) if first_time and fresh and not master else None
+    scene_rows = stage_lines(scene, tw) if scene else []
+    for row in scene_rows:
+        say(c("2;3", row))
     shown_lesson = None
     if task.scroll and not master and (first_time or mode == "train" or unsolved):
         lesson = theme.lesson(task, state)
@@ -306,7 +311,7 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
     # владелец 21.10: полными словами, без «софт» и обрывков
     hint = (f"hint — подсказка за {theme.word('money_name')} {theme.word('money')}" if job
             else "hint — подсказка, бесплатно")
-    tall = card_rows(task, state, shown_lesson, wide) + CARD_TAIL > CARD_ROWS
+    tall = card_rows(task, state, shown_lesson, wide) + len(scene_rows) + CARD_TAIL > CARD_ROWS
     # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
     keys = (f"task — задание снова · {hint} · ans ОТВЕТ — сдать ответ · quit — выйти из задачи"
             if tall else
@@ -349,6 +354,11 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         say(c("2", f"   ask ВОПРОС — {theme.word('owl')}: наводка, не ответ"))
     if tall:            # FB5 п. 43: задание — последний смысловой блок длинной карточки
         say(tui.style(task_reminder(task.text(state), wide), "bold", c=cp))
+
+
+def stage_lines(text: str, width: int = None) -> List[str]:
+    """Ремарка сцены по ширине окна — строками, с отступом, как голос героя."""
+    return tui.fill(text, width or tui.story_width(), "  ", "  ")
 
 
 def card_rows(task, state: dict, lesson: Optional[str], width: int = None) -> int:

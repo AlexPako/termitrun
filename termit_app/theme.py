@@ -298,6 +298,12 @@ def intro(task, state: dict, lore: bool = True) -> Optional[str]:
     return f"{lore} {head}" if lore else head
 
 
+def stage(task) -> Optional[str]:
+    """Ремарка сцены (FB5 п. 67): 1–2 фразы рассказчика — что происходит, до первой реплики.
+    Только из выбранной темы; нет — None."""
+    return _entry(task).get("stage") or None
+
+
 def task_text(task, state: dict) -> str:
     """Строка атмосферы (если есть) + суть задачи обычным языком."""
     head = intro(task, state, lore=False)
