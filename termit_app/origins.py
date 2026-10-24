@@ -37,6 +37,9 @@ COMMANDS: Dict[str, Origin] = {
                   "«concatenate» — «склеить»: cat a b выдаст два файла подряд, одним куском. "
                   "Показать один файл — просто самый частый случай."),
     "echo": Origin("эхо", "по-английски «эхо» — повторяет, что ему сказали."),
+    "str": Origin("string",
+                  "«string» — «нить»: буквы нанизаны одна за другой, как бусы. В Python строку "
+                  "так и зовут — str."),
     "mkdir": Origin("make directory", "«make directory» — «сделай папку»."),
     "cp": Origin("copy", "«copy» — «копировать»."),
     "mv": Origin("move", "«move» — «перенести»."),
@@ -266,6 +269,7 @@ NANO_KEYS = ("В nano буквы — из подписей внизу: ^W — Wh
 FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Основы»
     "meet_terminal": ("echo",),
+    "quotes": ("str",),
     "where_am_i": ("pwd",),
     # владелец 23.10 (Р4): клавиши строки — советами с первых задач, уроки клавиш — позже
     "climb_down": ("cd", "ls", "cat", "Ctrl+C", "Ctrl+A", "Ctrl+E"),

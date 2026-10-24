@@ -338,9 +338,13 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             else "hint — подсказка, бесплатно")
     tall = card_rows(task, state, shown_lesson, wide) + len(scene_rows) + CARD_TAIL > CARD_ROWS
     # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
-    keys = (f"task — задание снова · {hint} · ans ANSWER — сдать ответ · quit — выйти из задачи"
+    # владелец 24.10: «к записям своим доступа нет, чтобы вспомнить синтаксис» — book был, но
+    # не на виду; теперь он в строке команд каждой карточки
+    keys = (f"task — задание снова · {hint} · book — мои записи: выученные команды · "
+            "ans ANSWER — сдать ответ · quit — выйти из задачи"
             if tall else
-            f"task — задание снова · lesson — урок · {hint} · ans ANSWER — сдать ответ · "
+            f"task — задание снова · lesson — урок · {hint} · "
+            "book — мои записи: выученные команды · ans ANSWER — сдать ответ · "
             "reset — собрать задачу заново · giveup — сдаться и посмотреть разбор · "
             "skip — пропустить задачу, вернётся завтра · quit — выйти из задачи · "
             "bug — написать замечание")

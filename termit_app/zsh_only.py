@@ -87,12 +87,13 @@ ITEMS: Dict[str, Trick] = {
 # Сверяет tools/audit_zsh.py.
 FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Основы»
+    "quotes": ("quotes",),
     "deep_dig": ("globstar", "qualifiers"),
     "history_recall": ("history",),
     "z_jump": ("setopt", "auto_pushd", "zshrc"),
     # «Свалка»
     "find_name": ("nomatch",),
-    "batch_rename": ("quotes",),     # 24.10: zmv убран из урока и шпаргалки (одна мысль — цикл)
+    # 24.10: zmv убран из batch_rename; "$ИМЯ" в кавычках теперь впервые звучит в уроке «Кавычки»
     "disk_sweep": ("case_glob",),
     "dup_sort": ("alternation",),
     # «Окружение»
