@@ -14,7 +14,13 @@ V003  первая встреча (вариант 0) сложнее самого
 S008  в эталоне команда, которой нет в третьей подсказке (N25)
 S009  команда эталона или третьей подсказки не встретилась в карточках раньше по пути
       игрока: только своё место до задачи, места-предки целиком и after (N11)
-Q001  первая задача места спрашивает больше одного ответа сразу (N21)"""
+Q001  первая задача места спрашивает больше одного ответа сразу (N21)
+F010  урок упоминает команду, которую задаче не нужно и которую игрок ещё не проходил —
+      забегание вперёд (владелец 24.10: «полнейший перегруз»; скилл termit-lesson)
+      Знакомые команды из прошлых уроков упоминать можно (владелец 24.10: «в заданиях к урокам
+      мы спокойно должны пользоваться всеми предыдущими уроками») — отдельного правила нет.
+F012  заготовка кириллицей (ФАЙЛ, КОМАНДА, ЧИСЛО…) — заготовки пишут английскими заглавными,
+      как в man: FILE, COMMAND, NUMBER (владелец 24.10; предупреждение до общей замены)"""
 import re
 from typing import Dict, List, Optional, Set
 
@@ -398,8 +404,78 @@ def one_question_issues(task, add) -> None:
                              "один вопрос")
 
 
+# заготовки в командах и ответах: кириллица → английские заглавные (скилл termit-lesson)
+CYR_PLACEHOLDERS = {"ЧИСЛО": "NUMBER", "ИМЯ": "NAME", "СЛОВО": "WORD", "ФАЙЛ": "FILE",
+                    "КОМАНДА": "COMMAND", "НОМЕР": "NUMBER", "ПУТЬ": "PATH", "ПАПКА": "DIR",
+                    "БУКВА": "LETTER", "ТЕКСТ": "TEXT", "ОТВЕТ": "ANSWER", "СТРОКА": "LINE",
+                    "КОД": "CODE", "АДРЕС": "ADDRESS", "ИМЯ_ФАЙЛА": "FILE", "ИМЯ_ПАПКИ": "DIR",
+                    "ПУТЬ_К_ФАЙЛУ": "PATH", "ПАРОЛЬ": "PASSWORD", "ВЕРСИЯ": "VERSION",
+                    "ЧТО": "WHAT", "КУДА": "WHERE", "ДАТА": "DATE", "ЦЕНА": "PRICE",
+                    "ГОРОД": "CITY", "ФАМИЛИЯ": "SURNAME", "ТИП": "TYPE", "ЧАС": "HOUR"}
+_CYR_PH = re.compile(r"(?<![\wА-Яа-яЁё])(" + "|".join(sorted(CYR_PLACEHOLDERS, key=len, reverse=True))
+                     + r")(?![\wА-Яа-яЁё])")
+_SHELL_NAMES = {"zsh", "bash", "sh", "ans", "man"}
+# F010 — сознательные исключения с причиной (решение владельца старше общего правила)
+FORWARD_OK: dict = {}       # task_id → (команды, причина); сейчас исключений нет
+
+
+def _needed_commands(task, variants) -> Set[str]:
+    """Команды, которые задаче (этим вариантам) нужны: эталоны и подсказки."""
+    from termit_app.tasks import lint
+    out: Set[str] = set()
+    for i in variants:
+        try:
+            var = task.variants[i] if task.variants else None
+            sol = task._solution(var) if var is not None else (task.solution or "")
+            hints = lint._raw_hints(task, var) if var is not None else list(task.hints or ())
+        except (AttributeError, IndexError, KeyError, TypeError):
+            continue        # учебная задача линтера без эталона — нечего сравнивать
+        out |= lint.command_words(_strip_fields(sol or ""))
+        for h in hints or ():
+            out |= lint.command_words(_strip_fields(h or ""))
+    return out
+
+
+def extra_command_issues(task, add) -> None:
+    """F010: урок говорит о командах, которых в задаче нет (владелец 24.10, flag_use: du,
+    head, jq, tldr, rm в уроке про один флаг). Команда — настоящая программа системы; слова в
+    скобках-расшифровках и имена оболочек не в счёт."""
+    import shutil
+    from termit_app.tasks import lint
+    if task.track not in STRICT_TRACKS:
+        return
+    lessons = all_lessons(task)
+    own = {k for k in lessons if k}
+    nvar = max(1, len(task.variants))
+    taught = path_taught(task)
+    for v, text in sorted(lessons.items()):
+        variants = [v] if v else [i for i in range(nvar) if i not in own] or [0]
+        need = _needed_commands(task, variants)
+        said = {w for w in lint.command_words(_outside_parens(text)) if shutil.which(w)}
+        extra = said - need - _SHELL_NAMES
+        where = "" if v == 0 else f"урок варианта {v}: "
+        allowed = FORWARD_OK.get(task.id, (set(), ""))[0]
+        ahead = sorted(w for w in extra if w not in taught and w not in allowed)
+        if ahead:
+            add("F010", "error", f"{where}забегание вперёд: {', '.join(ahead)} — этого игрок ещё "
+                                 "не проходил, а задаче оно не нужно. Убери из урока")
+
+
+def placeholder_issues(task, lesson: Optional[str], add) -> None:
+    """F012: заготовки кириллицей в карточке, уроке и тексте задания (владелец 24.10)."""
+    texts = [task.scroll or "", lesson or ""] + [getattr(v, "text", "") or ""
+                                                 for v in (task.variants or ())]
+    texts = [t for t in texts if isinstance(t, str)]
+    found = sorted({m.group(1) for t in texts for m in _CYR_PH.finditer(t)})
+    if found:
+        add("F012", "warn", "заготовки кириллицей: " + ", ".join(
+            f"{w}→{CYR_PLACEHOLDERS[w]}" for w in found))
+
+
 def static_issues(task, lesson: Optional[str], add) -> None:
     lesson_issues(task, lesson, add)
+    extra_command_issues(task, add)
+    placeholder_issues(task, lesson, add)
     first_variant_issues(task, add)
     hint3_issues(task, add)
     path_issues(task, add)

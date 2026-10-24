@@ -270,8 +270,9 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # владелец 23.10 (Р4): клавиши строки — советами с первых задач, уроки клавиш — позже
     "climb_down": ("cd", "ls", "cat", "Ctrl+C", "Ctrl+A", "Ctrl+E"),
     "home_tilde": ("bash", "Ctrl+U"),
-    "hidden_cache": ("mkdir",),
-    "copy_move": ("cp", "mv", "find"),
+    "mkdir_p": ("mkdir",),
+    "copy_move": ("cp", "mv"),
+    "find_name": ("find",),
     "file_ext": ("file",),
     "star_mask": ("rm",),
     "run_script": ("chmod",),
