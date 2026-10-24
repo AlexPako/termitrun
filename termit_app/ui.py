@@ -338,16 +338,10 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             else "hint — подсказка, бесплатно")
     tall = card_rows(task, state, shown_lesson, wide) + len(scene_rows) + CARD_TAIL > CARD_ROWS
     # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
-    # владелец 24.10: «к записям своим доступа нет, чтобы вспомнить синтаксис» — book был, но
-    # не на виду; теперь он в строке команд каждой карточки
-    keys = (f"task — задание снова · {hint} · book — мои записи: выученные команды · "
-            "ans ANSWER — сдать ответ · quit — выйти из задачи"
-            if tall else
-            f"task — задание снова · lesson — урок · {hint} · "
-            "book — мои записи: выученные команды · ans ANSWER — сдать ответ · "
-            "reset — собрать задачу заново · giveup — сдаться и посмотреть разбор · "
-            "skip — пропустить задачу, вернётся завтра · quit — выйти из задачи · "
-            "bug — написать замечание")
+    # владелец 24.10: «синяя панель создаёт видимость, что это все команды… оставить несколько
+    # самых важных: в ране book, skip, quit, help» — остальное по help (ui.task_help)
+    keys = (f"ans ANSWER — сдать ответ · {hint} · book — мои записи · skip — отложить · "
+            "quit — выйти · help — что здесь и все команды")
     if cp.level == "plain":     # Н3.8: по ширине окна — переносом, таймер не отрывается
         items = (keys + timer.replace("   ", " · ", 1)).split(" · ")
         # по экранной ширине: 💳 и ⏱ — две клетки (textwrap считал их за одну)
@@ -393,6 +387,46 @@ def tier_label(task, state: dict) -> Optional[str]:
         return None
     t = tiers[variant_index(state.get("_variant"), len(tiers))]
     return f"ступень {t + 1} из {progress.TIER_TOP + 1} — {progress.TIER_NAMES[t]}"
+
+
+TASK_HELP = (
+    "ans ANSWER — сдать ответ (ANSWER — сюда то, что нашёл)",
+    "hint — подсказка: на тренировке даром, на деле — за кредиты",
+    "task — задание ещё раз",
+    "lesson — урок к заданию — полностью",
+    "book — мои записи: выученные команды (book WORD — найти)",
+    "keys — клавиши терминала: правка строки, история, экран",
+    "ext — копилка расширений файлов",
+    "reset — собрать задачу заново",
+    "skip — отложить — вернётся завтра",
+    "giveup — сдаться и посмотреть разбор",
+    "ask QUESTION — вопрос Сове, если она включена",
+    "loot CODE — сдать находку из охоты",
+    "bug — написать замечание",
+    "quit — выйти из задачи",
+)
+
+
+def task_help(task=None, state: Optional[dict] = None) -> str:
+    """help в задаче (владелец 24.10: «help должен очень развёрнуто рассказывать о текущем
+    месте»): что это за задача и место, что сделать, как сдать, — и все команды задачи с
+    расшифровкой. Задачу и таймер не трогает."""
+    rows = []
+    if task is not None and state is not None:
+        rows.append(f"Ты в задаче «{theme.title(task)}» — {theme.place(task.track)}.")
+        try:
+            rows += ["", "Что сделать:"] + [_wrap(task.text(state), width=tui.text_width())]
+            form = answer_form(task, state)
+        except (KeyError, IndexError, ValueError):      # испорченное состояние — без текста
+            form = None
+        if form:
+            rows += ["", "Как сдать:"] + tui.fill(form, tui.text_width(), "   ", "   ")
+        rows += ["", "Застрял — hint; урок к заданию — lesson; свои записи — book.", ""]
+    pairs = [x.split(" — ", 1) for x in TASK_HELP]
+    width = max(len(w) for w, _ in pairs)
+    rows.append("Команды задачи — набирай прямо здесь:")
+    rows += [f"  {w.ljust(width)}  {what}" for w, what in pairs]
+    return "\n".join(rows)
 
 
 def stage_lines(text: str, width: int = None) -> List[str]:
@@ -994,9 +1028,8 @@ BOARD_CARDS = {
     # FB18: каждое слово — «слово — что делает» (владелец: skip и bug без расшифровки)
     # владелец 21.10: «не нравятся сокращённые описания» — полными фразами, карточка может
     # занять две строки (hideout._board_rows переносит по ширине окна)
-    "game": "task — показать задание снова · hint — подсказка (в ране — за {money}) · "
-            "book — выученные команды · keys — клавиши терминала · "
-            "skip — пропустить задачу, вернётся завтра · bug — написать замечание",
+    "game": "hint — подсказка (в ране — за {money}) · book — мои записи · skip — отложить · "
+            "quit — выйти · help — что здесь и все команды",
 }
 
 

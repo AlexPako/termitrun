@@ -199,7 +199,7 @@ if [[ -n $TERMIT_ZOXIDE ]] && (( $+commands[zoxide] )); then
   _tr_zo_on=1
 fi
 
-unalias task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson 2>/dev/null
+unalias task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson help 2>/dev/null
 _tr() { "$TERMIT_PY" -I -B -c "$_tr_boot" "$_tr_root" termit_app.hook "$@" }
 task()   { _tr task }
 hint()   { _tr hint }
@@ -233,6 +233,7 @@ keys()   { _tr keys "$*" }
 ext()    { _tr ext }
 book()   { _tr book "$*" }
 lesson() { _tr lesson }
+help()   { _tr help }       # владелец 24.10: все команды задачи — одним словом
 # Без noglob «bug почему не работает?» падает с «no matches found» — ? и * это маски.
 alias bug='noglob bug' book='noglob book' ans='noglob ans' loot='noglob loot' memory='noglob memory' ask='noglob ask'
 
@@ -289,7 +290,7 @@ if autoload -Uz add-zle-hook-widget 2>/dev/null; then
 fi
 
 # Служебные команды не попадают в историю — иначе !! повторит task.
-typeset -ga _tr_service=(task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson)
+typeset -ga _tr_service=(task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson help)
 [[ -n $TERMIT_LINGER ]] && _tr_service+=(next)
 _tr_addhist() {
   local w=${${(z)1}[1]}
@@ -376,7 +377,7 @@ if [[ -n $TERMIT_HUB ]]; then
   command_not_found_handler() {
     _termit_layout_hint "$1" && return 127
     case $1 in
-      board|callsign|clear|coach|deck|diary|dossier|feedback|fence|grind|help|home|hub|implants|inbox|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|shop|short|sound|stats|style|theme|train|update|wheels)
+      board|callsign|clear|coach|deck|diary|dossier|feedback|fence|grind|home|hub|implants|inbox|info|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|settings|shop|short|sound|stats|story|style|theme|train|update|wheels)
         print -r -- "$1 — слово убежища. quit — и ты в убежище, там набери $1."
         return 127 ;;
     esac

@@ -927,13 +927,18 @@ PROMPT_WHAT = ("Приглашение (по-английски prompt) — на
                "перед курсором: терминал как бы говорит «готов, вводи». Хорошее приглашение "
                "сразу показывает, где ты стоишь и не упала ли прошлая команда.")
 # как деталь выглядит на деле (папка-пример drum внутри ~/projects/drum/src)
+PROMPT_NAMES: Dict[str, str] = {
+    "path_short": "папка, где стоишь", "path_full": "весь путь от дома",
+    "exit_code": "код ошибки", "deck_icon": "значок деки", "two_lines": "две строки",
+    "time_right": "время справа",
+}
 PROMPT_LOOKS: Dict[str, str] = {
-    "path_short": "drum % — только папка, где стоишь",
-    "path_full": "~/projects/drum/src % — весь путь от дома (~ — домашняя папка)",
-    "exit_code": "drum ✗1 % — красный ✗ и код ошибки, только если прошлая команда упала",
-    "deck_icon": "⟁ drum % — значок деки в начале",
-    "two_lines": "путь на одной строке, ввод — на следующей: длинный путь не съедает место",
-    "time_right": "время у правого края: …   18:15:07",
+    "path_short": "drum %",
+    "path_full": "~/projects/drum/src % (~ — домашняя папка)",
+    "exit_code": "drum ✗1 % — красный ✗, только если прошлая команда упала",
+    "deck_icon": "⟁ drum %",
+    "two_lines": "путь сверху, ввод строкой ниже: длинный путь не съедает место",
+    "time_right": "…   18:15:07",
 }
 
 
@@ -971,31 +976,39 @@ def prompt_lines(p: dict) -> List[str]:
     else:
         out.append("Сейчас своё приглашение выключено: в задачах — обычное приглашение игры. "
                    f"Включить — {pre}prompt on.")
+    # владелец 24.10: «сначала пишут, что доступно 3 варианта, потом о недоступных 3 модулях, а
+    # под этим ещё десяток вариантов… непонятно» — один список: деталь, как выглядит, есть ли,
+    # как получить; ниже — только команды, которые сейчас что-то меняют
     on_sale = {i.id for i in shop.visible(p, date.today())}
-    owned = [pid for pid in PROMPT_PARTS if pid in have]
-    buy = [pid for pid in PROMPT_PARTS if pid not in have]
-    if owned:
-        out += ["", "Детали, которые у тебя есть:"]
-        out += [ui.story_fill(f"{pid} — {PROMPT_LOOKS[pid]}", "  ", "      ") for pid in owned]
-    if buy:
-        out += ["", "Можно купить:"]
-        for pid in buy:
-            price = (f" · {shop.get(pid).price} {cash}, купить: shop {pid}" if pid in on_sale
-                     else " · пока не продаётся")
-            out.append(ui.story_fill(f"{pid} — {PROMPT_LOOKS[pid]}{price}", "  ", "      "))
+    buy = "" if commands.hub_on() else "./termit "
+    out += ["", "Из чего оно собрано (✓ — есть; купленная деталь включается сама):"]
+    width = max(len(PROMPT_NAMES[pid]) for pid in PROMPT_PARTS)
+    for pid in PROMPT_PARTS:
+        name = PROMPT_NAMES[pid].ljust(width)
+        if pid in have:
+            row = f"✓ {name}  {PROMPT_LOOKS[pid]}"
+        elif pid in on_sale:
+            row = (f"· {name}  {PROMPT_LOOKS[pid]} — {shop.get(pid).price} {cash}, "
+                   f"купить: {buy}shop {pid}")
+        else:
+            row = f"· {name}  {PROMPT_LOOKS[pid]} — пока не продаётся"
+        out.append(ui.story_fill(row, "  ", "    " + " " * (width + 2)))
     pals = palettes(p)
     if pals:
         cur = _settings(p).get("palette")
         out += ["", "Палитры (цвет пути): " + ", ".join(
             (f"▸{x[4:]}" if x == cur else x[4:]) for x in pals) + f" — выбрать: {pre}palette ID"]
-    out += ["", "Как поменять (набирай здесь, в убежище):",
-            f"  {pre}prompt off — выключить своё приглашение",
-            f"  {pre}prompt on — включить снова",
-            f"  {pre}prompt path full — весь путь",
-            f"  {pre}prompt path short — только папка",
-            f"  {pre}prompt show — как это записано на языке zsh,",
-            "  чтобы перенести такое же приглашение в свой терминал (~/.zshrc)",
-            "  Изменения видно со следующей задачи."]
+    out += ["", "Что можно сделать (набирай здесь, в убежище):"]
+    if {"path_full", "path_short"} <= have:
+        full = _settings(p).get("prompt_path") != "short"
+        out.append(f"  {pre}prompt path {'short' if full else 'full'} — показывать "
+                   f"{'только папку' if full else 'весь путь'} (сейчас — "
+                   f"{'весь путь' if full else 'только папка'})")
+    out += [ui.story_fill(f"{pre}prompt off — выключить своё приглашение, {pre}prompt on — "
+                          "вернуть", "  ", "    "),
+            ui.story_fill(f"{pre}prompt show — строки, чтобы поставить такое же приглашение в "
+                          "свой настоящий терминал (~/.zshrc)", "  ", "    "),
+            "Изменения видно со следующей задачи."]
     return [row for x in out for row in (x.split("\n") if "\n" in x else [x])]
 
 

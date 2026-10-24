@@ -14,7 +14,7 @@ from termit_app.tasks.base import AnswerTask, Verdict, grep_recursive, grep_wait
 
 EXIT_SHELL = 10
 SERVICE = ("task", "hint", "ans", "reset", "giveup", "skip", "quit", "bug", "loot", "memory", "ask",
-           "keys", "ext", "book", "lesson")
+           "keys", "ext", "book", "lesson", "help")
 
 
 QUIT_HUB = "Назад в убежище."
@@ -599,6 +599,13 @@ def main(argv) -> int:
             return 0 if note else 1
         if cmd == "ext":        # FB3: копилка расширений — задачу не трогает
             ui.say(extensions.sheet(extensions.read_box(box)))
+            return 0
+        if cmd == "help":       # владелец 24.10: о задаче и все её команды — таймер не трогает
+            try:
+                task, state = _load(box)
+            except Exception:                   # noqa: BLE001 — нет задачи: хватит списка
+                task, state = None, None
+            ui.say(ui.task_help(task, state))
             return 0
         if cmd == "book":       # FB3: книга выученных команд — задачу и таймер не трогает
             ui.say(book_mod.show(book_mod.read_box(box), " ".join(args)))

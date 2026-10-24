@@ -37,7 +37,7 @@ WORDS = (
     Word("short", ("short",), "play"),
     Word("grind", ("grind",), "play"),
     Word("new", ("new",), "play", aliases=("more",)),
-    Word("train", ("train",), "play", "[ТЕМА|ID|exam|keys]", aliases=("play",)),
+    Word("train", ("train",), "play", "[ТЕМА|ID|exam|keys]"),
     Word("master", ("master",), "play", rule="master"),
     Word("rehearse", ("rehearse",), "play", "ID", rule="rehearse"),
     Word("home", ("home",), "home"),
@@ -72,6 +72,12 @@ WORDS = (
     Word("implants", ("implants",), "settings", rule="implants"),
     Word("wheels", ("wheels",), "settings", "[get]", rule="wheels"),
     Word("update", ("update",), "settings"),
+    # владелец 24.10: «как сделать, чтобы из хаба был доступ ко всему» — меню в два уровня:
+    # пульт → раздел (слово раздела открывает его экран) → место; home — свой экран и раздел
+    Word("play", (), "hub", own=True),
+    Word("story", (), "hub", own=True),
+    Word("info", (), "hub", own=True),
+    Word("settings", (), "hub", own=True),
     Word("hub", (), "hub", own=True),
     Word("help", (), "hub", "[WORD]", own=True),
     Word("clear", (), "hub", own=True),
@@ -81,7 +87,7 @@ WORDS = (
 # команды ./termit, которых нет в убежище, — с причиной (охранный тест сверяет с ABOUT)
 HUB_SKIP = {
     "track": "из убежища убран: новое приходит только с раном и new (спека 2.2)",
-    "play": "синоним train в убежище (спека 2.2)",
+    "play": "в убежище — раздел меню «Играть» (владелец 24.10); тренировка — train",
 }
 
 # короткая расшифровка слова — на пульте и в help рядом со словом (владелец 21.10:
@@ -126,8 +132,12 @@ SHORT = {
     "implants": "утилиты",
     "wheels": "пакеты Python",
     "update": "обновить игру",
-    "hub": "показать пульт",
-    "help": "все слова",
+    "hub": "главное меню",
+    "help": "что здесь и как",
+    "play": "раздел «Играть»",
+    "story": "раздел «История»",
+    "info": "раздел «Сведения»",
+    "settings": "раздел «Настройки»",
     "clear": "очистить экран",
     "quit": "выйти",
 }
@@ -159,10 +169,20 @@ GROUPS: Tuple[Tuple[str, str], ...] = (
     ("play", "Играть"),
     ("home", "Дом"),
     ("story", "История"),
-    ("help", "Справка"),
+    ("help", "Сведения"),
     ("settings", "Настройки"),
     ("hub", "Убежище"),
 )
+# владелец 24.10: «хаб должен быть хабом… не понимаешь, какие есть возможности, куда можно
+# „сходить“» — под заголовком раздела строка, что в нём
+GROUP_ABOUT = {
+    "play": "раны, уроки, тренировки и стражи",
+    "home": "твоя комната, витрина Шныря, доска, приглашение, дека",
+    "story": "дело, досье, память, письма, тайник",
+    "help": "книга команд, клавиши, счёт, список задач",
+    "settings": "звук, тема, подсказчики, обновление",
+    "hub": "сам пульт убежища",
+}
 
 # команды задачи, которые игрок по привычке набирает в убежище, — с подсказкой, что здесь
 TASK_ONLY = {
@@ -171,8 +191,12 @@ TASK_ONLY = {
 
 HUB_ABOUT = {
     "run": "ран дня на ~10 минут — главное дело дня",
-    "hub": "показать пульт заново",
-    "help": "все открытые слова; help WORD — подробно об одном",
+    "hub": "главное меню: где ты, что дальше и разделы игры",
+    "help": "что такое убежище и как в нём всё устроено; help WORD — подробно об одном слове",
+    "play": "раздел «Играть»: раны, уроки, тренировки, стражи — с пояснениями",
+    "story": "раздел «История»: дело, досье, память, письма, тайник — с пояснениями",
+    "info": "раздел «Сведения»: книга команд, клавиши, счёт, список задач — с пояснениями",
+    "settings": "раздел «Настройки»: звук, тема, подсказчики, обновление — с пояснениями",
     "clear": "очистить экран",
     "quit": "выйти из игры (Ctrl+D — то же)",
 }
@@ -385,7 +409,56 @@ def closed_words(p: dict) -> List[Word]:
             and not (w.rule == "report" and not edition.ISSUES_URL)]
 
 
-HELP_HEAD = "Слова убежища (Enter — то, что отмечено ⏎; help WORD — подробно):"
+SECTIONS = (("play", "play"), ("home", "home"), ("story", "story"), ("info", "help"),
+            ("settings", "settings"))          # слово раздела → группа слов
+SECTION_KEY = {g: k for k, g in SECTIONS}
+MENU_HEAD = "Главное меню — набери слово раздела и Enter:"
+MENU_TAIL = "hub — это меню · help — что такое убежище, help WORD — подробно о слове · quit — выйти"
+HUB_HELP = (
+    "Убежище — твоя база между ранами. Здесь не задачи, а сама игра: набираешь просто слово "
+    "игры и Enter.\n\n"
+    "Пульт (слово hub) — главный экран. Сверху — где ты и что дальше: сыгран ли ран дня, серия, "
+    "что подтянуть, что купить. Снизу — разделы игры, у каждого — что в нём. Слово раздела "
+    "открывает его: там все места и действия раздела, каждое с пояснением.\n\n"
+    "Enter без слова делает то, что на пульте отмечено ⏎, — обычно самое нужное сейчас.\n\n"
+    "Ран (run) — дневная вылазка: новые уроки и повторы, минут на десять. За дела платят "
+    "кредиты 💳 и карму ✦. Кредиты тратят у Шныря на витрине (shop), карма копится и открывает "
+    "слоты деки.\n\n"
+    "Серия — дни подряд, когда сыгран ран. Пропуск без заморозки стоит кармы; заморозки "
+    "копятся сами за регулярные раны.\n\n"
+    "Страж — проверочное задание в конце каждого места: взял — открывается следующее.\n\n"
+    "help WORD — подробно о любом слове: help run, help shop, help home…")
+
+
+def menu_lines(p: dict, width: int) -> List[str]:
+    """Пульт, нижняя часть: разделы по строке — слово, название, что внутри (владелец 24.10)."""
+    titles = dict(GROUPS)
+    out = [MENU_HEAD]
+    for key, group in SECTIONS:
+        out += tui.fill(f"{titles[group]}: {GROUP_ABOUT[group]}", width,
+                        f"  {key.ljust(9)} ", " " * 12)
+    out += tui.fill(MENU_TAIL, width, "  ", "  ")
+    return out
+
+
+def section_lines(p: dict, group: str, width: Optional[int] = None) -> List[str]:
+    """Экран раздела: открытые слова с расшифровкой, закрытые — именами."""
+    width = width or tui.caps().width
+    title = dict(GROUPS)[group]
+    words = [w for w in open_words(p) if w.group == group]
+    out = [f"{title} — {GROUP_ABOUT[group]}. Набери слово и Enter:"]
+    if words:
+        longest = max(tui.vlen(_cell(w.name)) for w in words)
+        out += _short_rows("  ", [w.name for w in words], width, longest)
+    closed = [w.name for w in closed_words(p) if w.group == group]
+    if closed:
+        out += _group_rows(CLOSED_HEAD.ljust(14), closed, width)
+    out.append("  help WORD — подробно о слове · hub — главное меню")
+    return [tui.trunc(line, width) for line in out]
+
+
+HELP_HEAD = ("Всё, что есть в игре, — по разделам. Набери слово и Enter; help WORD — подробно "
+             "об одном; Enter без слова — то, что отмечено ⏎:")
 
 
 def help_lines(p: dict, name: str = "", width: Optional[int] = None, dense: bool = False,
@@ -478,7 +551,7 @@ def board_screen(p: dict, day=None, cp=None) -> List[str]:
         kw = dict(step)
         art, room = kw.pop("art"), kw.pop("room_lines", None)
         lines = (hubview.board(p, day, cp, art=art, room_lines=room) + [""] +
-                 help_lines(p, width=cp.width, **kw))
+                 menu_lines(p, cp.width))
         if len(lines) <= SCREEN_LINES:
             break
     return lines
@@ -706,6 +779,10 @@ class Hub:
                     self.after_run(music_before, code == 0)
             if run:
                 self.show_board()
+            elif act.name == "home" and len(act.argv) == 1 and code == 0:
+                ui.say()
+                for row in section_lines(self.load(), "home"):
+                    ui.say(row)
         return True
 
     def show_board(self) -> None:
@@ -803,7 +880,17 @@ class Hub:
 
     def own(self, act: Action) -> None:
         if act.name == "help":
-            for line in help_lines(self.load(), " ".join(act.args)):
+            # владелец 24.10: help — не карта, а подробно о месте или о слове
+            if act.args:
+                lines = help_lines(self.load(), " ".join(act.args))
+            else:
+                lines = [row for para in HUB_HELP.split("\n\n")
+                         for row in ui.story_fill(para, "", "").splitlines() + [""]][:-1]
+            for line in lines:
+                ui.say(line)
+        elif act.name in ("play", "story", "info", "settings"):
+            group = dict(SECTIONS)[act.name]
+            for line in section_lines(self.load(), group):
                 ui.say(line)
         elif act.name == "clear":
             if self.tty:

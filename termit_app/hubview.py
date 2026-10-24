@@ -439,7 +439,11 @@ def tour_shown(p: dict, names: List[str]) -> List[str]:
 
 
 HINT_LINES = 4
-TAIL = ["help — подробно", "quit — выйти"]
+TAIL = ["hub — главное меню", "help — что здесь и как", "quit — выйти"]
+# владелец 24.10: «синие надписи сбивают с толку… оставить основные: run, quit, help» — на
+# пульте только ⏎, новое (не больше FRESH_ON_HINT) и CORE; карта всего — в help
+CORE = ("run",)
+FRESH_ON_HINT = 2
 
 
 def _wrap(items: List[str], width: int = None, indent: str = "") -> List[str]:
@@ -474,9 +478,9 @@ def hint_line(p: dict, day: date, fresh: List[str] = (), words: List[str] = (),
     def said(w: str) -> str:            # владелец 21.10: везде хотя бы короткая расшифровка
         return f"{w} — {shorts[w]}" if w in shorts else w
 
-    items += [f"{said(w)} (новое)" for w in fresh[:4]]
-    taken = set(fresh) | {line.split()[0]} | ({"inbox"} if unread else set())
-    rest = [said(w) for w in words if w not in taken and w not in SILENT[:4]]
+    items += [f"{said(w)} (новое)" for w in fresh[:FRESH_ON_HINT]]
+    taken = set(fresh[:FRESH_ON_HINT]) | {line.split()[0]} | ({"inbox"} if unread else set())
+    rest = [said(w) for w in CORE if w not in taken and (w in words or not words)]
     while True:
         lines = _wrap(items + rest + TAIL)
         if len(lines) <= HINT_LINES:
