@@ -33,11 +33,12 @@ FREEZE_CAP = 2                  # держать заморозок не бол�
 STREAK_MILESTONES = {7: 30, 14: 50, 30: 100, 60: 150, 90: 200, 180: 300}
 SLOT_KARMA = {2: 1500, 3: 4000}  # карма открывает слоты деки, сама не тратится
 TRAIN_XP = 5
-NEW_FIRST_WEEK = 2              # новых задач в ране первые 7 дней игры
+NEW_NOVICE = 4                  # новых в ране, пока решено меньше NOVICE_SOLVED (владелец 24.10:
+                                # «на начальных уроках спокойно 3+, там не сложно совсем»)
+NOVICE_SOLVED = 15
 # владелец 23.10: «мы прошли порядочно, а нам всё подсовывают элементарный уровень» — ран был
 # 4 повтора + 1 новое; теперь новое — основа рана, повторов — session.review_slots, остальное — grind
 NEW_LATER = 3                   # дальше — по три
-FIRST_WEEK_DAYS = 7
 TIER_TOP = 2                    # Р1: ступени повтора 0..2 (Variant.tier)
 TIER_NAMES = ("базовая", "с подвохом", "связка")
 # Сова (локальная Ollama): вопрос на деле = −1 ★ и OWL_BASE × ярус; в тренировке —
@@ -596,9 +597,11 @@ def weak(rec: dict) -> bool:
 
 
 def new_limit(p: dict, today: date) -> int:
-    """Сколько новых задач в ране: первые 7 дней игры — по 2, потом — по 1."""
-    before = [d for d in p["days"] if d < today.isoformat()]
-    return NEW_FIRST_WEEK if len(before) < FIRST_WEEK_DAYS else NEW_LATER
+    """Сколько новых задач в ране: пока решено меньше NOVICE_SOLVED задач — NEW_NOVICE, потом
+    NEW_LATER. Владелец 24.10 (вариант В): мерить опытом игрока, а не неделей календаря —
+    быстрый игрок не тормозит, медленный не получает лавину. today — для совместимости."""
+    solved = sum(1 for r in p["tasks"].values() if isinstance(r, dict) and r.get("solved"))
+    return NEW_NOVICE if solved < NOVICE_SOLVED else NEW_LATER
 
 
 def tier(track: str) -> int:

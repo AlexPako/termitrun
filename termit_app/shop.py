@@ -242,6 +242,9 @@ def _story_on() -> bool:
 def _shown(p: dict, item: Item, today: date) -> bool:
     if item.price is None or (item.story and not _story_on()):
         return False
+    from termit_app import absence
+    if absence.sold_out(p, item.id, today):     # пока игрока не было, «кто-то выкупил»
+        return False
     if not item.consumable and owned(p, item.id):
         return False
     if item.cosmetic:

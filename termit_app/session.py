@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
+from termit_app import absence
 from termit_app import book as book_mod
 from termit_app import (coach, contracts, cosmetics, edition, extensions, field, freezes, goal,
                         hideout, hook, implants, inbox, judge, lifehacks,
@@ -1249,6 +1250,12 @@ def _close_run(p: dict, opts: Options, today: date, tally: dict, before: dict) -
     # второй ран за день) кончается итогом в две строки; счётчик ранов — по дням
     day_closed = p.get("ritual_day") == today.isoformat()
     tally["froze"] = progress.close_day(p, today)    # тут и тратятся заморозки
+    # владелец 24.10: пропуск, не закрытый заморозкой, — письмо Ворона и штраф (absence)
+    lost = absence.apply(p, today)
+    if lost:
+        text = theme.absence_letter(lost)
+        inbox.post(p, "story", "raven", text, f"absence:{today.isoformat()}", today)
+        tally["extra"] = list(tally.get("extra", ())) + [theme.absence_line(lost)]
     tally["froze_split"] = freezes.split_spent(p, len(tally["froze"]["bought"]))
     earned_freeze = freezes.earn(p, today)          # 3 рана за 7 дней — в запас (М4)
     tally["extra"] = list(tally.get("extra", ())) + freezes.lines(p, tally["froze"],
@@ -1311,6 +1318,11 @@ def _close_day_ritual(p: dict, opts: Options, today: date, tally: dict, streak_b
     bonus = progress.pay_milestone(p, progress.current_streak(p, today))
     tally["earned"] += bonus
     tally["milestone_pay"] = bonus
+    streak_pay = absence.streak_pay(p, progress.current_streak(p, today))   # владелец 24.10
+    if streak_pay:
+        tally["earned"] += streak_pay
+        tally["extra"] = list(tally.get("extra") or ()) + [theme.streak_pay_line(
+            progress.current_streak(p, today), streak_pay)]
     progress.save(opts.progress_path, p)    # день засчитан, даже если дальше прервут
     aim = goal.line(p)              # FB12 (A2): ближняя цель — первой строкой под счётом
     tally["extra"] = ([aim] if aim else []) + list(tally.get("extra") or ())

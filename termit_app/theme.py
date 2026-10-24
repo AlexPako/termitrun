@@ -242,6 +242,48 @@ def tomorrow(kind: str, key: str, seed: int = 0) -> Optional[str]:
     return _one((_own("tomorrow").get(kind) or {}).get(key), seed)
 
 
+def _days(n: int) -> str:
+    if n % 10 == 1 and n % 100 != 11:
+        return f"{n} день"
+    return f"{n} {'дня' if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else 'дней'}"
+
+
+_ABSENCE_FALLBACK = {
+    "letter": ["Тебя не было {days}. Заказ ушёл другому исполнителю: карма −{karma}."],
+    "sold": "С витрины пропало «{item}» — вернётся через {back}.",
+    "line": "Пропуск {days}: карма −{karma}{sold}",
+    "line_sold": " · «{item}» вернётся через {back}",
+    "streak": "Серия {days}: надбавка +{pay} {cash}",
+}
+
+
+def _absence(key: str):
+    return _own("absence").get(key) or _ABSENCE_FALLBACK[key]
+
+
+def absence_letter(lost: dict) -> str:
+    """Письмо о пропуске (absence.apply): сколько дней, сколько кармы, что раскупили."""
+    from termit_app import absence, shop
+    pool = _absence("letter")
+    text = pool[lost["missed"] % len(pool)].format(days=_days(lost["missed"]), karma=lost["karma"])
+    if lost.get("sold"):
+        text += "\n\n" + _absence("sold").format(item=shop.name(lost["sold"].id),
+                                                 back=_days(absence.SOLD_DAYS))
+    return text
+
+
+def absence_line(lost: dict) -> str:
+    from termit_app import absence, shop
+    sold = (_absence("line_sold").format(item=shop.name(lost["sold"].id),
+                                         back=_days(absence.SOLD_DAYS))
+            if lost.get("sold") else "")
+    return _absence("line").format(days=_days(lost["missed"]), karma=lost["karma"], sold=sold)
+
+
+def streak_pay_line(days: int, pay: int) -> str:
+    return _absence("streak").format(days=_days(days), pay=pay, cash=word("money"))
+
+
 def milestone(days: int) -> Optional[str]:
     return _own("milestones").get(days)
 
