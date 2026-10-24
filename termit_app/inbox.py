@@ -273,10 +273,10 @@ def _answer_field(p, fid, reply, day, opts) -> bool:
     if fid not in field.CMD:
         return reply != "?"     # задания уже нет в игре — ответ просто закрывает
     if reply == "?":
-        field.show_command(fid)
+        field.show_command(fid, p)
         return False
     if reply.strip().lower() in YES:      # владелец 23.10: сделал — а как делают, не увидел
-        field.show_command(fid)
+        field.show_command(fid, p)
     field.answer(p, fid, reply, day)
     return True
 

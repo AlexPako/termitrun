@@ -41,7 +41,15 @@ FIELD = [
     ("f_which_python", "Узнай, сколько у тебя python3 и какой из них запускается первым."),
     ("f_shasum", "Возьми любой скачанный установщик и сверь его отпечаток с тем, что написан "
                  "на сайте автора."),
+    # владелец 24.10: «пускай Кролик даёт альтернативные и где-то сложные вопросы, для которых
+    # нужно попотеть самостоятельно» — задания со звёздочкой (HARD): нужного в уроках не было
+    ("f_lines_zshrc", "Узнай, сколько строк в файле настроек zsh — он лежит у тебя дома, скрытый, "
+                      "и зовётся .zshrc."),
+    ("f_disk_free", "Узнай, сколько места свободно на диске твоего Mac."),
+    ("f_uptime", "Узнай, сколько времени твой Mac работает без перезагрузки."),
+    ("f_week_downloads", "Посчитай, сколько файлов ты скачал за последнюю неделю."),
 ]
+HARD = {"f_lines_zshrc", "f_disk_free", "f_uptime", "f_week_downloads"}
 WHY = {
     "f_home_pwd": "это твой настоящий дом, ~ — от него считаются пути на этом Mac.",
     "f_hidden_home": "там живут настройки программ — .zshrc, .ssh, — их стоит знать в лицо.",
@@ -66,6 +74,11 @@ WHY = {
                       "первый в списке, и venv встаёт как раз впереди.",
     "f_shasum": "отпечаток совпал — файл тот, что выложил автор; добрый ли он — решаешь сам. "
                 "Антивирус ClamAV ставится brew install clamav — по желанию, не через игру.",
+    "f_lines_zshrc": "длинный .zshrc — повод заглянуть, что в нём накопилось.",
+    "f_disk_free": "диск забит — Mac тормозит; знать запас полезно до того, как кончится.",
+    "f_uptime": "неделями без перезагрузки Mac копит мусор в памяти — иногда это ответ на «почему "
+                "тормозит».",
+    "f_week_downloads": "видно, сколько за неделю пришло в Загрузки — и сколько потом чистить.",
 }
 # команда — только по просьбе («?»), чтобы задание не было строкой для копирования
 CMD = {
@@ -75,6 +88,10 @@ CMD = {
     "f_newest_download": "ls -t ~/Downloads | head -3",
     "f_open_here": "cd ~/projects && open .",
     "f_count_desktop": "ls ~/Desktop | wc -l",
+    "f_lines_zshrc": "wc -l ~/.zshrc",
+    "f_disk_free": "df -h /",
+    "f_uptime": "uptime",
+    "f_week_downloads": "find ~/Downloads -type f -mtime -7 | wc -l",
     "f_top_cpu": "top -o cpu",
     "f_find_pdf": "find ~/Documents -name '*.pdf' | head",
     "f_big_dirs": "du -sh ~/* 2>/dev/null | sort -h | tail -5",
@@ -114,6 +131,8 @@ FIELD_AFTER = {
     "f_top_commands": "top_values", "f_download_types": "top_values",
     "f_sqlite_date": "select_where", "f_sqlite_csv": "csv_sql",
     "f_env_path": "path_which", "f_which_python": "path_which", "f_shasum": "script_audit",
+    "f_lines_zshrc": "hidden_cache", "f_disk_free": "du_heavy", "f_uptime": "top_hog",
+    "f_week_downloads": "recent_move",
 }
 
 
@@ -146,10 +165,62 @@ def _later(p: dict) -> dict:
 
 
 
-def show_command(fid: str) -> None:
+def unknown_commands(p: dict, cmd: str) -> list:
+    """Команды из cmd, которых игрок сам не набирал: нет в эталонах и подсказках вариантов,
+    что ему выпадали в решённых задачах. Шпаргалка не в счёт — её читают не всю (владелец
+    24.10: grep_r решён вариантом grep -rl, а wc из соседнего варианта он «ещё не изучал»)."""
+    from termit_app.tasks import lint, registry
+    known = set(lint.BASE_COMMANDS)
+    tasks = registry.all_tasks()
+    for tid, rec in (p.get("tasks") or {}).items():
+        if tid not in tasks or not isinstance(rec, dict) or not rec.get("solved"):
+            continue
+        task = tasks[tid]
+        variants = lint._variants(task)
+        for i in progress.seen_variants(rec):
+            if i < len(variants):
+                v = variants[i]
+                known |= lint.command_words(task._solution(v) or "")
+                for h in lint._raw_hints(task, v) or ():
+                    known |= lint.command_words(h or "")
+    return sorted(w for w in lint.command_words(cmd) if w not in known)
+
+
+def pipe_seen(p: dict) -> bool:
+    """Труба | была в эталоне или подсказке варианта, что игроку выпадал в решённой задаче."""
+    from termit_app.tasks import lint, registry
+    tasks = registry.all_tasks()
+    for tid, rec in (p.get("tasks") or {}).items():
+        if tid in tasks and isinstance(rec, dict) and rec.get("solved"):
+            variants = lint._variants(tasks[tid])
+            for i in progress.seen_variants(rec):
+                if i < len(variants):
+                    v = variants[i]
+                    texts = [tasks[tid]._solution(v) or ""]
+                    texts += list(lint._raw_hints(tasks[tid], v) or ())
+                    if any("|" in (t or "") for t in texts):
+                        return True
+    return False
+
+
+def show_command(fid: str, p: dict = None) -> None:
+    """Команда по «?» — и отсылка к справке (владелец 24.10: «в реальном мире не всё
+    разжёвывают, надо самому учиться работать со справкой» — man в помощь)."""
     ui.say(f"   Команда: {progress.clean_text(CMD[fid])}")
     if fid in NOTE:
         ui.say(f"   ({progress.clean_text(NOTE[fid])})")
+    new = unknown_commands(p or {}, CMD[fid])
+    if new:
+        names = ", ".join(new)
+        ui.say(ui.story_fill(f"{theme.word('field_icon')} {names} в уроках ещё не было — "
+                             f"man {new[0]} в помощь (q — выйти). В реале никто не "
+                             "разжёвывает: справка — твой напарник.", "   ", "   "))
+    else:
+        ui.say(ui.story_fill(f"{theme.word('field_icon')} Забыл, что делает флаг, — man и имя "
+                             "команды в помощь.", "   ", "   "))
+    if "|" in CMD[fid] and not pipe_seen(p or {}):     # у трубы нет man — одна фраза
+        ui.say(ui.story_fill("| — труба (pipe): то, что напечатала левая команда, получает "
+                             "правая.", "   ", "   "))
 
 
 def answer(p: dict, fid: str, reply: str, today: date = None) -> None:
@@ -160,11 +231,12 @@ def answer(p: dict, fid: str, reply: str, today: date = None) -> None:
     if fid in p["field"]["done"]:
         return          # уже засчитано (старый дубль вопроса) — второй раз не платим
     if reply.strip().lower() in YES:
-        p["xp"] += progress.FIELD_KARMA
-        p["money"] += progress.FIELD_MONEY
+        mult = 2 if fid in HARD else 1         # со звёздочкой — вдвое: разбирался сам
+        p["xp"] += progress.FIELD_KARMA * mult
+        p["money"] += progress.FIELD_MONEY * mult
         p["field"]["done"].append(fid)
-        ui.ok("   " + theme.msg("field_bonus", xp=progress.FIELD_KARMA))
-        ui.ok(f"   +{progress.FIELD_MONEY} {theme.word('money')}")
+        ui.ok("   " + theme.msg("field_bonus", xp=progress.FIELD_KARMA * mult))
+        ui.ok(f"   +{progress.FIELD_MONEY * mult} {theme.word('money')}")
         _later(p).pop(fid, None)
     else:           # «нет» или молчание — отложить, без упрёка; придёт следующее
         _later(p)[fid] = (today + timedelta(days=RETRY_DAYS)).isoformat()
@@ -190,7 +262,7 @@ def ask_pending(p: dict, ask, today: date = None) -> None:
             a = ""
         if a.strip() != "?":
             break
-        show_command(pend)
+        show_command(pend, p)
         prompt = "   Сделал? [y/n] "
     answer(p, pend, a, today)
 
@@ -209,7 +281,12 @@ def give(p: dict, today: date = None) -> None:
                                  f"в обычном терминале, с настоящими папками:", "", "   "))
             ui.say(ui.story_fill(text, "   ", "   "))
             ui.say(ui.story_fill(f"Зачем: {WHY[fid]}", "   ", "   "))
-            ui.say(ui.story_fill(f"Приём — из урока «{lesson_title(fid)}». Забудешь — "
-                                 "./termit book; команду покажу, когда спрошу «Сделал?».",
-                                 "   ", "   "))
+            if fid in HARD:
+                ui.say(ui.story_fill("★ Со звёздочкой: такого в уроках не было — разбирайся "
+                                     "сам, man и tldr в помощь. Награда двойная; команду "
+                                     "покажу, когда спрошу «Сделал?».", "   ", "   "))
+            else:
+                ui.say(ui.story_fill(f"Приём — из урока «{lesson_title(fid)}». Забудешь — "
+                                     "./termit book; команду покажу, когда спрошу «Сделал?».",
+                                     "   ", "   "))
             return
