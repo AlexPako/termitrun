@@ -42,7 +42,7 @@ def datapeek() -> types.ModuleType:
 
 
 def report(path, shown: str) -> str:
-    """Текст «datapeek ФАЙЛ» по файлу path, как будто его назвали shown (первая строка
+    """Текст «datapeek FILE» по файлу path, как будто его назвали shown (первая строка
     сводки — «shown: N rows, M columns»)."""
     text = datapeek().report(str(path))
     head, nl, rest = text.partition("\n")

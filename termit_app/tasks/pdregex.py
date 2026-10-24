@@ -52,33 +52,33 @@ class PdRegex(PdAnswer):
     variants = (
         Variant("В payments.csv у части платежей в memo — номер счёта: INV- и ровно четыре "
                 "цифры. Сколько строк с таким номером? Обрывки вроде INV-12 не в счёт. "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Отбор по регулярке — .str.contains(r\"…\") у колонки memo.",
                        "Шаблон — INV-, потом четыре цифры: [0-9]{{4}}; len(…) вокруг отбора. "
                        "Не забудь .venv.",
-                       _pd(PAYMENTS, _CONTAINS) + " → ans ЧИСЛО"),
+                       _pd(PAYMENTS, _CONTAINS) + " → ans NUMBER"),
                 solution=_pd(PAYMENTS, _CONTAINS),
                 wrong=(_pd(PAYMENTS, 'print(len(df[df["memo"].str.contains("INV")]))'),),
                 alternatives=("df[\"memo\"].str.contains(r\"INV-\\d{{4}}\").sum() — \\d тоже "
                               "цифра, True считается как 1",),
                 key="contains"),
         Variant("Сколько платежей в payments.csv — возвраты: в memo есть слово refund в любом "
-                "регистре — refund, Refund, REFUND? ans ЧИСЛО",
+                "регистре — refund, Refund, REFUND? ans NUMBER",
                 hints=("Слово в колонке ищет .str.contains; регистр отключает case=False.",
                        ".str.contains(\"refund\", case=False) — True и False; .sum() сосчитает "
                        "True.",
-                       _pd(PAYMENTS, _CASE) + " → ans ЧИСЛО"),
+                       _pd(PAYMENTS, _CASE) + " → ans NUMBER"),
                 solution=_pd(PAYMENTS, _CASE),
                 wrong=(_pd(PAYMENTS, 'print(df["memo"].str.contains("refund").sum())'),),
                 alternatives=("df[\"memo\"].str.lower().str.contains(\"refund\").sum() — "
                               "сначала всё в маленькие",),
                 key="case"),
         Variant("Сколько разных номеров счетов (INV- и четыре цифры) упомянуто в memo "
-                "payments.csv? Один счёт встречается по нескольку раз. ans ЧИСЛО",
+                "payments.csv? Один счёт встречается по нескольку раз. ans NUMBER",
                 hints=("Номер из memo вынет .str.extract с группой ( ) в шаблоне.",
                        ".str.extract(r\"(…)\")[0] — колонка номеров; .nunique() — сколько "
                        "разных.",
-                       _pd(PAYMENTS, _EXTRACT) + " → ans ЧИСЛО"),
+                       _pd(PAYMENTS, _EXTRACT) + " → ans NUMBER"),
                 solution=_pd(PAYMENTS, _EXTRACT),
                 wrong=(_pd(PAYMENTS, 'print(df["memo"].str.extract(r"(INV-[0-9]{{4}})")[0]'
                                      '.count())'),),

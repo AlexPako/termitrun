@@ -27,7 +27,7 @@ _WINDOW = 'df[(d >= "{start}") & (d <= "{end}")]'
 class PdDates(PdAnswer):
     """pd.to_datetime, .dt.month; B — resample("ME", on=…); C — format="%d.%m.%Y" и
     сравнение дат с датой ISO. Ловушки — день вместо месяца, наименьший месяц, итог дня,
-    сравнение строк ДД.ММ.ГГГГ, границы без «=»."""
+    сравнение строк DD.MM.YYYY, границы без «=»."""
     id = "pd_dates"
     title = "Даты в таблице"
     par = 90
@@ -38,7 +38,7 @@ class PdDates(PdAnswer):
               "Месяц и число не путай: ответ выйдет правдоподобный, но чужой.")
     variants = (
         Variant("Сколько переведено в transfers.csv за {month_name} (месяц {month})? ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Даты в файле — текст. Сначала pd.to_datetime, потом .dt.month у "
                        "колонки date.",
                        "Отбери строки месяца {month} и сложи amount: df[… == {month}][\"amount\"]"
@@ -52,7 +52,7 @@ class PdDates(PdAnswer):
                 key="month"),
         Variant("Помесячные итоги transfers.csv — df.resample(\"ME\", on=\"date\") и сумма "
                 "amount; наибольший из них найдёт s.max(). Какой итог у самого сильного месяца? "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Сначала pd.to_datetime у колонки date — resample понимает только даты.",
                        "df.resample(\"ME\", on=\"date\")[\"amount\"].sum() — по строке на месяц; "
                        "наибольшую найдёт .max().",
@@ -67,7 +67,7 @@ class PdDates(PdAnswer):
         Variant("В transfers.csv даты записаны как 14.03.2026 — день, месяц, год; такой формат "
                 "объясняют так: pd.to_datetime(df[\"date\"], format=\"%d.%m.%Y\"). "
                 "Сколько переводов с {start_name} по {end_name} 2026 года включительно? ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Формат дат подскажи pandas сам: pd.to_datetime(df[\"date\"], "
                        "format=\"%d.%m.%Y\").",
                        "Даты сравнивают с датой ISO: df[\"date\"] >= \"{start}\" — и не забудь «=» "
@@ -133,7 +133,7 @@ class PdMerge(PdAnswer):
               "Склеивай по номеру счёта, а не по имени: у тёзок имена одинаковые.")
     variants = (
         Variant("Переводы — в transfers.csv (колонка account — номер счёта), владельцы счетов — "
-                "в accounts.csv. Сколько всего перевёл {owner}? ans ЧИСЛО",
+                "в accounts.csv. Сколько всего перевёл {owner}? ans NUMBER",
                 hints=("Имён в transfers.csv нет — их надо подклеить из accounts.csv по колонке "
                        "account: pd.merge.",
                        "После склейки отбери строки {owner} и сложи amount.",
@@ -146,7 +146,7 @@ class PdMerge(PdAnswer):
                               "без склейки",),
                 key="merge"),
         Variant("Сколько счетов из accounts.csv ни разу не переводили денег — их номеров нет в "
-                "transfers.csv? Склейка, которая оставляет все счета, — how=\"left\". ans ЧИСЛО",
+                "transfers.csv? Склейка, которая оставляет все счета, — how=\"left\". ans NUMBER",
                 hints=("Слева — счета: pd.merge(a, df, on=\"account\", how=\"left\") оставит "
                        "все, даже без переводов.",
                        "У счёта без переводов amount после склейки — NaN: .isna().sum().",
@@ -158,7 +158,7 @@ class PdMerge(PdAnswer):
                               "через isin",),
                 key="left"),
         Variant("В transfers.csv есть и номер счёта, и имя владельца; уровень счёта (tier) — в "
-                "accounts.csv. Сколько переведено со счетов уровня {tier}? ans ЧИСЛО",
+                "accounts.csv. Сколько переведено со счетов уровня {tier}? ans NUMBER",
                 hints=("Уровень подклей из accounts.csv склейкой pd.merge — но по какой колонке?",
                        "Имена бывают одинаковыми — у {twin} есть тёзка. Склеивай по номеру: "
                        "on=\"account\".",
@@ -222,7 +222,7 @@ class PdPivot(PdAnswer):
               "Ячейка — pt[\"card\"][\"Omsk\"]: сначала колонка, потом строка.")
     variants = (
         Variant("Сводная по transfers.csv: города — строки, каналы (channel) — колонки, в "
-                "ячейке — сумма amount. Сколько в ячейке {city} × {channel}? ans ЧИСЛО",
+                "ячейке — сумма amount. Сколько в ячейке {city} × {channel}? ans NUMBER",
                 hints=("Сводную строит df.pivot_table: index — город, columns — канал, values — "
                        "amount.",
                        "Сумма — aggfunc=\"sum\": без него в ячейке будет среднее. Ячейка — "
@@ -238,7 +238,7 @@ class PdPivot(PdAnswer):
                               "\"{channel}\")][\"amount\"].sum() — одну ячейку и без сводной",),
                 key="sum"),
         Variant("Та же сводная по transfers.csv, но в ячейке — число переводов: "
-                "aggfunc=\"count\". Сколько переводов в ячейке {city} × {channel}? ans ЧИСЛО",
+                "aggfunc=\"count\". Сколько переводов в ячейке {city} × {channel}? ans NUMBER",
                 hints=("Та же сводная, но aggfunc=\"count\" — сколько строк попало в ячейку.",
                        "Ячейка — pt[\"{channel}\"][\"{city}\"]: сначала колонка-канал, потом "
                        "строка-город.",
@@ -311,7 +311,7 @@ class PdApply(PdAnswer):
               "подключает строка import math в начале кода.")
     variants = (
         Variant("Банк берёт комиссию по каналу (channel): {rates_text} от суммы. Сколько всего "
-                "комиссий по transfers.csv? Округли до 2 знаков — .round(2): ans ЧИСЛО",
+                "комиссий по transfers.csv? Округли до 2 знаков — .round(2): ans NUMBER",
                 hints=("Ставку каждой строки даст .map со словарём «канал → доля»: 2 % — это "
                        "0.02.",
                        "Комиссия строки — amount, умноженный на ставку; потом .sum() и "
@@ -327,7 +327,7 @@ class PdApply(PdAnswer):
                 key="map"),
         Variant("Бухгалтерия округляет каждый перевод вверх до целого: 12.01 → 13. Это "
                 "math.ceil. Сколько выйдет всего по transfers.csv после такого округления? "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Функцию к каждому значению колонки применяет .apply: "
                        "df[\"amount\"].apply(math.ceil).",
                        "math — модуль Python: import math в начале кода; дальше — .sum().",
@@ -342,7 +342,7 @@ class PdApply(PdAnswer):
                 key="apply"),
         Variant("Ставки комиссии: {rates_text}; у остальных каналов ({unknown}) ставки нет в "
                 "таблице — им {default} %. Сколько всего комиссий по transfers.csv? Округли до 2 "
-                "знаков: ans ЧИСЛО",
+                "знаков: ans NUMBER",
                 hints=("Ставку даст .map со словарём; канала нет в словаре — map вернёт NaN.",
                        "NaN в сумме молча пропадёт. Поставь запасную ставку: "
                        ".fillna({default_share}).",
@@ -593,7 +593,7 @@ class PdSql(PdAnswer):
               "con=con можно писать и просто con.")
     variants = (
         Variant("В bank.db — таблица transfers. Сколько в ней переводов дороже {limit}? Строго "
-                "больше. Запрос — через pandas: pd.read_sql. ans ЧИСЛО",
+                "больше. Запрос — через pandas: pd.read_sql. ans NUMBER",
                 hints=("Открой базу: con = sqlite3.connect(\"bank.db\") — и передай запрос в "
                        "pd.read_sql(…, con).",
                        "Порог — в самом SQL: WHERE amount > {limit}; строк в ответе — len(df).",
@@ -608,7 +608,7 @@ class PdSql(PdAnswer):
                 key="read"),
         Variant("Кто перевёл больше всех — с учётом всех своих счетов? Таблицы bank.db: "
                 "transfers (account) и accounts (account, name). Склей и сложи прямо в SQL, "
-                "pandas — прочесть ответ. ans ИМЯ",
+                "pandas — прочесть ответ. ans NAME",
                 hints=("JOIN accounts по account, GROUP BY a.name, SUM(t.amount), ORDER BY … DESC "
                        "— всё в одном запросе.",
                        "Запрос — в pd.read_sql(…, con); первая строка ответа — лидер.",

@@ -502,7 +502,7 @@ class _DbAnswer(AnswerTask):
         return common_form_hint(line)
 
     def _form(self, st) -> Optional[str]:
-        """Что просит задание после «Ответ: ans» — ИМЯ ГОРОД, ID ID ID (по тексту варианта)."""
+        """Что просит задание после «Ответ: ans» — NAME CITY, ID ID ID (по тексту варианта)."""
         m = _FORM.search(self._task_text(st))
         return m.group(1).rstrip(".") if m else None
 
@@ -608,17 +608,17 @@ class SqliteOpen(_DbAnswer):
     variants = (
         # FB12 (N21): первая задача места — один вопрос (сколько таблиц); колонки (.schema)
         # — повторы 1 и 2
-        Variant("В папке — учебная база records.db. Сколько в ней таблиц? Ответ: ans ЧИСЛО",
+        Variant("В папке — учебная база records.db. Сколько в ней таблиц? Ответ: ans NUMBER",
                 hints=("Таблицы перечислит .tables — прямо из оболочки, без захода в базу.",
                        "sqlite3 records.db \".tables\" печатает имена таблиц — пересчитай их.",
-                       "sqlite3 records.db \".tables\" — и сдай число имён: ans ЧИСЛО"),
+                       "sqlite3 records.db \".tables\" — и сдай число имён: ans NUMBER"),
                 solution='sqlite3 records.db ".tables"',
                 solution_script='sqlite3 records.db "' + _COUNT_TABLES + '"',
                 wrong=('sqlite3 record.db ".tables" | wc -w',),
                 alternatives=("sqlite3 records.db, а внутри .tables и .quit — то же изнутри",
                               "| wc -w после .tables — пересчитать имена командой: wc -w "
                               "считает слова")),
-        Variant("Сколько колонок в таблице {table} базы records.db? Ответ: ans ЧИСЛО",
+        Variant("Сколько колонок в таблице {table} базы records.db? Ответ: ans NUMBER",
                 hints=("Колонки таблицы показывает .schema с её именем.",
                        "В скобках после CREATE TABLE {table} — колонки через запятую.",
                        "sqlite3 records.db \".schema {table}\""),
@@ -637,7 +637,7 @@ class SqliteOpen(_DbAnswer):
                 solution='sqlite3 records.db ".schema"',
                 solution_script='sqlite3 records.db "' + _TABLE_OF + '"',
                 wrong=("print -r -- {col}", 'sqlite3 record.db ".tables" | wc -w'),
-                alternatives=("sqlite3 records.db \".tables\" — имена, затем .schema ИМЯ по "
+                alternatives=("sqlite3 records.db \".tables\" — имена, затем .schema NAME по "
                               "одной",)),
     )
     hints = variants[0].hints
@@ -731,7 +731,7 @@ class SelectWhere(_DbAnswer):
                 alternatives=("sqlite3 records.db, а внутри .headers on, .mode column, затем SELECT "
                               "name, city, phone FROM people WHERE name = '{name}'; — видно обоих",)),
         Variant("Почта {email} всплыла в чужом письме. В каком городе живёт её хозяин? Ответ: "
-                "ans ГОРОД",
+                "ans CITY",
                 hints=("Почта — колонка email, город — city, обе в таблице people.",
                        "Условие по почте: WHERE email = '…' — целиком, в одинарных кавычках.",
                        "sqlite3 records.db \"SELECT city FROM people WHERE email = '{email}'\""),
@@ -741,7 +741,7 @@ class SelectWhere(_DbAnswer):
                 alternatives=("sqlite3 records.db \"SELECT name, city FROM people WHERE email = "
                               "'{email}'\" — заодно и кто это",)),
         Variant("В таблице people у каждого свой номер — колонка id. Кто записан под номером "
-                "{pid} и где живёт? Ответ: ans ИМЯ ГОРОД",
+                "{pid} и где живёт? Ответ: ans NAME CITY",
                 hints=("Две колонки сразу: SELECT name, city — через запятую.",
                        "Номер — число, кавычки ему не нужны: WHERE id = {pid}.",
                        "sqlite3 records.db \"SELECT name, city FROM people WHERE id = {pid}\""),
@@ -897,7 +897,7 @@ class DistinctLike(_DbAnswer):
               "Сколько строк вышло — допиши | wc -l после закрывающей кавычки.")
     variants = (
         Variant("Почты людей — в колонке email таблицы people. Из скольких разных городов люди "
-                "с почтой на @{domain}? Ответ: ans ЧИСЛО",
+                "с почтой на @{domain}? Ответ: ans NUMBER",
                 hints=("Города без повторов даст DISTINCT, почту по концу — LIKE с % в начале.",
                        "WHERE email LIKE '%@{domain}' — всё, что кончается на @{domain}.",
                        "sqlite3 records.db \"SELECT DISTINCT city FROM people WHERE email LIKE "
@@ -911,7 +911,7 @@ class DistinctLike(_DbAnswer):
                 alternatives=("sqlite3 records.db \"SELECT DISTINCT city FROM people WHERE email "
                               "LIKE '%@{domain}'\" — список глазами, без счёта",)),
         Variant("В колонке name таблицы people — имя с фамилией целиком. Сколько разных "
-                "значений name начинается на {pref}? Ответ: ans ЧИСЛО",
+                "значений name начинается на {pref}? Ответ: ans NUMBER",
                 hints=("Значения name без повторов — DISTINCT name, начало — LIKE с % в конце.",
                        "WHERE name LIKE '{pref}%'. У тёзок name одинаковый — его считают раз.",
                        "sqlite3 records.db \"SELECT DISTINCT name FROM people WHERE name LIKE "
@@ -925,7 +925,7 @@ class DistinctLike(_DbAnswer):
                 alternatives=("sqlite3 records.db \"SELECT DISTINCT name FROM people WHERE name "
                               "LIKE '{pref}%'\" — сами имена",)),
         Variant("У счетов есть заметки — колонка note таблицы accounts. Сколько счетов с "
-                "заметкой, где встречается слово {word}? Ответ: ans ЧИСЛО",
+                "заметкой, где встречается слово {word}? Ответ: ans NUMBER",
                 hints=("«Встречается где угодно» — LIKE с % с обеих сторон.",
                        "WHERE note LIKE '%{word}%'; каждый счёт — своя строка, DISTINCT не нужен.",
                        "sqlite3 records.db \"SELECT id FROM accounts WHERE note LIKE "
@@ -1019,7 +1019,7 @@ class InBetween(_DbAnswer):
               "последний день потеряет его часы после полуночи.")
     variants = (
         Variant("Сколько людей родились с {lo} по {hi} включительно и живут в одном из городов: "
-                "{cities}? Дата рождения — колонка born. Ответ: ans ЧИСЛО",
+                "{cities}? Дата рождения — колонка born. Ответ: ans NUMBER",
                 hints=("Два условия: дата в промежутке и город из списка.",
                        "born BETWEEN '{lo}' AND '{hi}' — с обеими границами; city IN (…) — "
                        "список в скобках, через запятую.",
@@ -1033,7 +1033,7 @@ class InBetween(_DbAnswer):
                        "'{hi}'\" | wc -l"),
                 alternatives=("born >= '{lo}' AND born <= '{hi}' — то же, что BETWEEN",)),
         Variant("Сколько переводов на сумму от {lo} до {hi} включительно? Сумма — колонка "
-                "amount таблицы transfers. Ответ: ans ЧИСЛО",
+                "amount таблицы transfers. Ответ: ans NUMBER",
                 hints=("«От и до включительно» — ровно BETWEEN.",
                        "amount BETWEEN {lo} AND {hi}: числа — без кавычек, границы входят.",
                        "sqlite3 records.db \"SELECT id FROM transfers WHERE amount BETWEEN {lo} "
@@ -1046,7 +1046,7 @@ class InBetween(_DbAnswer):
                        "| wc -l"),
                 alternatives=("amount >= {lo} AND amount <= {hi} — то же длиннее",)),
         Variant("Сколько переводов было в сентябре 2726 года? Время — колонка ts таблицы "
-                "transfers, вида 2726-09-14 18:03:11. Ответ: ans ЧИСЛО",
+                "transfers, вида 2726-09-14 18:03:11. Ответ: ans NUMBER",
                 hints=("Время — строка: «весь сентябрь» — от его первого дня до первого дня "
                        "октября, не включая его.",
                        "ts >= '2726-09-01' AND ts < '2726-10-01'. BETWEEN по '2726-09-30' "
@@ -1125,7 +1125,7 @@ class NullCoalesce(_RecordsAnswer):
               "с ним сосчитает grep -c none.")
     variants = (
         Variant("Сколько людей в people без почты — графа email у них NULL или пустая строка? "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("Пусто бывает двух видов: NULL и ''. Нужны оба, через OR.",
                        "WHERE email IS NULL OR email = '' — а = NULL не сработает никогда.",
                        "sqlite3 records.db \"SELECT COUNT(*) FROM people WHERE email IS NULL OR "
@@ -1137,7 +1137,7 @@ class NullCoalesce(_RecordsAnswer):
                 alternatives=("sqlite3 records.db \"SELECT id FROM people WHERE email IS NULL OR "
                               "email = ''\" | wc -l — списком и счётом",)),
         Variant("Сколько строк в people, где email — именно NULL? Посчитай без WHERE: COUNT(*) "
-                "считает все строки, COUNT(email) — те, где email не NULL. Ответ: ans ЧИСЛО",
+                "считает все строки, COUNT(email) — те, где email не NULL. Ответ: ans NUMBER",
                 hints=("Разница двух счётчиков: все строки минус строки, где почта записана.",
                        "SELECT COUNT(*) - COUNT(email): пустая строка '' — тоже значение, "
                        "COUNT(email) её считает.",
@@ -1148,7 +1148,7 @@ class NullCoalesce(_RecordsAnswer):
                 alternatives=("sqlite3 records.db \"SELECT COUNT(*) FROM people WHERE email IS "
                               "NULL\" — то же через WHERE",)),
         Variant("Нужен список почт города {city}: графа email, а где она NULL — слово none. "
-                "Сколько none будет в этом списке? Ответ: ans ЧИСЛО",
+                "Сколько none будет в этом списке? Ответ: ans NUMBER",
                 hints=("COALESCE(графа, 'запасное') ставит запасное там, где NULL.",
                        "SELECT COALESCE(email, 'none') … WHERE city = '{city}', а строки с none "
                        "сосчитает grep -c none.",
@@ -1247,7 +1247,7 @@ class GroupCount(_RecordsAnswer):
               "всю таблицу в одну строку.")
     variants = (
         Variant("В каком городе живёт больше всего людей из people и сколько их там? Ответ: ans "
-                "ГОРОД ЧИСЛО",
+                "CITY NUMBER",
                 hints=("По строке на город — GROUP BY city, в каждой COUNT(*).",
                        "Дай счётчику имя — COUNT(*) AS n — и отсортируй: ORDER BY n DESC LIMIT 1.",
                        "sqlite3 records.db \"SELECT city, COUNT(*) AS n FROM people GROUP BY city "
@@ -1261,7 +1261,7 @@ class GroupCount(_RecordsAnswer):
                               "city\" — все города, глазами",)),
         Variant("Какой средний баланс у счетов со статусом {status} (таблица accounts)? Среднее "
                 "считает AVG(balance), а ROUND(x, 2) округлит до двух знаков после точки. Ответ: "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Среднее — AVG(balance), отбор строк — WHERE status = '{status}'.",
                        "ROUND(AVG(balance), 2) — два знака; ROUND без второго числа округлит до "
                        "целого.",
@@ -1275,7 +1275,7 @@ class GroupCount(_RecordsAnswer):
                 alternatives=("sqlite3 records.db \"SELECT AVG(balance) FROM accounts WHERE "
                               "status = '{status}'\" — без округления, для сверки",)),
         Variant("Какой счёт отправил больше всего денег — по сумме всех своих переводов? В "
-                "transfers отправитель — from_acc, сумма — amount. Ответ: ans СЧЁТ СУММА",
+                "transfers отправитель — from_acc, сумма — amount. Ответ: ans ACCOUNT SUM",
                 hints=("По строке на отправителя — GROUP BY from_acc, в ней SUM(amount).",
                        "SUM(amount) AS total, затем ORDER BY total DESC LIMIT 1.",
                        "sqlite3 records.db \"SELECT from_acc, SUM(amount) AS total FROM transfers "
@@ -1393,7 +1393,7 @@ class GroupHaving(_RecordsAnswer):
               "Агрегат в WHERE нельзя — sqlite3 ответит misuse of aggregate.\n"
               "> 5 — строго больше, пять не входит; «пять и больше» — >= 5. Сколько групп вышло — | wc -l.")
     variants = (
-        Variant("В скольких городах из people живёт больше {n} человек? Ответ: ans ЧИСЛО",
+        Variant("В скольких городах из people живёт больше {n} человек? Ответ: ans NUMBER",
                 hints=("Группы — города; условие на размер группы — после GROUP BY, в HAVING.",
                        "GROUP BY city HAVING COUNT(*) > {n}: «больше {n}» — строго, ровно {n} не "
                        "входит.",
@@ -1407,7 +1407,7 @@ class GroupHaving(_RecordsAnswer):
                 alternatives=("sqlite3 records.db \"SELECT city, COUNT(*) FROM people GROUP BY "
                               "city HAVING COUNT(*) > {n}\" — с числами, глазами",)),
         Variant("Сколько людей владеют двумя счетами или больше? Владелец счёта — person_id в "
-                "accounts. Ответ: ans ЧИСЛО",
+                "accounts. Ответ: ans NUMBER",
                 hints=("Группа — человек: GROUP BY person_id, размер группы — COUNT(*).",
                        "«Два и больше» — HAVING COUNT(*) >= 2: строгое > 2 потеряет тех, у кого "
                        "ровно два.",
@@ -1422,7 +1422,7 @@ class GroupHaving(_RecordsAnswer):
                 alternatives=("sqlite3 records.db \"SELECT person_id, COUNT(*) AS n FROM accounts "
                               "GROUP BY person_id HAVING n >= 2\" | wc -l — по имени графы",)),
         Variant("Считаем только активные счета (status = 'active'). У скольких людей сумма "
-                "балансов таких счетов больше {limit}? Ответ: ans ЧИСЛО",
+                "балансов таких счетов больше {limit}? Ответ: ans NUMBER",
                 hints=("Сначала отбор строк — WHERE по статусу, потом группы по person_id и "
                        "условие на сумму — HAVING.",
                        "WHERE status = 'active' GROUP BY person_id HAVING SUM(balance) > {limit}: "
@@ -1598,7 +1598,7 @@ class JoinInner(_JoinAnswer):
               "имя одно на двоих.")
     variants = (
         Variant("Сколько денег на всех счетах у {name} из города {city}? Имя и город — в people, "
-                "балансы — в accounts. Ответ: ans ЧИСЛО",
+                "балансы — в accounts. Ответ: ans NUMBER",
                 hints=("Счета связаны с людьми через person_id: склей people и accounts.",
                        "people p JOIN accounts a ON a.person_id = p.id, затем SUM(a.balance) и "
                        "WHERE по имени и городу.",
@@ -1614,7 +1614,7 @@ class JoinInner(_JoinAnswer):
                               "accounts a ON a.person_id = p.id WHERE p.name = '{name}' AND "
                               "p.city = '{city}'\" — по счетам, глазами",)),
         Variant("Чей счёт номер {acc}? Номер — id в accounts, владелец — в people. Ответ: ans "
-                "ИМЯ ФАМИЛИЯ",
+                "NAME SURNAME",
                 hints=("В accounts только person_id — имя ищи в people, склеив по нему.",
                        "accounts a JOIN people p ON p.id = a.person_id WHERE a.id = {acc}; просто "
                        "id — ambiguous.",
@@ -1628,7 +1628,7 @@ class JoinInner(_JoinAnswer):
                 alternatives=("sqlite3 records.db \"SELECT p.name, p.city FROM accounts a JOIN "
                               "people p ON p.id = a.person_id WHERE a.id = {acc}\" — и город",)),
         Variant("Кто отправил самый крупный перевод? Отправитель — владелец счёта from_acc из "
-                "transfers. Ответ: ans ИМЯ ФАМИЛИЯ ГОРОД",
+                "transfers. Ответ: ans NAME SURNAME CITY",
                 hints=("Три таблицы: transfers → accounts (по from_acc) → people (по person_id).",
                        "transfers t JOIN accounts a ON a.id = t.from_acc JOIN people p ON p.id = "
                        "a.person_id, затем ORDER BY t.amount DESC LIMIT 1.",
@@ -1749,7 +1749,7 @@ class JoinLeft(_JoinAnswer):
               "COUNT(a.id) считает найденные пары, COUNT(*) — строки склейки: у человека без "
               "счетов он даст 1, а не 0.")
     variants = (
-        Variant("Сколько людей из people без единого счёта в accounts? Ответ: ans ЧИСЛО",
+        Variant("Сколько людей из people без единого счёта в accounts? Ответ: ans NUMBER",
                 hints=("Нужны люди без пары в accounts: LEFT JOIN оставит их, справа будет NULL.",
                        "people p LEFT JOIN accounts a ON a.person_id = p.id WHERE a.id IS NULL — "
                        "и COUNT(*).",
@@ -1765,7 +1765,7 @@ class JoinLeft(_JoinAnswer):
                               "accounts a ON a.person_id = p.id WHERE a.id IS NULL\" — сами "
                               "люди",)),
         Variant("Со скольких счетов в accounts не ушло ни одного перевода — в transfers их нет "
-                "в графе from_acc? Ответ: ans ЧИСЛО",
+                "в графе from_acc? Ответ: ans NUMBER",
                 hints=("Счета без пары в transfers по from_acc: LEFT JOIN и NULL справа.",
                        "accounts a LEFT JOIN transfers t ON t.from_acc = a.id WHERE t.id IS NULL.",
                        "sqlite3 records.db \"SELECT COUNT(*) FROM accounts a LEFT JOIN transfers "
@@ -1779,8 +1779,8 @@ class JoinLeft(_JoinAnswer):
                 alternatives=("sqlite3 records.db \"SELECT a.id FROM accounts a LEFT JOIN "
                               "transfers t ON t.from_acc = a.id WHERE t.id IS NULL\" | wc -l — "
                               "списком",)),
-        Variant("В городе {city} у одного жителя нет ни одного счёта. Кто это? Ответ: ans ИМЯ "
-                "ФАМИЛИЯ",
+        Variant("В городе {city} у одного жителя нет ни одного счёта. Кто это? Ответ: ans NAME "
+                "SURNAME",
                 hints=("Жители со счетами и без: LEFT JOIN, затем GROUP BY p.id и число пар.",
                        "У человека без счетов COUNT(a.id) — 0, а COUNT(*) — 1. Отбор групп — "
                        "HAVING COUNT(a.id) = 0.",
@@ -3281,7 +3281,7 @@ class CsvSql(_DbAnswer):
     variants = (
         Variant("В sales.csv — продажи за полгода. Сколько денег принесли продажи в городе "
                 "{city}? Сложи колонку amount по всем его строкам, статус не важен. Ответ: ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Базы нет — есть CSV. sqlite3 :memory: заведёт базу в памяти, а -cmd "
                        "\".import --csv sales.csv t\" загрузит файл.",
                        "Дальше обычный запрос к t: SUM(amount) и WHERE city = '{city}'.",
@@ -3295,7 +3295,7 @@ class CsvSql(_DbAnswer):
                 alternatives=("sqlite3 sales.db \".import --csv sales.csv t\" — то же в файл: "
                               "база останется на диске",)),
         Variant("По sales.csv: из какого города больше всего денег — по сумме amount всех его "
-                "продаж? Ответ — город, как в таблице: ans ГОРОД",
+                "продаж? Ответ — город, как в таблице: ans CITY",
                 hints=("Загрузи CSV в базу в памяти: sqlite3 :memory: -cmd \".import --csv "
                        "sales.csv t\".",
                        "Сводка по городам: GROUP BY city, сортировка по SUM(amount) — DESC, "
@@ -3312,7 +3312,7 @@ class CsvSql(_DbAnswer):
                 alternatives=("duckdb -c \"SELECT city, SUM(amount) FROM 'sales.csv' GROUP BY "
                               "city ORDER BY 2 DESC\" — вся сводка сразу; ORDER BY 2 — по второй графе",)),
         Variant("Сколько в sales.csv продаж со статусом {status} на сумму больше {limit}? Сумма "
-                "— колонка amount, статус — status. Ответ: ans ЧИСЛО",
+                "— колонка amount, статус — status. Ответ: ans NUMBER",
                 hints=("CSV — в базу в памяти: sqlite3 :memory: -cmd \".import --csv sales.csv "
                        "t\", потом запрос.",
                        "Два условия: status = '{status}' AND amount > {limit} — «больше», не «не "

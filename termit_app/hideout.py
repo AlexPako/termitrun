@@ -402,9 +402,9 @@ USE: Dict[str, tuple] = {
                 "./termit home palette ID — выбрать, off — без цвета."),
     "glyph_pack": ("⚙ ./termit home prompt glyph — знак у курсора",
                    "Знак перед курсором: ./termit home prompt glyph — какие есть, "
-                   "./termit home prompt glyph ЗНАК — поставить, off — убрать."),
-    "callsign": ("⚙ ./termit home callsign ИМЯ — свой позывной",
-                 "Позывной встанет в шапку и в приглашение: ./termit home callsign ИМЯ — "
+                   "./termit home prompt glyph CHAR — поставить, off — убрать."),
+    "callsign": ("⚙ ./termit home callsign NAME — свой позывной",
+                 "Позывной встанет в шапку и в приглашение: ./termit home callsign NAME — "
                  "задать (буквы, цифры, _ и -), off — снять."),
 }
 USE_GROUPS = ("prompt", "palette", "glyph_pack", "callsign")
@@ -609,7 +609,7 @@ def _extra_short(key: str, ids: List[str]) -> str:
     if key in USE_GROUPS:
         return use_short(key)
     whos = sorted({i[:-1] for i in ids})
-    return EXTRA_SHORT[key].format(who=whos[0] if len(whos) == 1 else "ИМЯ")
+    return EXTRA_SHORT[key].format(who=whos[0] if len(whos) == 1 else "NAME")
 
 
 def _extra_lines(p: dict) -> List[str]:

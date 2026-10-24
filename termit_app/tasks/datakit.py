@@ -219,8 +219,8 @@ def parts(rng, days: int = 7) -> Dict[str, str]:
 # --- excel.csv -------------------------------------------------------------------------------
 
 def excel(rng, n: int) -> Tuple[str, str]:
-    """«Экселевская» выгрузка: (src, want). src — «id;date;product;amount», даты ДД.ММ.ГГГГ;
-    want — то же с запятыми и датами ГГГГ-ММ-ДД. Суммы целые: других кусков вида
+    """«Экселевская» выгрузка: (src, want). src — «id;date;product;amount», даты DD.MM.YYYY;
+    want — то же с запятыми и датами YYYY-MM-DD. Суммы целые: других кусков вида
     dd.dd.dddd, кроме дат, в файле нет."""
     products = rng.sample(kit.LATIN, rng.randint(6, 10))
     nid = rng.randint(1000, 1999)

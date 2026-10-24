@@ -48,7 +48,7 @@ class Implant:
 CATALOG: Tuple[Implant, ...] = (
     Implant("tldr", "tlrc", "tldr",
             "короткие живые примеры к команде вместо длинного man",
-            "man КОМАНДА и поиск /слово внутри", "tldr_tar"),
+            "man COMMAND и поиск /слово внутри", "tldr_tar"),
     Implant("rg", "ripgrep", "rg",
             "поиск текста в папках, быстрее grep -r, пропускает .git",
             "grep -rn 'текст' .", "grep_r"),

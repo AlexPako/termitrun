@@ -269,9 +269,10 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "where_am_i": ("pwd",),
     # владелец 23.10 (Р4): клавиши строки — советами с первых задач, уроки клавиш — позже
     "climb_down": ("cd", "ls", "cat", "Ctrl+C", "Ctrl+A", "Ctrl+E"),
-    "home_tilde": ("bash", "Ctrl+U"),
+    "home_tilde": ("bash", "Ctrl+U", "cp"),
+    "cut_paste": ("Ctrl+K",),      # новичок 24.10: Ctrl+K — в уроке варианта 0 и шпаргалке
     "mkdir_p": ("mkdir",),
-    "copy_move": ("cp", "mv"),
+    "copy_move": ("mv",),
     "find_name": ("find",),
     "file_ext": ("file",),
     "star_mask": ("rm",),
@@ -282,10 +283,10 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "z_jump": ("dirs", "setopt"),
     # «Инструменты»
     "man_flag": ("man",),
-    "less_search": ("less", "tail"),
+    "less_search": ("less",),
     "nano_config": ("nano",),
     "vim_trap": ("vim",),
-    "brew_lesson": (STUB_NAME, "which", "rg"),
+    "brew_lesson": (STUB_NAME, "rg"),
     "flag_use": ("head",),
     "tldr_tar": ("tar", "tldr"),
     "json_check": ("jq",),
@@ -293,13 +294,13 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "job_control": ("Ctrl+Z", "fg", "bg", "kill"),
     # «Свалка»
     "open_gui": ("open",),
+    "path_which": ("which",),      # 24.10: which ушёл из урока brew_lesson
     "grep_r": ("wc",),
     "du_heavy": ("du", "sort", "head", "tail"),
-    "batch_rename": ("autoload", "zmv"),
     "zip_pack": ("zip", "unzip"),
     "pbcopy_list": ("pbcopy", "pbpaste"),
-    "kill_frozen": ("ps", "kill", "pgrep", "pkill"),
-    "top_hog": ("top",),
+    "kill_frozen": ("kill", "pgrep", "pkill"),
+    "top_hog": ("top", "ps"),     # 24.10: ps ушёл из kill_frozen (там один путь — pgrep)
     "rg_hunt": ("rg", "xargs"),
     "fd_hunt": ("fd",),
     "csv_by_hand": ("tr",),

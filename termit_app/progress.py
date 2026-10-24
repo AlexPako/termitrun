@@ -7,7 +7,7 @@ import tempfile
 import time
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Sequence
 
 INTERVALS = [1, 3, 7, 16, 35]   # дни до следующего повторения на уровнях 1..5
 START_MONEY = 50
@@ -35,9 +35,11 @@ SLOT_KARMA = {2: 1500, 3: 4000}  # карма открывает слоты де
 TRAIN_XP = 5
 NEW_FIRST_WEEK = 2              # новых задач в ране первые 7 дней игры
 # владелец 23.10: «мы прошли порядочно, а нам всё подсовывают элементарный уровень» — ран был
-# 4 повтора + 1 новое; теперь новое — основа рана (session.RUN_SIZE), повторы — остаток и grind
+# 4 повтора + 1 новое; теперь новое — основа рана, повторов — session.review_slots, остальное — grind
 NEW_LATER = 3                   # дальше — по три
 FIRST_WEEK_DAYS = 7
+TIER_TOP = 2                    # Р1: ступени повтора 0..2 (Variant.tier)
+TIER_NAMES = ("базовая", "с подвохом", "связка")
 # Сова (локальная Ollama): вопрос на деле = −1 ★ и OWL_BASE × ярус; в тренировке —
 # OWL_FREE_TRAIN бесплатно за ран; не больше OWL_PER_TASK на задачу и OWL_PER_RUN за ран
 OWL_BASE = 15
@@ -82,7 +84,7 @@ def empty() -> dict:
                          "compare": {}},
             # FB3: копилка расширений — встреченные в заданиях, по порядку (termit_app.extensions)
             "extensions": [],
-            # FB5: команды ./termit СЛОВО, которым уже показана строка «что это» (ui.glossary)
+            # FB5: команды ./termit WORD, которым уже показана строка «что это» (ui.glossary)
             "cmds_seen": [],
             # убежище (хаб): разовое знакомство показано; слова, уже показанные в подсказке
             "hub": {"tour": False, "shown": []},
@@ -158,7 +160,7 @@ def _clean_drill_fields(rec: dict) -> None:
 def _normalize(p: dict) -> None:
     """Словари, которые игра ожидает, — словари; вложенные ключи — своего типа (недостающие
     дополняются). Ценное (tasks, money, xp, bosses) здесь не трогается; из days уходят только
-    записи, которые не дата ГГГГ-ММ-ДД, — в p["days_bad"], не в никуда."""
+    записи, которые не дата YYYY-MM-DD, — в p["days_bad"], не в никуда."""
     base = empty()
     days = p.get("days")
     if not isinstance(days, list) or not all(_iso_day(d) for d in days):
@@ -361,20 +363,40 @@ def variant_history(rec: Optional[dict], n: int) -> List[int]:
     return [v for v in raw if isinstance(v, int) and not isinstance(v, bool) and 0 <= v < n]
 
 
+def tier_of(rec: Optional[dict]) -> int:
+    """Ступень повтора игрока по задаче (Р1): 0 базовая, 1 с подвохом, 2 связка."""
+    t = (rec or {}).get("tier", 0)
+    return t if isinstance(t, int) and not isinstance(t, bool) and 0 <= t <= TIER_TOP else 0
+
+
+def tier_pool(pool: List[int], tiers: Optional[Sequence[int]], tier: int) -> List[int]:
+    """Варианты своей ступени; таких нет — ближайшей ниже; у задачи одна ступень — все."""
+    if not tiers or len(set(tiers)) < 2:
+        return pool
+    for t in range(tier, -1, -1):
+        same = [v for v in pool if v < len(tiers) and tiers[v] == t]
+        if same:
+            return same
+    return pool
+
+
 def pick_variant(rec: Optional[dict], n: int, rng,
-                 allowed: Optional[Iterable[int]] = None, prefer: Optional[int] = None) -> int:
+                 allowed: Optional[Iterable[int]] = None, prefer: Optional[int] = None,
+                 tiers: Optional[Sequence[int]] = None) -> int:
     """Какой вариант выдать на повторе: сначала ни разу не выпадавшие, иначе наименее
     недавний; тот же, что в прошлый раз, — никогда (если вариантов больше одного).
     Среди равных решает rng. allowed — какие варианты можно выдать здесь (Task.allowed_variants:
-    режиму может не хватать среды); номера вне 0..n-1 отбрасываются, пусто — все."""
+    режиму может не хватать среды); номера вне 0..n-1 отбрасываются, пусто — все.
+    tiers — ступень каждого варианта (Variant.tier): выбор идёт среди ступени игрока (Р1)."""
     if n <= 1:
         return 0
     pool = sorted({v for v in (allowed or ()) if isinstance(v, int) and 0 <= v < n}) \
         or list(range(n))
-    if len(pool) == 1:
-        return pool[0]
     if prefer in pool:          # FB12 (п. 34): вариант-практика стража — на первом повторе
         return prefer
+    pool = tier_pool(pool, tiers, tier_of(rec))
+    if len(pool) == 1:
+        return pool[0]
     history = variant_history(rec, n)
     unseen = [v for v in pool if v not in history]
     if unseen:
@@ -433,13 +455,17 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
            spell: str = None, boss: bool = False, mode: str = "job",
            practice: bool = False, pay_per_star: int = MONEY_PER_STAR,
            variant: Optional[int] = None, tools: Optional[Iterable[str]] = None,
-           hints: Optional[int] = None, drill: bool = False) -> dict:
+           hints: Optional[int] = None, drill: bool = False,
+           top_tier: Optional[int] = None) -> dict:
     """practice — круг мастера и отработка (train): знакомую освоенную задачу расписание
     не трогает.
     pay_per_star — оплата звезды дела (выше обычной в «выгодном ране»).
     variant — выданный вариант (его выбрал родитель, а не task.json песочницы).
     drill — отработка (train, спека 2.6): без кармы, рекорд только без подсказок, день
-    попытки — в drill_day (одна задача не повторяется дважды в день)."""
+    попытки — в drill_day (одна задача не повторяется дважды в день).
+    top_tier — верхняя ступень вариантов задачи (Р1+, владелец 24.10): пока она не взята
+    дважды подряд на ★★★, ★★★ не откладывает тему, а усложняет — следующая ступень завтра.
+    None — без лестницы (как раньше: ★★★ сразу растит интервал)."""
     known = task_id in p["tasks"]
     rec = p["tasks"].setdefault(task_id, {"attempts": 0, "solved": 0, "best": None,
                                           "level": 0, "due": None, "last_stars": 0,
@@ -483,6 +509,10 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         rec["retrain"] = outcome != "solved"
         return rec
     rec["jobs"] = rec.get("jobs", 0) + 1
+    # серия повторов на ★★★ подряд: по ней ран берёт меньше повторов (session.review_target)
+    if outcome != "skip":
+        clean = p.get("clean_jobs", 0) if isinstance(p.get("clean_jobs"), int) else 0
+        p["clean_jobs"] = clean + 1 if outcome == "solved" and stars == 3 else 0
     if outcome == "solved":
         rec["solved"] += 1
         _note_best(rec, elapsed)
@@ -493,10 +523,25 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         if boss and task_id not in p["bosses"]:
             p["bosses"].append(task_id)
             p["money"] += BOSS_MONEY.get(task_id, 100)
-    if outcome == "solved" and stars == 3:
+    ladder = top_tier is not None and (tier_of(rec) < top_tier or rec.get("top_streak", 0) < 1)
+    climbing = ladder and outcome == "solved" and stars == 3
+    if ladder and outcome == "solved" and stars == 2 and hints == 0:
+        rec["due"] = tomorrow       # верно, но медленно: та же ступень ещё раз, тему не откладываем
+    elif climbing:
+        # владелец 24.10: «мы не откладываем топик в дальний ящик при быстром безошибочном
+        # исполнении, мы его усложняем… когда максимальную сложность закрываем 2 раза подряд
+        # на 3 звезды — тогда начинаем откладывать». Уровень интервала не растёт, повтор завтра
+        if tier_of(rec) < top_tier:
+            rec["tier"], rec["top_streak"] = tier_of(rec) + 1, 0
+        else:
+            rec["top_streak"] = rec.get("top_streak", 0) + 1
+        rec["due"] = tomorrow
+    elif outcome == "solved" and stars == 3:
         # ★★★ второй раз подряд — знает твёрдо: через ступень (владелец 23.10: «нам всё
         # подсовывают элементарный уровень»)
         step = 2 if rec.get("last_stars") == 3 else 1
+        if top_tier is not None and rec.get("top_streak") == 1:
+            rec["top_streak"] = 2       # лестница пройдена: ★★★ подряд — сразу на 3 дня
         rec["level"] = min(rec["level"] + step, len(INTERVALS))
         rec["due"] = (today + timedelta(days=INTERVALS[rec["level"] - 1])).isoformat()
     elif outcome == "solved" and stars == 2 and hints == 0:
@@ -517,6 +562,11 @@ def record(p: dict, task_id: str, outcome: str, stars: int, elapsed: float, toda
         rec["retrain"] = True
     elif outcome == "solved":
         rec["retrain"] = False
+    # Р1: ★★★ — следующий повтор ступенью сложнее; не вышло — ступенью проще; отложить — не срыв
+    if top_tier is None and outcome == "solved" and stars == 3:
+        rec["tier"] = min(tier_of(rec) + 1, TIER_TOP)
+    elif outcome != "solved" and outcome != "skip":
+        rec["tier"], rec["top_streak"] = max(tier_of(rec) - 1, 0), 0
     rec["last_stars"] = stars
     return rec
 

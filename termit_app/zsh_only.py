@@ -76,9 +76,6 @@ ITEMS: Dict[str, Trick] = {
         r"\.\((?:#i\))?\(?\w+\|\w+",
         f"только в zsh: (a|b) в маске. Bash поймёт её только после {_keep('shopt -s extglob')} "
         "и в виде @(a|b)."),
-    "zmv": Trick(
-        r"\bzmv\b",
-        "только в zsh: zmv. В bash пачку файлов переименовывают тем же циклом for."),
     "print": Trick(
         r"\bprint -r\b",
         "только в zsh: print — встроенная команда zsh, в bash её нет. Там то же делает "
@@ -95,7 +92,7 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "z_jump": ("setopt", "auto_pushd", "zshrc"),
     # «Свалка»
     "find_name": ("nomatch",),
-    "batch_rename": ("quotes", "zmv"),
+    "batch_rename": ("quotes",),     # 24.10: zmv убран из урока и шпаргалки (одна мысль — цикл)
     "disk_sweep": ("case_glob",),
     "dup_sort": ("alternation",),
     # «Окружение»

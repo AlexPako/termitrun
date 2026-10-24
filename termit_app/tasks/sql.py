@@ -471,7 +471,7 @@ class SqlAnswer(VaultData, VaultAnswer, db._DbAnswer):
         if form and len(want) > 1 and common in (base.MSG_ONE, base.MSG_EXTRA):
             return self.msg_parts_extra.format(form=form)
         if common == base.MSG_PARTIAL.format(n=len(want)):
-            # «ЧИСЛО ТИП» — назвать недостающее; одна заготовка («ИМЯ» из двух слов) — нет:
+            # «NUMBER TYPE» — назвать недостающее; одна заготовка («NAME» из двух слов) — нет:
             # число частей ответа отклик не выдаёт
             if form and len(form.split()) > 1:
                 return db.MSG_PARTS_MISSING.format(form=form)
@@ -605,10 +605,10 @@ class PsqlNav(SqlAnswer):
         # FB12 (N21): первая задача места — один вопрос (сколько таблиц); тип графы (\\d) —
         # повтор, вариант 1
         Variant("Учебная база vault уже ждёт: psql — и ты внутри. Сколько в ней таблиц (\\dt)? "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("Таблицы перечислит \\dt — внутри psql или снаружи: psql -c \"\\dt\".",
                        "Таблиц столько, сколько написано внизу вывода: (N rows).",
-                       "psql -c \"\\dt\" — и сдай число из (N rows): ans ЧИСЛО"),
+                       "psql -c \"\\dt\" — и сдай число из (N rows): ans NUMBER"),
                 solution='psql -c "\\dt"',
                 solution_script=('psql -At -c "SELECT COUNT(*) FROM pg_tables '
                                  "WHERE schemaname = 'public'\""),
@@ -628,7 +628,7 @@ class PsqlNav(SqlAnswer):
                 wrong=("print -r -- id", "print -r -- {table}"),
                 alternatives=("psql, внутри \\d {table}, выход \\q — то же изнутри",)),
         Variant("Сколько баз данных на учебном сервере и кто владелец (Owner) базы vault? Все "
-                "базы сервера с владельцами перечислит \\l. Ответ: ans ЧИСЛО ВЛАДЕЛЕЦ",
+                "базы сервера с владельцами перечислит \\l. Ответ: ans NUMBER OWNER",
                 hints=("Все базы сервера с владельцами показывает \\l.",
                        "Баз столько, сколько в (N rows); владелец vault — в колонке Owner её "
                        "строки.",
@@ -944,7 +944,7 @@ class PgDialect(SqlAnswer):
               "таблицы схемы ops.")
     variants = (
         Variant("Сколько клиентов из района kazan? В базе район записан как попало: Kazan, "
-                "kazan, KAZAN. Ответ: ans ЧИСЛО",
+                "kazan, KAZAN. Ответ: ans NUMBER",
                 hints=("В PostgreSQL LIKE и = различают регистр — нужен поиск без него.",
                        "ILIKE 'kazan' найдёт все три написания; COUNT(*) — сколько строк.",
                        "psql -At -c \"SELECT COUNT(*) FROM customers WHERE district ILIKE "
@@ -962,7 +962,7 @@ class PgDialect(SqlAnswer):
                               "'^kazan$'\" — ~* — регулярка без учёта регистра, ^…$ — "
                               "строка целиком")),
         Variant("Сколько счетов выписано {day}? issued_at хранит дату вместе со временем. "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("Время мешает: '{day}' для timestamp — только полночь.",
                        "Приведи к дате: issued_at::date = '{day}' — и посчитай COUNT(*).",
                        "psql -At -c \"SELECT COUNT(*) FROM invoices WHERE issued_at::date = "
@@ -975,7 +975,7 @@ class PgDialect(SqlAnswer):
                 alternatives=("psql -At -c \"SELECT COUNT(*) FROM invoices WHERE issued_at >= "
                               "'{day}' AND issued_at < '{next_day}'\" — полуоткрытый день",)),
         Variant("В схеме ops учебной базы — таблица дежурных. Кто дежурит в районе {district}? "
-                "Ответ: ans ИМЯ ФАМИЛИЯ",
+                "Ответ: ans NAME SURNAME",
                 hints=("Схемы покажет \\dn, таблицы схемы ops — \\dt ops.*.",
                        "Таблица не в public — пиши её со схемой: FROM ops.duty WHERE district = "
                        "'{district}'.",
@@ -1312,7 +1312,7 @@ class CaseWhen(SqlAnswer):
     variants = (
         Variant("Разложи счета (invoices) в {db} по корзинам: small — дешевле {lo}, mid — от {lo} "
                 "до {hi} включительно, big — дороже {hi}. Сколько счетов в корзине mid? Ответ: "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Метку каждой строке даёт CASE WHEN … THEN … ELSE … END, итог по меткам "
                        "— GROUP BY.",
                        "«От {lo} до {hi} включительно»: small — amount < {lo}, mid — amount <= "
@@ -1332,7 +1332,7 @@ class CaseWhen(SqlAnswer):
                 alternatives=("{run} \"SELECT COUNT(*) FROM invoices WHERE amount BETWEEN {lo} "
                               "AND {hi}\" — одна корзина и без CASE",)),
         Variant("Платежи (payments) в {db}: big — от {hi} и больше, остальные — small. Сколько "
-                "денег (сумма amount) в корзине big? Ответ: ans ЧИСЛО",
+                "денег (сумма amount) в корзине big? Ответ: ans NUMBER",
                 hints=("Метка — CASE WHEN … THEN … ELSE … END, деньги по меткам — SUM(amount) и "
                        "GROUP BY.",
                        "«От {hi} и больше» — amount >= {hi}: платёж ровно на {hi} — тоже big.",
@@ -1346,7 +1346,7 @@ class CaseWhen(SqlAnswer):
                 alternatives=("{run} \"SELECT SUM(amount) FROM payments WHERE amount >= {hi}\" "
                               "— одна корзина и без CASE",)),
         Variant("Метки счетов (invoices) в {db}: paid — done, все остальные статусы — debt. "
-                "Сколько денег (сумма amount) в метке debt? Ответ: ans ЧИСЛО",
+                "Сколько денег (сумма amount) в метке debt? Ответ: ans NUMBER",
                 hints=("Метка — CASE WHEN status = 'paid' THEN … ELSE … END: ELSE соберёт все "
                        "остальные статусы.",
                        "SUM(amount) по метке — GROUP BY метке; нужна строка debt.",
@@ -1522,7 +1522,7 @@ class Subquery(SqlAnswer):
               "большой.")
     variants = (
         Variant("Неоплаченные счета (invoices) в {db} — со статусом open или overdue. Сколько "
-                "из них дороже среднего неоплаченного счёта? Ответ: ans ЧИСЛО",
+                "из них дороже среднего неоплаченного счёта? Ответ: ans NUMBER",
                 hints=("Среднее — подзапрос в скобках: (SELECT AVG(amount) FROM invoices WHERE "
                        "…); снаружи — сравнение с ним.",
                        "Условие на статус нужно дважды: и снаружи, и в скобках — иначе среднее "
@@ -1540,7 +1540,7 @@ class Subquery(SqlAnswer):
                               "'paid')\" — «не paid» — то же самое",)),
         Variant("Сколько счетов (invoices) в {db} не получили ни одного платежа? Платежи — в "
                 "payments, счёт платежа — invoice_id (у части платежей он пуст). Ответ: ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Счета, которых нет в списке invoice_id из payments, — это NOT IN "
                        "(SELECT …).",
                        "В списке есть NULL — с ним NOT IN не найдёт ничего: в скобках отсей "
@@ -1555,7 +1555,7 @@ class Subquery(SqlAnswer):
                 alternatives=("{run} \"SELECT COUNT(*) FROM invoices i LEFT JOIN payments p ON "
                               "p.invoice_id = i.id WHERE p.id IS NULL\" — через LEFT JOIN",)),
         Variant("Кто из клиентов в {db} выписал самый крупный счёт? Найди сумму подзапросом, а "
-                "по ней — счёт и клиента. Ответ: ans ИМЯ ФАМИЛИЯ",
+                "по ней — счёт и клиента. Ответ: ans NAME SURNAME",
                 hints=("Самая крупная сумма — (SELECT MAX(amount) FROM invoices); клиент счёта — "
                        "customer_id.",
                        "Подзапрос в подзапросе: id клиента IN (SELECT customer_id … WHERE amount "
@@ -1733,7 +1733,7 @@ class CteWith(SqlAnswer):
               "Склейка размножает строки и суммы: сначала сложи в WITH, потом клей.")
     variants = (
         Variant("Долг по счёту — сумма счёта (invoices) минус все платежи по нему (payments). "
-                "Сколько счетов в {db} с долгом больше {x}? Ответ: ans ЧИСЛО",
+                "Сколько счетов в {db} с долгом больше {x}? Ответ: ans NUMBER",
                 hints=("Платежи одного счёта сначала сложи — в WITH по invoice_id, потом приклей "
                        "этот итог к счетам.",
                        "У счёта без платежей пары нет: LEFT JOIN и COALESCE(g.s, 0). Долг — "
@@ -1750,7 +1750,7 @@ class CteWith(SqlAnswer):
                               "COALESCE((SELECT SUM(amount) FROM payments WHERE invoice_id = "
                               "i.id), 0) > {x}\" — подзапросом на каждый счёт",)),
         Variant("Доля просрочки района — какая часть счетов (invoices) его клиентов имеет статус "
-                "overdue. В каком районе в {db} доля наибольшая? Ответ: ans РАЙОН",
+                "overdue. В каком районе в {db} доля наибольшая? Ответ: ans DISTRICT",
                 hints=("Итог по районам — в WITH: склей счета с клиентами и сгруппируй по "
                        "district.",
                        "Доля — AVG(CASE WHEN status = 'overdue' THEN 1 ELSE 0 END): среднее из "
@@ -1771,7 +1771,7 @@ class CteWith(SqlAnswer):
                               "BY share DESC\" — все доли списком",)),
         Variant("В ledger строки клиентов: начисления (charge) — с плюсом, оплаты и списания — с "
                 "минусом. Чистый долг района — сумма amount строк его клиентов. Какие три района "
-                "в {db} с наибольшим чистым долгом? Ответ: ans РАЙОН РАЙОН РАЙОН",
+                "в {db} с наибольшим чистым долгом? Ответ: ans DISTRICT DISTRICT DISTRICT",
                 hints=("Итог по районам — в WITH: склей ledger с customers и сложи amount по "
                        "district.",
                        "Из итога — три первых: ORDER BY s DESC LIMIT 3. Знак уже в amount — "
@@ -2037,7 +2037,7 @@ class WindowRank(SqlAnswer):
                               "i.customer_id WHERE c.district = '{district}' ORDER BY i.amount "
                               "DESC, i.id LIMIT 1 OFFSET 1\" — без окна",)),
         Variant("Первое место клиента — его самый крупный счёт (invoices) в {db}. У скольких "
-                "клиентов первое место делят два счёта с равной суммой? Ответ: ans ЧИСЛО",
+                "клиентов первое место делят два счёта с равной суммой? Ответ: ans NUMBER",
                 hints=("Равным одно место даёт RANK() OVER (PARTITION BY customer_id ORDER BY "
                        "amount DESC).",
                        "Снаружи — строки с r = 1, по клиентам: GROUP BY и HAVING COUNT(*) = 2; "
@@ -2233,7 +2233,7 @@ class WindowLag(SqlAnswer):
               "в PostgreSQL; \"SELECT date_trunc('month', t)\" — первый день.")
     variants = (
         Variant("Оплаты (payments) в {db} по месяцам — месяц: {month}. В каком месяце рост к "
-                "прошлому месяцу наибольший и какой он? Ответ: ans ГГГГ-ММ ЧИСЛО",
+                "прошлому месяцу наибольший и какой он? Ответ: ans YYYY-MM NUMBER",
                 hints=("Сначала итог по месяцам — WITH m AS (SELECT {month} AS mon, SUM(amount) "
                        "AS s … GROUP BY mon).",
                        "Рост — s - LAG(s) OVER (ORDER BY mon); у первого месяца он NULL. Выбери "
@@ -2251,9 +2251,9 @@ class WindowLag(SqlAnswer):
                        "mon) - s AS up FROM m) SELECT mon, up FROM d WHERE up IS NOT NULL ORDER "
                        "BY up DESC LIMIT 1\""),
                 alternatives=("в PostgreSQL — date_trunc('month', paid_at) вместо {month}: "
-                              "месяц первым днём, ответ вида ГГГГ-ММ-01 тоже примут",)),
+                              "месяц первым днём, ответ вида YYYY-MM-01 тоже примут",)),
         Variant("Накопительный итог оплат (payments) в {db} по месяцам — месяц: {month}. Сколько "
-                "всего заплачено к концу {mon}? Ответ: ans ЧИСЛО",
+                "всего заплачено к концу {mon}? Ответ: ans NUMBER",
                 hints=("Итог по месяцам — в WITH, накопительный — SUM(s) OVER (ORDER BY mon).",
                        "Накопительный итог месяца — все месяцы до него включительно; нужна строка "
                        "{mon}.",
@@ -2269,7 +2269,7 @@ class WindowLag(SqlAnswer):
                 alternatives=("{run} \"SELECT SUM(amount) FROM payments WHERE {month} <= "
                               "'{mon}'\" — одной суммой, без окна",)),
         Variant("Платежи (payments) в {db} по порядку времени (paid_at): сколько раз платёж "
-                "оказался крупнее предыдущего? Ответ: ans ЧИСЛО",
+                "оказался крупнее предыдущего? Ответ: ans NUMBER",
                 hints=("Прошлый платёж рядом с нынешним — LAG(amount) OVER (ORDER BY paid_at).",
                        "Окно — в подзапросе, снаружи считай строки, где amount больше прошлого; у "
                        "первого прошлого нет (NULL).",
@@ -2432,7 +2432,7 @@ class JoinsMore(SqlAnswer):
     variants = (
         Variant("Непарные строки в {db}: счета (invoices) без единого платежа и платежи "
                 "(payments) без счёта — invoice_id пуст. Сколько их всего вместе? Ответ: ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Обе стороны разом вытащит FULL JOIN invoices и payments по invoice_id.",
                        "Непарная строка — та, где с одной стороны NULL: WHERE i.id IS NULL OR "
                        "p.id IS NULL.",
@@ -2449,7 +2449,7 @@ class JoinsMore(SqlAnswer):
                               "{run} \"SELECT COUNT(*) FROM payments WHERE invoice_id IS NULL\" — "
                               "двумя запросами",)),
         Variant("У сотрудника (employees) в {db} manager_id — id его начальника. У кого больше "
-                "всего прямых подчинённых? Ответ: ans ИМЯ ФАМИЛИЯ",
+                "всего прямых подчинённых? Ответ: ans NAME SURNAME",
                 hints=("Таблица сама с собой: employees e JOIN employees m ON m.id = "
                        "e.manager_id — рядом с каждым его начальник m.",
                        "Подчинённых считает GROUP BY m.id, m.name и COUNT(*); первый — ORDER BY "
@@ -2466,7 +2466,7 @@ class JoinsMore(SqlAnswer):
                               "FROM employees GROUP BY manager_id ORDER BY COUNT(manager_id) DESC "
                               "LIMIT 1)\" — подзапросом",)),
         Variant("Два списка почт в {db} — leads и subscribers (графа email). Сколько разных "
-                "адресов в них вместе? Ответ: ans ЧИСЛО",
+                "адресов в них вместе? Ответ: ans NUMBER",
                 hints=("Строки двух SELECT в один столбик сложит UNION.",
                        "UNION убирает повторы, UNION ALL — нет. Строки склейки сосчитай: SELECT "
                        "COUNT(*) FROM (… UNION …) t.",
@@ -3299,7 +3299,7 @@ class JsonbQuery(SqlAnswer):
               "у jq.")
     variants = (
         Variant("События (events) в базе vault: payload — JSON вида {{\"type\": …, \"who\": …, "
-                "\"tags\": […]}}. Сколько событий типа {etype}? Ответ: ans ЧИСЛО",
+                "\"tags\": […]}}. Сколько событий типа {etype}? Ответ: ans NUMBER",
                 hints=("Поле JSON текстом даёт ->>: payload->>'type'.",
                        "-> вернёт JSON, и сравнение со строкой упадёт; нужен ->> и = '{etype}'.",
                        "psql -At -c \"SELECT COUNT(*) FROM events WHERE payload->>'type' = "
@@ -3312,7 +3312,7 @@ class JsonbQuery(SqlAnswer):
                 alternatives=("psql -At -c \"SELECT payload->>'type', COUNT(*) FROM events "
                               "GROUP BY 1\" — все типы разом",)),
         Variant("События (events) в базе vault: в payload есть массив tags. У скольких событий "
-                "среди тегов есть {tag}? Ответ: ans ЧИСЛО",
+                "среди тегов есть {tag}? Ответ: ans NUMBER",
                 hints=("«Содержит» в JSON — @>: payload @> '{{\\\"tags\\\": [\\\"{tag}\\\"]}}'; "
                        "кавычки JSON внутри \"…\" — с косой.",
                        "= сравнит массив целиком — найдутся только те, где тег единственный.",
@@ -3327,7 +3327,7 @@ class JsonbQuery(SqlAnswer):
                 alternatives=("psql -At -c \"SELECT COUNT(*) FROM events WHERE payload->'tags' "
                               "? '{tag}'\" — ? : есть ли такая строка в массиве",)),
         Variant("События (events) в базе vault: в payload есть массив tags. Какой тег "
-                "встречается чаще всех и сколько раз? Ответ: ans ТЕГ ЧИСЛО",
+                "встречается чаще всех и сколько раз? Ответ: ans TAG NUMBER",
                 hints=("Элементы массива строками — jsonb_array_elements_text(payload->'tags') "
                        "во FROM, рядом с events.",
                        "Дальше как всегда: GROUP BY тег, ORDER BY COUNT(*) DESC LIMIT 1.",
@@ -4054,7 +4054,7 @@ class Columnar(SqlAnswer):
               "PostgreSQL хранит строками; здесь мы только считаем, что прочла бы Vertica.")
     variants = (
         Variant("Запрос SELECT sum(amount) FROM ops.clicks колоночная база прочтёт по одному "
-                "столбцу amount. Сколько байт весит этот столбец? Ответ: ans ЧИСЛО",
+                "столбцу amount. Сколько байт весит этот столбец? Ответ: ans NUMBER",
                 hints=("Вес одного значения — pg_column_size(amount), всех — их сумма.",
                        "SELECT sum(pg_column_size(amount)) FROM ops.clicks — через psql -At "
                        "-c.",
@@ -4083,7 +4083,7 @@ class Columnar(SqlAnswer):
                               "графу",)),
         Variant("Отчёт SELECT city, sum(amount) FROM ops.clicks GROUP BY city колоночная база "
                 "прочтёт по двум столбцам. Сколько байт весят city и amount вместе? Ответ: ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Нужны только два столбца: city и amount.",
                        "sum(pg_column_size(city)) + sum(pg_column_size(amount)) — одним SELECT.",
                        "psql -At -c \"SELECT sum(pg_column_size(city)) + "
@@ -4484,7 +4484,7 @@ class Segments(SqlAnswer):
               "Сколько строк на каждом узле — сразу видно.")
     variants = (
         Variant("Прикинь сегментацию ops.orders по id на 3 узла (узел — id % 3). Сколько строк "
-                "окажется на самом загруженном узле? Ответ: ans ЧИСЛО",
+                "окажется на самом загруженном узле? Ответ: ans NUMBER",
                 hints=("Номер узла — id % 3, строк на узле — count(*) с GROUP BY по нему.",
                        "SELECT id % 3 AS node, count(*) … GROUP BY node — возьми наибольшее "
                        "число.",
@@ -4498,7 +4498,7 @@ class Segments(SqlAnswer):
                 alternatives=("psql -At -c \"SELECT count(*) FROM ops.orders GROUP BY id % 3 "
                               "ORDER BY 1 DESC LIMIT 1\" — сразу наибольшее",)),
         Variant("А если сегментировать ops.orders по customer_id на 3 узла (узел — customer_id "
-                "% 3)? Сколько строк окажется на самом загруженном узле? Ответ: ans ЧИСЛО",
+                "% 3)? Сколько строк окажется на самом загруженном узле? Ответ: ans NUMBER",
                 hints=("Узел — customer_id % 3; посчитай строки на каждом.",
                        "SELECT customer_id % 3 AS node, count(*) … GROUP BY node — возьми "
                        "наибольшее.",
@@ -4514,7 +4514,7 @@ class Segments(SqlAnswer):
                               "customer_id % 3 ORDER BY 1 DESC LIMIT 1\" — сразу наибольшее",)),
         Variant("Кластер расширили до четырёх машин, раскладка — по клиенту: узел — "
                 "customer_id % 4. Найди узел, который почти простаивает: сколько строк "
-                "достанется самому лёгкому? Ответ: ans ЧИСЛО",
+                "достанется самому лёгкому? Ответ: ans NUMBER",
                 hints=("Узел — customer_id % 4; посчитай строки на каждом и найди наименьшее.",
                        "SELECT customer_id % 4 AS node, count(*) … GROUP BY node ORDER BY "
                        "count(*).",

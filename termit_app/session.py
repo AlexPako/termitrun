@@ -16,7 +16,7 @@ from termit_app import (coach, contracts, cosmetics, edition, extensions, field,
                         loot, master, music, owl, paths, progress, sandbox, shell_run, shop,
                         remarks, repute, sound, story, syserrors, textnorm, theme, ui,
                         warehouse, weekly)
-from termit_app.tasks import dbkit, registry
+from termit_app.tasks import dbkit, registry, tiers
 from termit_app.tasks.base import variant_index
 
 
@@ -120,13 +120,9 @@ def next_new(p: dict, limit: int) -> List[str]:
     return out
 
 
-REVIEWS_PER_RUN = 4         # потолок старых дел в обычном ране (build_queue, tomorrow_note)
-REVIEWS_SHORT = 2           # и в коротком (./termit short)
-# владелец 23.10: новое — первым и основой рана, повторов «не больше трети»: ран — RUN_SIZE
-# задач, сколько можно нового, остальное — повторы (не меньше REVIEWS_MIN); нового нет — ран
-# снова из повторов. Остальные просроченные — в grind.
-RUN_SIZE = 4
-RUN_SIZE_SHORT = 3
+REVIEWS_SHORT = 2           # потолок старых дел в коротком ране (./termit short)
+# новое — первым (владелец 23.10), повторов — review_slots (владелец 24.10, ниже); нового нет —
+# ран снова из повторов. Остальные просроченные — в grind.
 REVIEWS_MIN = 1
 GRIND_SIZE = 5
 
@@ -147,17 +143,33 @@ def new_count(p: dict, today: date, short: bool = False) -> int:
     return max(1, limit - 1) if short else limit
 
 
+# владелец 24.10: «в ране 3 новых и 5 повторов, раны должны быть больше; количество повторов
+# можно уменьшать, если всё проходится быстро на 3 звезды». Каждые CLEAN_STEP повторов подряд
+# на ★★★ (примерно чистый ран) — на один повтор меньше, но не меньше REVIEWS_FLOOR; повтор не
+# на ★★★ возвращает REVIEWS_FULL (progress.record ведёт p["clean_jobs"])
+REVIEWS_FULL = 5
+REVIEWS_FLOOR = 2
+CLEAN_STEP = 5
+
+
+def review_target(p: dict) -> int:
+    clean = p.get("clean_jobs", 0)
+    clean = clean if isinstance(clean, int) and clean > 0 else 0
+    return max(REVIEWS_FLOOR, REVIEWS_FULL - clean // CLEAN_STEP)
+
+
 def review_slots(p: dict, today: date, short: bool = False) -> int:
-    new = len(next_new(p, new_count(p, today, short)))
-    scale = run_scale(p)
-    size = (RUN_SIZE_SHORT if short else RUN_SIZE) * scale
-    cap = (REVIEWS_SHORT if short else REVIEWS_PER_RUN) * scale
-    return min(cap, max(REVIEWS_MIN, size - new))
+    """Повторов в ране: review_target (короткий ран — не больше REVIEWS_SHORT); нового меньше,
+    чем позволяет день, — недостающее место тоже занимают повторы."""
+    want = new_count(p, today, short)
+    new = len(next_new(p, want))
+    base = min(REVIEWS_SHORT, review_target(p)) if short else review_target(p)
+    return max(REVIEWS_MIN, base + (want - new))
 
 
 def today_reviews(p: dict, today: date, short: bool = False) -> List[str]:
     """Старые дела, которые возьмёт ран дня: проваленные стражи (вне лимита) и первые
-    REVIEWS_PER_RUN (REVIEWS_SHORT) просроченных. Один срез для build_queue и отработки:
+    review_slots просроченных. Один срез для build_queue и отработки:
     train их не трогает, ран остаётся полным (спека 2.6)."""
     tasks = registry.all_tasks()
     # замок after — одно правило для всех путей, и для повторений по сроку тоже: пара,
@@ -616,7 +628,8 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
     variant = (0 if first else held if held is not None else
                progress.pick_variant(p["tasks"].get(task.id), len(task.variants),
                                      random.Random(seed), allowed=allowed,
-                                     prefer=registry.practice_prefer(p, task)))
+                                     prefer=registry.practice_prefer(p, task),
+                                     tiers=tiers.of(task)))
     shard = story.shard_for(task, p, seed)
     found = story.found_for(task, p, seed)      # найденный скрипт (часть 7, E20): разбор ниже
     # хабар данных: только в задаче, выбранной на этот ран (loot.plant_for_run), и один раз
@@ -832,7 +845,8 @@ def run_task(task, p: dict, n: int, total: int, opts: Options, tally: dict = Non
                         boss=task.boss, mode=mode, practice=practice,
                         pay_per_star=progress.MONEY_PER_STAR * opts.pay_mult,
                         variant=variant, tools=_first_tools(box),
-                        hints=hints + owl_asked, drill=opts.drill)
+                        hints=hints + owl_asked, drill=opts.drill,
+                        top_tier=max(tiers.of(task) or [0]))
         if opts.drill:
             tally.setdefault("drill", []).append(
                 {"id": task.id, "outcome": outcome, "elapsed": elapsed,
@@ -1086,7 +1100,7 @@ def tomorrow_note(p: dict, nxt: date) -> Optional[str]:
     rest = [i for i in progress.due(p, nxt)
             if i in tasks and available(tasks[i]) and after_done(p, tasks[i])
             and not (tasks[i].boss and i not in p["bosses"])]
-    n = min(len(rest), REVIEWS_PER_RUN)
+    n = min(len(rest), review_slots(p, nxt))
     if not n:
         return None
     return theme.msg("tomorrow_count_tail" if len(rest) > n else "tomorrow_count", n=n)

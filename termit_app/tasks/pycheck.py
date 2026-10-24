@@ -235,7 +235,7 @@ def lint_issues(text: str, kind: int, col: str) -> List[str]:
 
 
 class PyLint(Task):
-    """flake8 ФАЙЛ: формат «файл:строка:колонка: КОД текст», F401/E501, N802 (pep8-naming),
+    """flake8 FILE: формат «файл:строка:колонка: CODE текст», F401/E501, N802 (pep8-naming),
     I001 (flake8-isort) и isort, который чинит порядок импортов сам."""
     id = "py_lint"
     track = "py"
@@ -246,7 +246,7 @@ class PyLint(Task):
     tool = "python"                     # значок 🐍, как у всего трека
     secret_keys = ("fixed",)
     scroll = ("flake8 файл.py — корректор кода: печатает замечания строками "
-              "файл:строка:колонка: КОД текст, а сам ничего не правит.\n"
+              "файл:строка:колонка: CODE текст, а сам ничего не правит.\n"
               "Ставится в .venv из склада: pip install --no-index --find-links ~/wheels flake8 "
               "pep8-naming.\n"
               "Исправил — запусти снова: пустой вывод — замечаний нет. isort файл.py сам "
@@ -302,7 +302,7 @@ class PyLint(Task):
                "код правила, а правит человек. Плагины добавляют свои коды: N — имена "
                "(pep8-naming), I — порядок импортов (flake8-isort). isort, в отличие от "
                "flake8, сам переписывает файл.")
-    spell = "flake8 файл.py — замечания файл:строка:колонка: КОД; isort файл.py — порядок импортов"
+    spell = "flake8 файл.py — замечания файл:строка:колонка: CODE; isort файл.py — порядок импортов"
     MSG_LEFT = ("flake8 ещё найдёт {codes} в {script}. Запусти flake8 {script} и исправь строки "
                 "из вывода.")
 
@@ -653,7 +653,7 @@ def types_issue(text: str, kind: int) -> Optional[str]:
 
 
 class PyTypes(Task):
-    """mypy ФАЙЛ: «error: … [arg-type]» — проверка аннотаций без запуска; Optional."""
+    """mypy FILE: «error: … [arg-type]» — проверка аннотаций без запуска; Optional."""
     id = "py_types"
     track = "py"
     title = "Обещания в коде"

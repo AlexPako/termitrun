@@ -1,4 +1,4 @@
-"""Учебный shellcheck песочницы: python -I … termit_app.shellstub АРГУМЕНТЫ (FB14).
+"""Учебный shellcheck песочницы: python -I … termit_app.shellstub ARGS (FB14).
 
 Настоящего shellcheck на Mac обычно нет (ставится brew install shellcheck), а сети в песочнице
 нет совсем. Обёртка .termit/bin/shellcheck есть только у задач с uses_shellcheck = True.
@@ -92,7 +92,7 @@ def _code_part(line: str) -> str:
 
 def _unquoted_vars(code: str):
     """(начало, конец) голых $имя / ${…} / $1 вне кавычек, вне [[ ]] и $(( )), не в
-    присваивании ИМЯ=$x. Конец — индекс последнего символа."""
+    присваивании NAME=$x. Конец — индекс последнего символа."""
     out = []
     quote = None
     i, n = 0, len(code)

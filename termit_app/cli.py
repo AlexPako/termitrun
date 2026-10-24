@@ -68,7 +68,7 @@ def usage(p: dict = None) -> str:
         return text if enabled and on[key] else ""
     story_lines = (line("case", cmd("case"), has_story) +
                    line("memory", cmd("memory"), has_story) +
-                   line("dossier", cmd("dossier", "[ИМЯ]"), has_story))
+                   line("dossier", cmd("dossier", "[NAME]"), has_story))
     fence_line = line("fence", cmd("fence", "[sell N]"), loot.enabled())
     master_line = line("master", cmd("master"))
     train_line = cmd("train", "[ТЕМА|ID|exam|keys]")
@@ -100,11 +100,11 @@ def usage(p: dict = None) -> str:
 {style_line}{rehearse_line}{cmd("list")}{cmd("map")}{cmd("home", "[look ID]")}\
 {home("prompt")}{home("board")}{home("shop")}{home("help")}\
 {callsign_line}{deck_line}{story_lines}{fence_line}{cmd("inbox", "[N|next]")}{cmd("book", "[слово]")}\
-{diary_line}{cmd("theme", "[ИМЯ]", themes)}{cmd("sound", "[on|off]", ";")}\
+{diary_line}{cmd("theme", "[NAME]", themes)}{cmd("sound", "[on|off]", ";")}\
                            test, pack ID|off, vol 1..10
 {music_line}{implants_line}{wheels_line}{owl_line}{cmd("coach", "[on|off]")}{cmd("feedback")}\
 {report_line}{cmd("help")}{later}
-Флаги: --theme ИМЯ (тема на один запуск), --no-sandbox (без защиты sandbox-exec),
+Флаги: --theme NAME (тема на один запуск), --no-sandbox (без защиты sandbox-exec),
        --bare (без твоего ~/.zshrc), --no-gui (open не открывает окна)"""
 
 
@@ -232,7 +232,7 @@ def choose_theme(name) -> int:
             th = theme.load(n)
             mark = "▸" if n == theme.current() else " "
             ui.say(f" {mark} {n:10} {th['name']} — {th['tagline']}")
-        ui.say("\nПереключить: ./termit theme ИМЯ  (прогресс общий для всех тем)")
+        ui.say("\nПереключить: ./termit theme NAME  (прогресс общий для всех тем)")
         return 0
     if name not in theme.available():
         ui.bad(f"Нет темы {name}. Есть: " + ", ".join(theme.available()))
@@ -463,7 +463,7 @@ def _where_needed(item, bought: list) -> bool:
     if item.kind not in WHERE_AFTER_BUY or not hideout.where_text(item.id):
         return False
     if item.kind == "dossier" and item.id.endswith("1") and bought:
-        return False            # «Читать: ./termit dossier ИМЯ» уже сказано
+        return False            # «Читать: ./termit dossier NAME» уже сказано
     return True
 
 
@@ -492,7 +492,7 @@ def _print_lines(lines) -> None:
         ui.say(line if not line or line.startswith("  ") else ui.story_fill(line, "", ""))
 
 
-# подкоманды ./termit home СЛОВО: по ним охрана сверяет тексты «как пользоваться» (FB8)
+# подкоманды ./termit home WORD: по ним охрана сверяет тексты «как пользоваться» (FB8)
 HOME_SUBCOMMANDS = tuple(commands.HOME_ABOUT)
 
 
@@ -541,7 +541,7 @@ def home(args) -> int:
         return 0
     ui.say("Убежище: ./termit home · осмотр: ./termit home look ID · "
            "приглашение: ./termit home prompt · палитра: ./termit home palette ID · "
-           "дневник: ./termit home diary · позывной: ./termit home callsign ИМЯ · "
+           "дневник: ./termit home diary · позывной: ./termit home callsign NAME · "
            "доска: ./termit home board · витрина: ./termit home shop · "
            "всё о доме: ./termit home help")
     return 2
@@ -762,10 +762,10 @@ def home_glyph(p, args) -> int:
         cur = cosmetics.glyph(p)
         ui.say(f"Знак приглашения: {cur or 'снят (стоит ⟁, если есть значок деки)'}")
         ui.say(f"  есть: {names}")
-        ui.say("  ./termit home prompt glyph ИМЯ|ЗНАК · снять: ./termit home prompt glyph off")
+        ui.say("  ./termit home prompt glyph NAME|CHAR · снять: ./termit home prompt glyph off")
         return 0
     if len(args) != 1:
-        ui.say("./termit home prompt glyph ИМЯ|ЗНАК|off")
+        ui.say("./termit home prompt glyph NAME|CHAR|off")
         return 2
     if args[0] == "off":
         p.setdefault("settings", {})["glyph"] = None
@@ -783,17 +783,17 @@ def home_glyph(p, args) -> int:
 
 
 def home_callsign(p, args) -> int:
-    """./termit home callsign [ИМЯ|off]: позывной в шапке рана и приглашении."""
+    """./termit home callsign [NAME|off]: позывной в шапке рана и приглашении."""
     if not args:
         if "callsign" not in (p.get("owned") or ()):
             ui.say("Позывного пока нет. Витрина: ./termit shop")
             return 0
         cur = cosmetics.callsign(p)
         ui.say(f"Позывной: {cur or 'не задан'}")
-        ui.say("  ./termit home callsign ИМЯ · снять: ./termit home callsign off")
+        ui.say("  ./termit home callsign NAME · снять: ./termit home callsign off")
         return 0
     if len(args) != 1:
-        ui.say("Позывной — одно слово: ./termit home callsign ИМЯ")
+        ui.say("Позывной — одно слово: ./termit home callsign NAME")
         return 2
     code = cosmetics.set_callsign(p, args[0])
     if code == "not_owned":
@@ -821,7 +821,7 @@ def home_palette(p, args) -> int:
         cur = p.get("settings", {}).get("palette")
         for x in have:
             ui.say(f"  {'▸' if x == cur else ' '} {x[4:]:7} {shop_mod.name(x)}")
-        ui.say("\nВыбрать: ./termit home palette ИМЯ · без цвета: ./termit home palette off")
+        ui.say("\nВыбрать: ./termit home palette NAME · без цвета: ./termit home palette off")
         return 0
     want = args[0] if args[0].startswith("pal_") else "pal_" + args[0]
     if args[0] == "off":
@@ -1091,7 +1091,7 @@ MODEL_NAME = re.compile(r"^[A-Za-z0-9._:/-]{1,80}$")
 
 
 def owl_cmd(args) -> int:
-    """./termit owl [on|off|model ИМЯ]: статус и настройки. Ollama только локальная."""
+    """./termit owl [on|off|model NAME]: статус и настройки. Ollama только локальная."""
     p = progress.load(paths.PROGRESS_FILE)
     sub = args[0] if args else ""
     name = theme.word("owl")
@@ -1104,7 +1104,7 @@ def owl_cmd(args) -> int:
         return 0
     if sub == "model":
         if len(args) < 2 or not MODEL_NAME.match(args[1]):
-            ui.say("./termit owl model ИМЯ — например gemma3:4b (список: ./termit owl)")
+            ui.say("./termit owl model NAME — например gemma3:4b (список: ./termit owl)")
             return 2
         settings["owl_model"] = args[1]
         _save_settings(p)
@@ -1116,7 +1116,7 @@ def owl_cmd(args) -> int:
             ui.say(f"{name}: модель {args[1]}.")
         return 0
     if sub:
-        ui.say("./termit owl [on|off|model ИМЯ]")
+        ui.say("./termit owl [on|off|model NAME]")
         return 2
     on = settings.get("owl") is not False
     names = owl_mod.models(timeout=1.0)
@@ -1130,12 +1130,12 @@ def owl_cmd(args) -> int:
         ui.say(f"Ollama: {OLLAMA_SHOWN}. Модели: {', '.join(names) or 'нет'}.")
         ui.say(f"Отвечает: {pick or '— (ollama pull gemma3:4b)'}.")
     w = theme.word("money")
-    ui.say(f"В задаче: ask ВОПРОС — наводка, не ответ. Тренировка: "
+    ui.say(f"В задаче: ask QUESTION — наводка, не ответ. Тренировка: "
            f"{progress.OWL_FREE_TRAIN} вопроса за {theme.word('session').lower()} бесплатно; "
            f"дело: {progress.OWL_BASE}×ярус {w} и −1 ★. Не больше {progress.OWL_PER_TASK} "
            f"на задачу и {progress.OWL_PER_RUN} за {theme.word('session').lower()}; "
            f"{theme.word('boss')}: ask молчит (в репетиции — можно).")
-    ui.say("Выключить: ./termit owl off · модель: ./termit owl model ИМЯ")
+    ui.say("Выключить: ./termit owl off · модель: ./termit owl model NAME")
     return 0
 
 

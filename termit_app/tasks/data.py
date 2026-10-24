@@ -40,7 +40,7 @@ class _DataAnswer(AnswerTask):
 
     def answer_kind(self, state: dict) -> str:
         """Одно число — «number»: карточка скажет «сдаёшь одно число», а не «одно слово»
-        (FB7: в «Данных» просили ans ЧИСЛО, а форма звала сдать слово)."""
+        (FB7: в «Данных» просили ans NUMBER, а форма звала сдать слово)."""
         exp = state["answer"]
         return ("number" if isinstance(exp, (int, float)) and not isinstance(exp, bool)
                 else "text")
@@ -62,7 +62,8 @@ class _DataAnswer(AnswerTask):
             v = str(value).casefold()
             if v in got and v not in want:
                 return self.trap_messages[key].format(**st)
-        return self.common_mistake(given, ctx) or self.fallback.format(**st)
+        return (self.common_mistake(given, ctx) or self.near_miss(given, ctx)
+                or self.fallback.format(**st))
 
 
 def _orders(box: Path, rng, **kw):
@@ -84,18 +85,18 @@ class HeadTail(_DataAnswer):
               "посчитает и её. Колонки разделены запятыми; первая здесь — id.")
     variants = (
         Variant("В orders.csv выгрузка заказов. Сколько в ней заказов — строк данных без "
-                "заголовка? Ответ: ans ЧИСЛО",
+                "заголовка? Ответ: ans NUMBER",
                 wrong=("print -r -- $(wc -l < orders.csv)",),
                 alternatives=("tail -n +2 orders.csv | wc -l — строки без заголовка сразу, "
                               "вычитать не нужно",)),
         Variant("Глянь на края orders.csv: какой id у самого первого заказа — первой строки под "
                 "заголовком? И какая дата у самого последнего? Дата — вторая колонка, вида "
-                "ГГГГ-ММ-ДД. Ответ: ans ID ДАТА",
+                "YYYY-MM-DD. Ответ: ans ID DATE",
                 hints=("Начало файла показывает head, конец — tail.",
                        "Первая строка — заголовок, первый заказ — вторая: head -n 2. Последний "
                        "заказ — tail -n 1, дата в нём — после первой запятой.",
                        "head -n 2 orders.csv — во второй строке первое поле; tail -n 1 "
-                       "orders.csv — дата. Сдай: ans ID ДАТА"),
+                       "orders.csv — дата. Сдай: ans ID DATE"),
                 solution="head -n 2 orders.csv; tail -n 1 orders.csv",
                 solution_script="print -r -- $(head -n 2 orders.csv | tail -n 1 | cut -d, -f1) "
                                 "$(tail -n 1 orders.csv | cut -d, -f2)",
@@ -105,11 +106,11 @@ class HeadTail(_DataAnswer):
                        "$(head -n 2 orders.csv | tail -n 1 | cut -d, -f2)"),
                 alternatives=("sed -n 2p orders.csv — ровно вторая строка файла",)),
         Variant("Выгрузку прислали кусками: day_1.csv, day_2.csv и day_3.csv, у каждого куска "
-                "свой заголовок. Сколько в трёх файлах заказов всего? Ответ: ans ЧИСЛО",
+                "свой заголовок. Сколько в трёх файлах заказов всего? Ответ: ans NUMBER",
                 hints=("Строки считает wc -l, и ему можно дать сразу несколько файлов.",
                        "wc -l day_1.csv day_2.csv day_3.csv напечатает итог total — в нём и три "
                        "заголовка, по одному на файл.",
-                       "wc -l day_1.csv day_2.csv day_3.csv — из итога вычти 3. Сдай: ans ЧИСЛО"),
+                       "wc -l day_1.csv day_2.csv day_3.csv — из итога вычти 3. Сдай: ans NUMBER"),
                 solution="wc -l day_1.csv day_2.csv day_3.csv",
                 solution_script="print -r -- $(( $(cat day_1.csv day_2.csv day_3.csv | wc -l) "
                                 "- 3 ))",
@@ -121,7 +122,7 @@ class HeadTail(_DataAnswer):
     hints = ("Строки файла считает wc -l, а начало файла покажет head.",
              "wc -l orders.csv считает и заголовок — первую строку с названиями колонок. "
              "Вычти 1.",
-             "wc -l orders.csv → минус 1. Сдай: ans ЧИСЛО")
+             "wc -l orders.csv → минус 1. Сдай: ans NUMBER")
     solution = "wc -l orders.csv"
     solution_script = "print -r -- $(( $(wc -l < orders.csv) - 1 ))"
     explain = ("Любую выгрузку первым делом меряй: head — что за колонки, tail — чем кончается, wc "
@@ -184,7 +185,7 @@ class GrepCount(_DataAnswer):
     id = "grep_count"
     title = "Счётчик ошибок"
     par = 50
-    scroll = ("grep СЛОВО файл — строки, где есть слово; -c — count, не печатать, а сосчитать; "
+    scroll = ("grep WORD файл — строки, где есть слово; -c — count, не печатать, а сосчитать; "
               "-i — не различать большие и маленькие буквы; -v — invert, наоборот: строки БЕЗ "
               "слова.\n"
               "Флаги склеиваются: grep -ic warn server.log, а ещё -vc и -vic. Без -i grep "
@@ -192,17 +193,17 @@ class GrepCount(_DataAnswer):
     variants = (
         Variant("В app.log ночь была тяжёлой. Сколько строк с ошибками — слово error любым "
                 "регистром: ERROR, Error, error? И сколько строк — НЕ уровня INFO? "
-                "Ответ: ans ЧИСЛО ЧИСЛО",
+                "Ответ: ans NUMBER NUMBER",
                 wrong=("print -r -- $(grep -c ERROR app.log) $(grep -vc INFO app.log)",
                        "print -r -- $(grep -ic error app.log) $(grep -vc info app.log)"),
                 alternatives=("grep -i error app.log | wc -l — то же первое число через "
                               "подсчёт строк",)),
         Variant("Сколько строк в app.log обошлись без ошибки — в них нет слова error ни в каком "
-                "регистре (ни ERROR, ни Error, ни error)? Ответ: ans ЧИСЛО",
+                "регистре (ни ERROR, ни Error, ни error)? Ответ: ans NUMBER",
                 hints=("Строки без слова даёт -v, регистр отключает -i, счёт — -c.",
                        "Флаги склеиваются в один: grep -vic — без слова, любым регистром, "
                        "числом.",
-                       "grep -vic error app.log → ans ЧИСЛО"),
+                       "grep -vic error app.log → ans NUMBER"),
                 solution="grep -vic error app.log",
                 wrong=("grep -vc ERROR app.log", "grep -ic error app.log"),
                 alternatives=("grep -vi error app.log | wc -l — то же через подсчёт строк",)),
@@ -273,16 +274,16 @@ class PipeCount(_DataAnswer):
               "просто ann.")
     variants = (
         Variant("Сколько ошибок ERROR за ночь выдал сервис {svc}? Его строки в app.log помечены "
-                "svc={svc}. Ответ: ans ЧИСЛО",
+                "svc={svc}. Ответ: ans NUMBER",
                 wrong=("grep ERROR app.log | grep -c {svc}", "grep -c svc={svc} app.log"),
                 alternatives=("grep svc={svc} app.log | grep ERROR | wc -l — тот же счёт, "
                               "звенья в другом порядке",)),
         Variant("Сервис {svc} (метка svc={svc} в app.log) шумел всю ночь. Сколько его строк — НЕ "
-                "уровня INFO, то есть всё, кроме обычной болтовни? Ответ: ans ЧИСЛО",
+                "уровня INFO, то есть всё, кроме обычной болтовни? Ответ: ans NUMBER",
                 hints=("Два условия сразу — два grep через палку |; «не INFO» даёт -v.",
                        "Сначала строки сервиса — ищи с меткой svc=, иначе попадут чужие "
                        "упоминания. Потом из них — без INFO: grep -vc.",
-                       "grep svc={svc} app.log | grep -vc INFO → ans ЧИСЛО"),
+                       "grep svc={svc} app.log | grep -vc INFO → ans NUMBER"),
                 solution="grep svc={svc} app.log | grep -vc INFO",
                 wrong=("grep {svc} app.log | grep -vc INFO", "grep -c svc={svc} app.log"),
                 alternatives=("grep svc={svc} app.log | grep -v INFO | wc -l — то же через "
@@ -305,7 +306,7 @@ class PipeCount(_DataAnswer):
     hints = ("Два условия сразу — два grep через палку |.",
              "Сначала оставь строки ERROR, потом из них — сервис. Ищи с меткой svc=, иначе "
              "попадут чужие упоминания.",
-             "grep ERROR app.log | grep -c svc={svc} → ans ЧИСЛО")
+             "grep ERROR app.log | grep -c svc={svc} → ans NUMBER")
     solution = "grep ERROR app.log | grep -c svc={svc}"
     explain = ("Конвейер — главный фокус терминала: мелкие команды, сцепленные палкой, раскалывают "
                "вопрос, который ни одна не осилит в одиночку. Имя ищи с меткой поля — иначе в счёт "
@@ -491,13 +492,13 @@ class CutUniq(_DataAnswer):
               "повторы (как sort | uniq).")
     variants = (
         Variant("Из скольких разных городов пришли заказы в orders.csv? Город — третья колонка. "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 wrong=("cut -d, -f3 orders.csv | sort -u | wc -l",
                        "cut -d, -f3 orders.csv | tail -n +2 | wc -l"),
                 alternatives=("cut -d, -f3 orders.csv | tail -n +2 | sort | uniq | wc -l — то "
                               "же длиннее",)),
         Variant("Сколько разных товаров заказывали из города {city}? Товар — четвёртая колонка "
-                "orders.csv, город — третья. Ответ: ans ЧИСЛО",
+                "orders.csv, город — третья. Ответ: ans NUMBER",
                 hints=("Строки города отберёт grep, колонку вырежет cut, повторы уберёт sort -u.",
                        "grep ',{city},' — только заказы города, заголовка среди них нет. Товар — "
                        "cut -d, -f4.",
@@ -509,7 +510,7 @@ class CutUniq(_DataAnswer):
                               "заодно и сколько раз брали каждый",)),
         Variant("В orders.csv заказы за несколько месяцев. В скольких разных месяцах были "
                 "заказы? Дата — вторая колонка, вида 2726-03-15; месяц — её первые 7 символов. "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("Колонку вырежет cut -d, -f2, кусок строки — cut -c, повторы — sort -u.",
                        "Месяц — первые 7 символов даты: cut -c1-7. Заголовок date срежет "
                        "tail -n +2.",
@@ -532,7 +533,7 @@ class CutUniq(_DataAnswer):
         "header": "В счёт попало слово {header} из заголовка: срежь его tail -n +2.",
         "rows": "Это число строк — повторы не убраны: sort -u.",
         "all": "Это товары всех городов, а нужны только из {city}: сначала grep ',{city},'.",
-        "dates": "Это разные даты, а нужны месяцы: cut -c1-7 оставит от даты ГГГГ-ММ.",
+        "dates": "Это разные даты, а нужны месяцы: cut -c1-7 оставит от даты YYYY-MM.",
     }
     fallback = "Не то. Вырежи колонку, убери повторы sort -u и проверь, не попал ли заголовок."
 
@@ -635,12 +636,12 @@ class TopValues(_DataAnswer):
               "Топ значений колонки: … | sort | uniq -c | sort -rn | head")
     variants = (
         Variant("Какой товар в orders.csv заказывали чаще всего и сколько раз? Товар — четвёртая "
-                "колонка. Ответ: ans ТОВАР ЧИСЛО",
+                "колонка. Ответ: ans ITEM NUMBER",
                 wrong=("cut -d, -f4 orders.csv | tail -n +2 | uniq -c | sort -rn | head -1",),
                 alternatives=("cut -d, -f4 orders.csv | tail -n +2 | sort | uniq -c | sort -rn | "
                               "head -3 — заодно видно, с каким запасом лидер",)),
         Variant("Какой товар в orders.csv на ВТОРОМ месте по числу заказов и сколько у него "
-                "заказов? Товар — четвёртая колонка. Ответ: ans ТОВАР ЧИСЛО",
+                "заказов? Товар — четвёртая колонка. Ответ: ans ITEM NUMBER",
                 hints=("Сначала топ: вырежи колонку, sort | uniq -c, самые частые наверх — "
                        "sort -rn.",
                        "Вторая строка топа: head -n 2 оставит две первые, tail -n 1 — последнюю "
@@ -655,7 +656,7 @@ class TopValues(_DataAnswer):
                 alternatives=("… | sort -rn | head -3 — и глазами взять вторую строку",)),
         Variant("Из какого города чаще всего возвращают заказы — статус refund — и сколько там "
                 "возвратов? Город — третья колонка orders.csv; заметка «refund requested» — не "
-                "возврат. Ответ: ans ГОРОД ЧИСЛО",
+                "возврат. Ответ: ans CITY NUMBER",
                 hints=("Сначала оставь только возвраты, потом топ по колонке города.",
                        "Статус ищи с запятыми по краям: grep ',refund,'. Город — cut -d, -f3, "
                        "дальше формула топа.",
@@ -748,19 +749,19 @@ class FlagReview(_DataAnswer):
     id = "flag_review"
     title = "Флаг найди сам"
     par = 60
-    scroll = ("Повторение. Нужного флага на этой карточке нет — найди его сам: man КОМАНДА, "
+    scroll = ("Повторение. Нужного флага на этой карточке нет — найди его сам: man COMMAND, "
               "/слово и Enter, q — выйти.\n"
               "Знакомые флаги складывай с новым: короткие склеивают (grep -ci = grep -c -i), "
               "значение пишут следом за флагом (head -n 3). Регистр важен.")
     variants = (
         Variant("Сколько строк в words.txt содержат art отдельным словом — не start, не party, "
                 "не artist? У grep есть флаг «только целые слова» — найди его в man grep (/word) "
-                "и сложи с подсчётом -c. Ответ: ans ЧИСЛО",
+                "и сложи с подсчётом -c. Ответ: ans NUMBER",
                 wrong=("grep -c art words.txt",),
                 alternatives=("grep -w art words.txt | wc -l — то же через wc",)),
         Variant("В names.txt одно имя записано дважды. Какое? У uniq есть флаг, который "
                 "печатает только повторы, — найди его в man uniq (/repeated). Помни: uniq видит "
-                "только соседние строки. Ответ: ans ИМЯ",
+                "только соседние строки. Ответ: ans NAME",
                 hints=("Повторы uniq находит только среди соседей — сначала sort.",
                        "В man uniq ищи /repeated — нужный флаг печатает только повторы.",
                        "sort names.txt | uniq -d"),
@@ -770,7 +771,7 @@ class FlagReview(_DataAnswer):
                               "тоже покажет имя",)),
         Variant("В app.log ошибок ERROR много. На какой строке файла — первая? Номер строки "
                 "даёт -n, а остановиться после первого совпадения grep умеет сам — найди флаг в "
-                "man grep (/max). Ответ: ans НОМЕР",
+                "man grep (/max). Ответ: ans NUMBER",
                 hints=("Номер строки у grep — флаг -n.",
                        "Остановиться после N совпадений — флаг -m со значением: -m 1.",
                        "grep -n -m 1 ERROR app.log — номер до двоеточия"),
@@ -784,7 +785,7 @@ class FlagReview(_DataAnswer):
              "Флаги склеивают: подсчёт и «целое слово» вместе — -cw.",
              "grep -cw art words.txt")
     solution = "grep -cw art words.txt"
-    explain = ("Флаг вылетел из головы — man КОМАНДА и /слово, гадать не надо. Новый флаг клеится к"
+    explain = ("Флаг вылетел из головы — man COMMAND и /слово, гадать не надо. Новый флаг клеится к"
                " знакомому: grep -cw — сосчитать строки с целым словом.")
     spell = "grep -w — целое слово; uniq -d — только повторы; grep -m 1 — первое совпадение"
     trap_messages = {
@@ -856,14 +857,14 @@ class AwkSum(_DataAnswer):
               "{print s}' — копить в s и напечатать в конце.")
     variants = (
         Variant("На какую сумму набралось заказов со статусом {status} в orders.csv? Нужна "
-                "сумма колонки amount — она пятая, статус — шестая. Ответ: ans ЧИСЛО",
+                "сумма колонки amount — она пятая, статус — шестая. Ответ: ans NUMBER",
                 wrong=("awk -F, '{{s+=$5}} END {{print s}}' orders.csv",
                        "grep {status} orders.csv | awk -F, '{{s+=$5}} END {{print s}}'"),
                 alternatives=("grep ',{status},' orders.csv | awk -F, '{{s+=$5}} END {{print s}}' "
                               "— отбор grep-ом, сумма awk-ом",)),
         Variant("Сколько выручки дал город {city}: сумма amount только по ОПЛАЧЕННЫМ заказам "
                 "(status = paid)? Город — третья колонка orders.csv, amount — пятая, статус — "
-                "шестая. Ответ: ans ЧИСЛО",
+                "шестая. Ответ: ans NUMBER",
                 hints=("Два условия на строку — awk соединяет их через &&.",
                        "$3==\"{city}\" && $6==\"paid\" перед скобками отберёт строки; s+=$5 копит, "
                        "END печатает.",
@@ -876,7 +877,7 @@ class AwkSum(_DataAnswer):
                 alternatives=("grep ',{city},' orders.csv | awk -F, '$6==\"paid\" {{s+=$5}} END "
                               "{{print s}}' — город отобрал grep",)),
         Variant("Сколько принесли крупные заказы — те, где amount строго больше {limit}? Статус "
-                "не важен; amount — пятая колонка orders.csv. Ответ: ans ЧИСЛО",
+                "не важен; amount — пятая колонка orders.csv. Ответ: ans NUMBER",
                 hints=("Условие на число пишут без кавычек: $5>…, перед фигурными скобками.",
                        "> — строго больше: заказ ровно на {limit} не в счёт. s+=$5 копит, END "
                        "печатает.",
@@ -988,14 +989,14 @@ class LogPeriod(_DataAnswer):
               "Голое '14:' цепляет и минуты (10:14:05), а дата без ^ — чужие строки.")
     variants = (
         Variant("Сколько ошибок ERROR было в app.log {date} с {h1}:00 до {h2}:59? "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 wrong=("grep -E '({h1}|{h2}):' app.log | grep -c ERROR",
                        "grep {date} app.log | grep -E '({h1}|{h2}):' | grep -c ERROR"),
                 alternatives=("grep -E '^{date} ({h1}|{h2}):.*ERROR' app.log | wc -l — одним "
                               "шаблоном: .* — сколько угодно любых символов",)),
         Variant("Сколько повторов с номером — строк вида «retry 17 calling auth» — записано в "
                 "app.log {date} за час с {h1}:00 до {h1}:59? Номер бывает любой длины; "
-                "порядковые повторы («retry 2nd calling …») не считай. Ответ: ans ЧИСЛО",
+                "порядковые повторы («retry 2nd calling …») не считай. Ответ: ans NUMBER",
                 hints=("Сначала строки часа (^ и дата), потом из них — повторы с номером: "
                        "второй grep -E, счёт — wc -l.",
                        "Номер — одна цифра или больше: [0-9]+. За ним — пробел и calling, так "
@@ -1008,7 +1009,7 @@ class LogPeriod(_DataAnswer):
                 alternatives=("grep -E '^{date} {h1}:.*retry [0-9]+ calling' app.log | wc -l — "
                               "одним шаблоном: .* — сколько угодно любых символов",)),
         Variant("Окно — {date} с {lo}:00 до {hi}:59, несколько часов подряд. Сколько строк ERROR "
-                "в app.log за это окно? Ответ: ans ЧИСЛО",
+                "в app.log за это окно? Ответ: ans NUMBER",
                 hints=("Часы {lo}…{hi} начинаются одной и той же цифрой — вторую задаст класс "
                        "[ ]: в нём одна цифра, а не число.",
                        "Шаблон: ^, дата, пробел и час {cls} — так минуты не зацепятся. ERROR "
@@ -1801,8 +1802,8 @@ class SedFix(Task):
                 wrong=("sed -i 's/;/,/g' excel.csv", "sed -i '' 's/;/,/' excel.csv"),
                 alternatives=("sed 's/;/,/g' excel.csv > tmp.csv && mv tmp.csv excel.csv — "
                               "переносимо: так работает и на Linux",)),
-        Variant("Для базы нужен dates.csv: тот же excel.csv, но даты ДД.ММ.ГГГГ переписаны в "
-                "ГГГГ-ММ-ДД (05.03.2726 → 2726-03-05). Разделитель ; оставь как есть, исходник "
+        Variant("Для базы нужен dates.csv: тот же excel.csv, но даты DD.MM.YYYY переписаны в "
+                "YYYY-MM-DD (05.03.2726 → 2726-03-05). Разделитель ; оставь как есть, исходник "
                 "не трогай.",
                 hints=("Замены делает sed; куски даты запоминают группы ( ) — это sed -E.",
                        r"([0-9]{{2}}) — две цифры в группе, \. — сама точка; \3-\2-\1 расставит "
@@ -1929,7 +1930,7 @@ class SedFix(Task):
                 return ("Даты не переписаны: нужен sed -E и группы — ([0-9]{2}) запоминает две "
                         "цифры, \\1 вставляет первую группу.")
             if [_ANY_DATE.sub("D", x) for x in got] == [_ANY_DATE.sub("D", x) for x in want]:
-                return ("Даты переставлены не так: нужно ГГГГ-ММ-ДД — год, третья группа, "
+                return ("Даты переставлены не так: нужно YYYY-MM-DD — год, третья группа, "
                         "встаёт первым, день — последним.")
         for i, (a, b) in enumerate(zip(got, want)):
             if a != b:
@@ -1957,14 +1958,14 @@ class JqField(_DataAnswer):
               "список: .[] — каждый его элемент.")
     variants = (
         Variant("Сводка exchange.json — одна длинная строка JSON. Какая цена (поле price) у лота "
-                "{lot} и сколько всего лотов в списке lots? Ответ: ans ЦЕНА ЧИСЛО",
+                "{lot} и сколько всего лотов в списке lots? Ответ: ans PRICE NUMBER",
                 wrong=("jq length exchange.json",
                        "print -r -- $(jq '.lots[] | select(.id | contains(\"{lot}\")) | .price' "
                        "exchange.json) $(jq '.lots | length' exchange.json)"),
                 alternatives=("jq '.lots[] | select(.id==\"{lot}\")' exchange.json — лот целиком, "
                               "цена — в поле price",)),
         Variant("В exchange.json — список лотов lots. Какой товар (поле item) у лота {lot} и "
-                "сколько лотов со статусом sold (поле status)? Ответ: ans ТОВАР ЧИСЛО",
+                "сколько лотов со статусом sold (поле status)? Ответ: ans ITEM NUMBER",
                 hints=("Лот по id отберёт select, проданные — тоже select; строки сосчитает wc -l.",
                        "-r печатает товар без кавычек. Для счёта выведи id проданных — по одному "
                        "в строке — и отдай wc -l.",
@@ -1980,7 +1981,7 @@ class JqField(_DataAnswer):
                               "лотов в каждом статусе разом",)),
         Variant("В lots.json сам файл — список лотов, без обёртки. Сколько стоит самый дорогой "
                 "из проданных — тех, у кого status равен sold? Цена — поле price. Ответ: ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Файл — список целиком: его элементы перебирает .[]. Цены проданных "
                        "достанет jq, самую большую найдёт sort.",
                        "jq '.[] | select(.status==\"sold\") | .price' выведет цены по одной в "
@@ -2142,7 +2143,7 @@ class JqDeep(_DataAnswer):
               "Пример: jq '.users | map(.age) | add' f.json")
     variants = (
         Variant("Какой товар у самого первого лота в market.json и сколько полей в meta? "
-                "ans ТОВАР ЧИСЛО",
+                "ans ITEM NUMBER",
                 hints=("Путь — через точку, элемент списка — [номер]; счёт идёт с нуля.",
                        "Первый лот — .market.lots[0]; имена полей meta даст keys, их число — "
                        "length.",
@@ -2156,7 +2157,7 @@ class JqDeep(_DataAnswer):
                        "length' market.json)"),
                 alternatives=("jq '.meta | length' market.json — length у объекта тоже считает "
                               "поля",)),
-        Variant("Сумма цен всех лотов со статусом open в market.json? ans ЧИСЛО",
+        Variant("Сумма цен всех лотов со статусом open в market.json? ans NUMBER",
                 hints=("Лоты — .market.lots: select оставит подходящие, map достанет поле у "
                        "каждого.",
                        "map(select(.status==\"open\") | .price) — цены открытых; add сложит их.",
@@ -2169,7 +2170,7 @@ class JqDeep(_DataAnswer):
                        "jq '.market.lots | map(.price) | add' market.json"),
                 alternatives=("jq '[.market.lots[] | select(.status==\"open\") | .price] | add' "
                               "market.json — то же через [ ]",)),
-        Variant("Сколько лотов в market.json закончились (qty равно 0)? ans ЧИСЛО",
+        Variant("Сколько лотов в market.json закончились (qty равно 0)? ans NUMBER",
                 hints=("Лоты — .market.lots: select оставит подходящие, length сосчитает.",
                        "map(select(.qty == 0)) — только лоты с нулём; | length — их число.",
                        "jq '.market.lots | map(select(.qty == 0)) | length' market.json"),
@@ -2239,7 +2240,7 @@ class JqDeep(_DataAnswer):
         last = ctx.cmds[-1].line if ctx.cmds else ""
         if not textnorm.clean(given) and "jq" in last and self._BARE_WORD.search(last):
             return self.unquoted
-        return self.common_mistake(given, ctx) or self.fallback
+        return self.common_mistake(given, ctx) or self.near_miss(given, ctx) or self.fallback
 
 
 # --- D18 -----------------------------------------------------------------------------------
@@ -2267,15 +2268,15 @@ class CurlApi(_DataAnswer):
     id = "curl_api"
     title = "Запрос к API"
     par = 90
-    scroll = ("curl АДРЕС — HTTP-запрос из терминала; curl -s -o файл АДРЕС — silent, без "
-              "полосы загрузки, и output, ответ в файл; curl -i АДРЕС — include, и заголовки "
+    scroll = ("curl ADDRESS — HTTP-запрос из терминала; curl -s -o файл ADDRESS — silent, без "
+              "полосы загрузки, и output, ответ в файл; curl -i ADDRESS — include, и заголовки "
               "(код 200, 404, Content-Length).\n"
               "Сети в песочнице нет: сервер слушает сокет api.sock — curl -s --unix-socket "
               "api.sock http://localhost/путь. Ответ в JSON — дальше | jq. Адрес с ? — в "
               "кавычках: 'http://localhost/a?b=c'.")
     variants = (
         Variant("Здесь работает учебный сервер API (сокет api.sock). Сохрани ответ /lots в "
-                "lots.json, а курс {cur} из /rates сдай: ans ЧИСЛО",
+                "lots.json, а курс {cur} из /rates сдай: ans NUMBER",
                 wrong=("curl -s -m 2 http://localhost:9/rates | jq '.rates.{cur}'",
                        "curl -s --unix-socket api.sock http://localhost/lots -o lots.json; curl -s "
                        "--unix-socket api.sock http://localhost/rates | jq '.rates.{other}'"),
@@ -2283,7 +2284,7 @@ class CurlApi(_DataAnswer):
                               "jq '.rates.{cur}' rates.json — сначала в файл, потом разбор",)),
         Variant("Учебный сервер за сокетом api.sock умеет отбирать лоты /lots по статусу — "
                 "что он умеет, покажет адрес /. Сохрани в sold.json только проданные лоты (status "
-                "sold) и сдай, сколько их: ans ЧИСЛО",
+                "sold) и сдай, сколько их: ans NUMBER",
                 hints=("Что умеет сервер, покажет адрес /: curl -s --unix-socket api.sock "
                        "http://localhost/",
                        "Фильтр — ?status=sold в конце адреса; адрес с ? бери в кавычки. -o "
@@ -2519,15 +2520,15 @@ class CurlPost(_DataAnswer):
     id = "curl_post"
     title = "Отправить в API"
     par = 120
-    scroll = ("curl -H 'X-Api-Key: КЛЮЧ' АДРЕС — запрос с заголовком: -H — header, строчка "
+    scroll = ("curl -H 'X-Api-Key: KEY' ADDRESS — запрос с заголовком: -H — header, строчка "
               "«Имя: значение»; ключ из файла — -H \"X-Api-Key: $(cat key.txt)\".\n"
-              "Отправить данные — curl -X POST -d '{}' АДРЕС: -X — request, метод; -d — data, "
+              "Отправить данные — curl -X POST -d '{}' ADDRESS: -X — request, метод; -d — data, "
               "тело.\n"
               "Сервер тот же: curl -s --unix-socket api.sock http://localhost/путь.")
     variants = (
         Variant("Отчёт /report учебного API (сокет api.sock) отдаётся только с ключом: ключ "
                 "лежит в key.txt, передают его заголовком X-Api-Key. Сдай выручку (revenue) из "
-                "отчёта: ans ЧИСЛО",
+                "отчёта: ans NUMBER",
                 hints=("Без ключа сервер ответит 401. Заголовок добавляет -H 'Имя: значение'.",
                        "-H \"X-Api-Key: $(cat key.txt)\" — двойные кавычки, чтобы $( ) "
                        "подставил ключ; дальше | jq .report.revenue",
@@ -2542,7 +2543,7 @@ class CurlPost(_DataAnswer):
                 alternatives=("curl -s --unix-socket api.sock -H \"X-Api-Key: {key}\" "
                               "http://localhost/report — ключ, вставленный руками",)),
         Variant("Оформи заказ в учебном API (сокет api.sock): POST на /orders с JSON — item "
-                "{item}, qty {qty}. Сервер ответит номером заказа — сдай его: ans ЧИСЛО",
+                "{item}, qty {qty}. Сервер ответит номером заказа — сдай его: ans NUMBER",
                 hints=("Отправить данные — curl -X POST, тело — -d '{{…}}', что это JSON — "
                        "заголовок -H.",
                        "-H 'Content-Type: application/json' -d '{{\"item\": \"{item}\", "
@@ -2564,7 +2565,7 @@ class CurlPost(_DataAnswer):
         Variant("Отчёт в учебном API (сокет api.sock) считается не сразу: POST на /jobs с "
                 "пустым JSON {{}} вернёт task_id, а GET /jobs/ЭТОТ_ID отвечает status "
                 "running, пока не готово, и done с result, когда готово. Номер удобно держать "
-                "в переменной tid. Сдай result: ans ЧИСЛО",
+                "в переменной tid. Сдай result: ans NUMBER",
                 hints=("Сначала POST: curl … -X POST -d '{{}}' http://localhost/jobs — в ответе "
                        "task_id.",
                        "Потом спрашивай GET /jobs/ID ещё раз, пока status не станет done: "
@@ -2665,7 +2666,7 @@ class CurlPages(_DataAnswer):
     variants = (
         Variant("Учебный API (сокет api.sock) отдаёт товары кусками: /items?offset=N&limit="
                 "{limit}, в ответе total — сколько всего. Собери все куски и сдай сумму qty по "
-                "всем товарам: ans ЧИСЛО",
+                "всем товарам: ans NUMBER",
                 hints=("Первый кусок — offset=0; total в ответе скажет, сколько кусков нужно.",
                        "Цикл по offset {offsets}, ответы — в jq -s и сложить: map(.items[].qty) "
                        "| add.",
@@ -2683,7 +2684,7 @@ class CurlPages(_DataAnswer):
         Variant("Учебный API (сокет api.sock) отдаёт товары кусками по {limit}: "
                 "/items?offset=N&limit={limit}, в ответе total — сколько всего. Сохрани все "
                 "товары одним массивом в all.json и "
-                "сдай, сколько их: ans ЧИСЛО",
+                "сдай, сколько их: ans NUMBER",
                 hints=("Пройди куски циклом по offset; total в первом ответе скажет, где конец.",
                        "jq -s 'map(.items) | add' склеит куски в один массив; > all.json; jq "
                        "length all.json.",
@@ -2699,7 +2700,7 @@ class CurlPages(_DataAnswer):
                               "пусто",)),
         Variant("Учебный API (сокет api.sock) отдаёт товары кусками: /items?offset=N&limit="
                 "{limit}, в ответе total — сколько всего. Сколько товаров со status sold? "
-                "Собери все куски: ans ЧИСЛО",
+                "Собери все куски: ans NUMBER",
                 hints=("Куски — циклом по offset; без всех кусков посчитаешь только первые.",
                        "jq -s 'map(.items[]) | map(select(.status == \"sold\")) | length'.",
                        "for o in {offsets}; do curl -s --unix-socket api.sock "
@@ -2863,7 +2864,7 @@ class BossData(Task):
                   "head -5 > report/top5.txt; ")
     _HINT_HOUR = ("Час атаки — тот, где строк больше всего: cut -c1-13 access.log | sort | "
                   "uniq -c | sort -rn | head -3. Папку — mkdir -p report.")
-    _HINT_TOP = ("Топ часа: grep '^ЧАС' access.log | cut -d' ' -f2 | sort | uniq -c | sort -rn "
+    _HINT_TOP = ("Топ часа: grep '^HOUR' access.log | cut -d' ' -f2 | sort | uniq -c | sort -rn "
                  "| head -5 > report/top5.txt")
     variants = (
         Variant("Неделю кто-то долбил сервер, и access.log распух. Найди час атаки, пятёрку "
@@ -2871,7 +2872,7 @@ class BossData(Task):
                 "унёс — тоже в отчёт. Всё — в папку report/, по шагам ниже.",
                 hints=(_HINT_HOUR,
                        _HINT_TOP + ". Лидера бери точно: awk '$2==\"IP\"'.",
-                       "grep '^ЧАС' access.log | awk '$2==\"IP\"' > report/leader.log; "
+                       "grep '^HOUR' access.log | awk '$2==\"IP\"' > report/leader.log; "
                        "awk '$5==200 {{s+=$6}} END {{print s}}' report/leader.log > "
                        "report/bytes.txt"),
                 solution=(_HOUR_SHOWN + _TOP_SHOWN +
@@ -2904,7 +2905,7 @@ class BossData(Task):
                 "строки его первой половины, сколько за этот час было неудачных входов и копия "
                 "первой половины с замаскированными адресами — такую можно показать посторонним.",
                 hints=(_HINT_HOUR,
-                       "Первая половина часа — минуты 00–29: grep -E '^ЧАС:[0-2]' access.log. "
+                       "Первая половина часа — минуты 00–29: grep -E '^HOUR:[0-2]' access.log. "
                        "Неудачный вход — строка с POST /login 401, grep -c её сосчитает.",
                        "sed -E 's/\\.[0-9]+ /.x /' report/first30.log > report/public.log — "
                        "последнее число адреса станет x."),
@@ -2984,29 +2985,29 @@ class BossData(Task):
         "hour": "Это не час атаки. Час атаки — тот, где строк больше всего: посчитай "
                 "cut -c1-13 access.log | sort | uniq -c | sort -rn.",
         "week": "В top5.txt топ за всю неделю, а нужен час атаки: сначала отбери его строки "
-                "grep '^ЧАС' access.log, потом считай.",
+                "grep '^HOUR' access.log, потом считай.",
         "top_count": "В top5.txt нужно ровно пять адресов, громкие сверху: | head -5.",
         "top_order": "Адреса те, но не по порядку: sort -rn ставит самых громких наверх.",
-        "top": "Это не пятёрка часа атаки: строки часа — grep '^ЧАС' access.log, адрес — "
+        "top": "Это не пятёрка часа атаки: строки часа — grep '^HOUR' access.log, адрес — "
                "cut -d' ' -f2, дальше sort | uniq -c | sort -rn | head -5.",
         "collision": "В leader.log чужие строки: адрес {collision} тоже начинается с {leader}. "
                      "Ищи точно по полю: awk '$2==\"{leader}\"'.",
         "leader": "В leader.log должны быть все строки лидера за час атаки — и только они: "
-                  "grep '^ЧАС' access.log | awk '$2==\"IP\"'.",
+                  "grep '^HOUR' access.log | awk '$2==\"IP\"'.",
         "bytes_all": "В сумму попали ответы не 200: условие $5==200 перед скобками.",
         "bytes": "Сумма не сходится: складывай поле bytes ($6) только у строк лидера с кодом "
                  "200 ($5).",
         "whole": "В first30.log весь час, а нужна первая половина: минуты 00–29 — после "
                  "двоеточия [0-2].",
         "days": "В first30.log есть строки других дней: привяжи шаблон к началу строки и дате — "
-                "^ЧАС:[0-2].",
+                "^HOUR:[0-2].",
         "first": "В first30.log должны быть все строки часа атаки с минутами 00–29 — и только "
                  "они, как в access.log.",
         "logins_week": "Это неудачные входы за всю неделю, а нужен час атаки: сначала "
-                       "grep '^ЧАС' access.log, потом grep -c.",
+                       "grep '^HOUR' access.log, потом grep -c.",
         "logins_any": "Посчитаны и удачные входы: нужен только ответ 401 — 'POST /login 401'.",
         "logins": "Число не сходится: строки часа атаки, где есть POST /login 401, — "
-                  "grep '^ЧАС' access.log | grep -c 'POST /login 401'.",
+                  "grep '^HOUR' access.log | grep -c 'POST /login 401'.",
         "same": "В public.log ничего не заменилось: шаблон не нашёл адрес. Последнее число "
                 "адреса — точка, цифры и пробел за ними: \\.[0-9]+ и пробел.",
         "public_noE": "В public.log ничего не заменилось: + sed понимает только с флагом -E — "

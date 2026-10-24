@@ -151,7 +151,7 @@ class PdInstall(Task):
     explain = ("requirements.txt — список пакетов проекта; pip install -r ставит всё по нему, "
                "вместе с зависимостями. Сети нет — не беда: pip возьмёт колёса из папки, "
                "--no-index --find-links.")
-    spell = "pip install --no-index --find-links ПАПКА -r requirements.txt; import pandas as pd"
+    spell = "pip install --no-index --find-links DIR -r requirements.txt; import pandas as pd"
     MSG_NO_VENV = "Окружения .venv нет — набери reset, соберу задачу заново."
     MSG_NET = ("Сети здесь нет, и не нужна: pip install --no-index --find-links ~/wheels -r "
                "requirements.txt")
@@ -363,7 +363,7 @@ class PdRead(PdAnswer):
               "Имена колонок — df.columns, типы — df.dtypes: текст object, числа int64 и "
               "float64.")
     variants = (
-        Variant("Сколько строк данных в transfers.csv? ans ЧИСЛО",
+        Variant("Сколько строк данных в transfers.csv? ans NUMBER",
                 hints=("Прочти файл в pandas: df = pd.read_csv(\"transfers.csv\") — и спроси "
                        "df.shape.",
                        "df.shape — пара (строк, колонок); шапка в строки не входит. Не "
@@ -375,12 +375,12 @@ class PdRead(PdAnswer):
                 alternatives=("tail -n +2 transfers.csv | wc -l — строки без шапки, без "
                               "pandas",),
                 key="rows"),
-        Variant("Сколько колонок в transfers.csv и какой тип у колонки {col}? ans ЧИСЛО ТИП",
+        Variant("Сколько колонок в transfers.csv и какой тип у колонки {col}? ans NUMBER TYPE",
                 hints=("Колонки и их типы покажет pandas: df.shape и df.dtypes.",
                        "Колонок — второе число df.shape; тип — в df.dtypes напротив {col}. "
                        "Номера строк слева в head — индекс, не колонка.",
                        _pd("transfers.csv", "print(df.shape); print(df.dtypes)")
-                       + " → ans ЧИСЛО ТИП"),
+                       + " → ans NUMBER TYPE"),
                 solution=_pd("transfers.csv", "print(df.shape); print(df.dtypes)"),
                 solution_script=_pd("transfers.csv",
                                     "print(df.shape[1], df.dtypes[\"{col}\"])"),
@@ -389,7 +389,7 @@ class PdRead(PdAnswer):
                 key="dtypes"),
         Variant("Выгрузка payments.csv пришла с разделителем «;», а pandas режет по запятой. "
                 "Свой разделитель — так: pd.read_csv(\"f.csv\", sep=\";\"). Сколько колонок "
-                "в payments.csv? ans ЧИСЛО",
+                "в payments.csv? ans NUMBER",
                 hints=("Открой файл глазами: head -n 3 payments.csv — что стоит между полями?",
                        "pd.read_csv по умолчанию режет по запятой; другой разделитель — "
                        "sep=\";\".",
@@ -459,27 +459,27 @@ class PdFilter(PdAnswer):
               "слово and pandas не поймёт.")
     variants = (
         Variant("Сколько переводов в transfers.csv больше {limit}? Строго больше: ровно "
-                "{limit} не в счёт. ans ЧИСЛО",
+                "{limit} не в счёт. ans NUMBER",
                 hints=("Отбери строки условием: df[df[\"amount\"] > {limit}].",
                        "Сколько строк осталось — len(…) вокруг отбора. Не забудь .venv.",
-                       _count(_GT) + " → ans ЧИСЛО"),
+                       _count(_GT) + " → ans NUMBER"),
                 solution=_count(_GT),
                 wrong=(_count('df["amount"] >= {limit}'),),
                 alternatives=("(df[\"amount\"] > {limit}).sum() — True считается как 1",),
                 key="gt"),
-        Variant("Сколько переводов в transfers.csv из городов {c1} и {c2} вместе? ans ЧИСЛО",
+        Variant("Сколько переводов в transfers.csv из городов {c1} и {c2} вместе? ans NUMBER",
                 hints=("Город из списка — .isin([…]) у колонки city.",
                        "df[df[\"city\"].isin([\"{c1}\", \"{c2}\"])] — и len(…) вокруг.",
-                       _count(_IN) + " → ans ЧИСЛО"),
+                       _count(_IN) + " → ans NUMBER"),
                 solution=_count(_IN),
                 wrong=(_count('df["city"] == "{c1}"'),),
                 alternatives=("два отбора по == и сложить их len — дольше, но верно",),
                 key="isin"),
         Variant("Сколько переводов из {city} больше {limit}? Нужно и то, и другое сразу. ans "
-                "ЧИСЛО",
+                "NUMBER",
                 hints=("Два условия: город и сумма. В pandas их соединяет &, не and.",
                        "Каждое условие — в своих скобках: (…) & (…), и len(…) вокруг отбора.",
-                       _count(_AND) + " → ans ЧИСЛО"),
+                       _count(_AND) + " → ans NUMBER"),
                 solution=_count(_AND),
                 wrong=(_count('(df["city"] == "{city}") | (df["amount"] > {limit})'),),
                 alternatives=("отбор в два шага: сначала город, потом сумма",),
@@ -544,7 +544,7 @@ class PdGroupby(PdAnswer):
               "Первые N — .head(3); имена групп — .index, первое — .index[0].")
     variants = (
         Variant("В каком городе по transfers.csv переведено больше всего — по сумме amount? "
-                "ans ГОРОД",
+                "ans CITY",
                 hints=("Сложи суммы по городам: df.groupby(\"city\")[\"amount\"].sum().",
                        "Отсортируй от большего — .sort_values(ascending=False): лидер будет "
                        "первым.",
@@ -558,7 +558,7 @@ class PdGroupby(PdAnswer):
                 alternatives=("…sort_values().tail(1) — лидер внизу списка по возрастанию",),
                 key="leader"),
         Variant("Какой средний перевод в отделе {dept} (колонка dept)? Средний — .mean() вместо "
-                ".sum(); до 2 знаков округлит .round(2): ans ЧИСЛО",
+                ".sum(); до 2 знаков округлит .round(2): ans NUMBER",
                 hints=("Сгруппируй по отделу: df.groupby(\"dept\")[\"amount\"].",
                        "Средний по каждой группе — .mean(), до 2 знаков — .round(2); нужный "
                        "отдел найдёшь в списке.",
@@ -572,7 +572,7 @@ class PdGroupby(PdAnswer):
                               "отбор, потом среднее",),
                 key="mean"),
         Variant("Назови три города с наибольшей суммой переводов в transfers.csv — от большей к "
-                "меньшей. ans ГОРОД ГОРОД ГОРОД",
+                "меньшей. ans CITY CITY CITY",
                 hints=("Суммы по городам — groupby и .sum(), потом сортировка.",
                        "От большего — .sort_values(ascending=False), первые три — .head(3).",
                        _pd("transfers.csv", _SUMS + "print(" + _BY_CITY + ".head(3))")
@@ -644,20 +644,20 @@ class PdMissing(PdAnswer):
               "Текст в числа: pd.to_numeric(df[\"amount\"], errors=\"coerce\") — что не "
               "число, станет NaN.")
     variants = (
-        Variant("Сколько пустых ячеек в колонке amount файла transfers.csv? ans ЧИСЛО",
+        Variant("Сколько пустых ячеек в колонке amount файла transfers.csv? ans NUMBER",
                 hints=("Пустая ячейка в pandas — NaN; найдёт их .isna() у колонки.",
                        "True считается как 1: .isna().sum() — сколько пустых. Только amount, "
                        "не вся таблица.",
-                       _pd("transfers.csv", "print(" + _NA + ")") + " → ans ЧИСЛО"),
+                       _pd("transfers.csv", "print(" + _NA + ")") + " → ans NUMBER"),
                 solution=_pd("transfers.csv", "print(" + _NA + ")"),
                 wrong=(_pd("transfers.csv", "print(df.isna().sum().sum())"),),
                 alternatives=("df.isna().sum() — пропуски по каждой колонке сразу",),
                 key="isna"),
         Variant("Какой средний перевод в transfers.csv, если пустую сумму считать нулём? "
-                "Округли до 2 знаков — .round(2): ans ЧИСЛО",
+                "Округли до 2 знаков — .round(2): ans NUMBER",
                 hints=("Пустые .mean() молча пропускает — а здесь они нули.",
                        "Сначала .fillna(0), потом .mean() и .round(2).",
-                       _pd("transfers.csv", "print(" + _ZERO + ")") + " → ans ЧИСЛО"),
+                       _pd("transfers.csv", "print(" + _ZERO + ")") + " → ans NUMBER"),
                 solution=_pd("transfers.csv", "print(" + _ZERO + ")"),
                 wrong=(_pd("transfers.csv", 'print(df["amount"].mean().round(2))'),
                        _pd("transfers.csv", 'print(df.dropna()["amount"].mean().round(2))')),
@@ -665,11 +665,11 @@ class PdMissing(PdAnswer):
                               "len(df)",),
                 key="fillna"),
         Variant("В колонке amount файла transfers.csv попадаются записи вроде «1 200» и «12,5». "
-                "Сколько значений amount не читаются как число — вместе с пустыми? ans ЧИСЛО",
+                "Сколько значений amount не читаются как число — вместе с пустыми? ans NUMBER",
                 hints=("Такие записи pandas читает как текст; в число их переводит "
                        "pd.to_numeric.",
                        "errors=\"coerce\" делает из нечисла NaN — дальше .isna().sum().",
-                       _pd("transfers.csv", "print(" + _NUM + ")") + " → ans ЧИСЛО"),
+                       _pd("transfers.csv", "print(" + _NUM + ")") + " → ans NUMBER"),
                 solution=_pd("transfers.csv", "print(" + _NUM + ")"),
                 wrong=(_pd("transfers.csv", "print(" + _NA + ")"),),
                 alternatives=("сначала новая колонка: df[\"n\"] = pd.to_numeric(…), потом "

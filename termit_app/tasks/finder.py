@@ -64,16 +64,18 @@ class OpenGui(Task):
     track = "finder"
     uses_gui = True      # open — суть урока: здесь песочница по определению проницаема (А5)
     title = "Покажи глазами"
-    scroll = ("open . — открыть текущую папку в Finder. open -a Программа файл — открыть файл в "
-              "нужной программе (a — application; open -a Preview картинка.png; open -e файл — "
-              "сразу в TextEdit, e — editor). open -R файл — Reveal: показать файл в Finder.")
+    scroll = ("open . — показать текущую папку в Finder; open DIR — папку по имени. "
+              "open -a APP FILE — открыть файл в нужной программе (a — application): "
+              "open -a TextEdit notes.txt. open -R FILE — показать файл в Finder выделенным "
+              "(R — Reveal). Сдавать ничего не надо: игра видит, какие окна ты открыл.")
     variants = (
         Variant("Покажи эту папку в Finder, а опись inventory.txt открой в TextEdit. "
-                "Всё — из терминала.",
+                "Всё — из терминала; сдавать ничего не надо, игра увидит окна сама.",
                 wrong=("open . && open inventory.txt",),
-                alternatives=("open -e inventory.txt — сразу в TextEdit, без -a",)),
+                alternatives=("open -e inventory.txt — флаг -e (e — editor, «редактор») сразу "
+                              "открывает в TextEdit, без -a",)),
         Variant("Покажи в Finder папку reports, а картинку plan.png открой именно в программе "
-                "Preview. Всё — из терминала.",
+                "Preview. Всё — из терминала; сдавать ничего не надо, игра увидит окна сама.",
                 hints=("Окна открывает open: папку — по её имени, как точку.",
                        "Программу выбирает флаг -a: open -a Preview файл",
                        "open reports && open -a Preview plan.png"),
@@ -82,7 +84,7 @@ class OpenGui(Task):
                 alternatives=("open reports/ — с косой чертой на конце тоже папка",)),
         Variant("Опись лежит глубоко: docs/{year}/{month}/inventory.txt. Покажи её в Finder — "
                 "чтобы открылось окно её папки и опись в нём была выделена. Сам файл "
-                "открывать не нужно.",
+                "открывать не нужно, сдавать тоже ничего — игра увидит окно сама.",
                 hints=("Показать файл в Finder, а не открыть его, — отдельный флаг open.",
                        "Флаг -R: open -R путь/к/файлу",
                        "open -R docs/{year}/{month}/inventory.txt"),
@@ -168,7 +170,7 @@ class OpenGui(Task):
             return Verdict(True)
         # владелец 21.10: сделал половину (open -e) — игра молчала; говорим, что осталось
         where = "open reports" if v == 1 else "open . (точка — эта папка)"
-        prog = "open -a Preview plan.png" if v == 1 else "open -e inventory.txt"
+        prog = "open -a Preview plan.png" if v == 1 else "open -a TextEdit inventory.txt"
         if right and not shown:
             return Verdict(False, f"{name} открыт где надо ✓. Осталось показать папку в Finder: "
                                   f"{where}")
@@ -185,19 +187,20 @@ class FindName(AnswerTask):
     track = "finder"
     title = "Потерянный файл"
     kind_answer = "path"
-    scroll = ("find ГДЕ -name 'маска' — искать файлы по имени во всех вложенных папках; -iname "
-              "— insensitive name: то же без учёта больших и маленьких букв.\n"
-              "Маску бери в кавычки: без них * раскроет сам zsh (или скажет no matches found), "
-              "а она нужна find. Путь сразу в ответ: ans $(find папка -iname 'маска')")
+    scroll = ("find DIR -name 'PATTERN' — искать файлы по имени во всех вложенных папках "
+              "(DIR — откуда искать, PATTERN — маска имени); find DIR -iname 'PATTERN' — то же "
+              "без учёта больших и маленьких букв (i — insensitive).\n"
+              "Маску всегда бери в одинарные кавычки. Один путь — сразу в ответ: ans $(find …); "
+              "несколько — выбери свой, тройной щелчок, Cmd+C, ans и Cmd+V.")
     variants = (
         Variant("Файл потерялся где-то в storage/. Имя начинается на license, но неизвестно, "
                 "большими буквами или маленькими. Расширение — .dat. Где он? "
-                "Ответ: ans ПУТЬ (как его напечатает find)",
+                "Ответ: ans PATH — путь, как его напечатает find.",
                 wrong=("find storage -name 'license*.dat'",),
                 alternatives=("ans $(find storage -iname 'license*.dat') — путь сразу в ответ",)),
         Variant("Где-то в глубине storage/ лежит единственный файл с расширением .sql — дамп "
                 "базы. Как он называется, неизвестно. Где он? "
-                "Ответ: ans ПУТЬ (как его напечатает find)",
+                "Ответ: ans PATH — путь, как его напечатает find.",
                 hints=("Имя неизвестно, известно только окончание — нужна маска со звёздочкой.",
                        "find storage -name '*.sql' — кавычки обязательны, иначе звёздочку "
                        "раскроет сам zsh.",
@@ -207,11 +210,12 @@ class FindName(AnswerTask):
                 alternatives=("find storage -iname '*.sql' — найдёт и .SQL большими",)),
         Variant("В storage/ раскиданы файлы config.yaml — по одному на каждую среду: dev, test, "
                 "preprod и prod. Нужен тот, что лежит в папке prod. "
-                "Ответ: ans ПУТЬ (как его напечатает find)",
+                "Ответ: ans PATH — путь, как его напечатает find.",
                 hints=("Имя известно точно — найди сначала все config.yaml.",
                        "find storage -name config.yaml покажет все пути. Нужен тот, где папка "
                        "называется ровно prod, а не preprod.",
-                       "find storage -name config.yaml — путь с /prod/ сдай: ans ПУТЬ"),
+                       "find storage -name config.yaml — путь с /prod/ скопируй тройным щелчком "
+                       "и сдай: ans PATH"),
                 solution="find storage -name config.yaml, путь с /prod/",
                 solution_script="find storage -name config.yaml | grep /prod/",
                 wrong=("find storage -name config.yaml | grep prod",
@@ -226,7 +230,7 @@ class FindName(AnswerTask):
     solution = "find storage -iname 'license*.dat'"
     explain = ("find прочёсывает все вложенные папки; -iname плевать на большие и маленькие "
                "буквы; кавычки прячут маску от zsh.")
-    spell = "find папка -iname 'маска*' — найти файл по имени где угодно внутри"
+    spell = "find DIR -iname 'PATTERN' — найти файл по имени где угодно внутри"
 
     ENVS = ("dev", "test", "preprod", "prod")
     trap_messages = {
@@ -275,20 +279,19 @@ class GrepR(AnswerTask):
     track = "finder"
     title = "Иголка в архиве"
     kind_answer = "path"
-    scroll = ("grep -r 'текст' папка — искать текст внутри всех файлов папки (r — recursive, "
-              "вглубь); -l — list: печатать только имена файлов, где нашлось.\n"
-              "Текст с пробелами — в кавычках, иначе grep примет второе слово за имя файла. "
-              "Ответ сразу: ans $(grep -rl 'текст' папка)\n"
-              "grep -rl 'текст' папка | wc -l — сколько файлов нашлось: wc -l считает строки "
-              "вывода (l — lines).")
+    scroll = ("grep -rl 'PATTERN' DIR — пути файлов в папке DIR и глубже, где есть текст "
+              "PATTERN (r — recursive, вглубь; l — list). Текст — в одинарных кавычках, буквы — "
+              "как в задании. Ответ сразу: ans $(grep -rl 'PATTERN' DIR)\n"
+              "… | wc -l — сколько строк вывода, то есть файлов (l — lines).")
     variants = (
-        Variant("В каком из файлов папки archive/ записан пароль от сейфа? Известны только "
-                "слова «safe password» (пароль от сейфа). Ответ: ans ПУТЬ_К_ФАЙЛУ",
+        Variant("В каком из файлов папки archive/ записан пароль от сейфа? Известна только "
+                "фраза целиком: «safe password» (пароль от сейфа). Ответ: ans PATH — путь к "
+                "файлу.",
                 wrong=("grep -rl 'password' archive",),
                 alternatives=("grep -rl 'safe pass' archive — хватит и куска фразы, если он "
                               "редкий",)),
-        Variant("В каком файле архива archive/ упомянут заказ «order #{n}»? Ответ: "
-                "ans ПУТЬ_К_ФАЙЛУ",
+        Variant("В каком файле архива archive/ упомянут заказ «order #{n}» — "
+                "ровно такой фразой? Ответ: ans PATH — путь к файлу.",
                 hints=("Искать внутри файлов умеет grep: -r — во всех подпапках, -l — только "
                        "имена.",
                        "Число {n} есть и в другом файле — ищи фразу целиком, в кавычках. # — это "
@@ -298,8 +301,9 @@ class GrepR(AnswerTask):
                 solution="grep -rl 'order #{n}' archive",
                 wrong=("grep -rl '{n}' archive",),
                 alternatives=("grep -rl '#{n}' archive — хватит и номера со значком",)),
-        Variant("Сколько файлов в archive/ упоминают слово «{word}»? Ответ — число: "
-                "ans ЧИСЛО. Посчитать строки вывода поможет | wc -l",
+        Variant("Сколько файлов в archive/ упоминают слово «{word}» (в файлах оно "
+                "написано так же, маленькими)? Ответ — число: ans NUMBER. Посчитать строки "
+                "поможет | wc -l",
                 hints=("Список файлов, где есть слово, даёт grep -rl.",
                        "Строки считает wc -l — поставь его после |. Без -l grep печатает "
                        "каждую найденную строку, а не файл: в одном файле их бывает две.",
@@ -316,7 +320,7 @@ class GrepR(AnswerTask):
              "grep -rl 'safe password' archive")
     solution = "grep -rl 'safe password' archive"
     explain = "grep -r ищет по содержимому всех файлов — Spotlight в одну строку."
-    spell = "grep -rl 'текст' папка — в каких файлах встречается текст"
+    spell = "grep -rl 'PATTERN' DIR — в каких файлах встречается текст"
 
     WORDS_C = ("raid", "smuggling", "cipher", "alarm")
     trap_messages = {
@@ -398,28 +402,29 @@ class DuHeavy(AnswerTask):
     title = "Кто сколько весит"
     kind_answer = "path"
     scroll = ("du -sh * — сколько весит каждая папка и файл здесь (s — summarize, итогом; h — "
-              "human-readable, по-человечески); sort -h — сортировать «человеческие» размеры (K "
-              "< M < G); | — передать вывод следующей команде: ls | head -1\n"
-              "sort -h ставит самое тяжёлое последним; | tail -1 — оставить последнюю строку, | "
-              "head -1 — первую. Имя выдели двойным щелчком и вставь в ans.")
+              "human-readable, в K, M, G). | — труба: отдать напечатанное следующей команде. "
+              "sort -h — по весу, самое тяжёлое последним: du -sh * | sort -h\n"
+              "Имя из последней строки — двойным щелчком, Cmd+C, ans NAME. Второе место — "
+              "предпоследняя строка: du -sh * | sort -h | tail -2 | head -1 (tail -2 — две "
+              "последние строки, head -1 — первая из них).")
     variants = (
         Variant("Диск трещит по швам. Какая из папок здесь весит больше всех? "
-                "Ответ: ans ИМЯ_ПАПКИ",
+                "Ответ: ans NAME — имя папки.",
                 wrong=("ls -S | head -1",),
                 alternatives=("du -sh * | sort -h | tail -1 — сразу одна строка",)),
         Variant("В media/ лежат одни файлы. Какой из них весит больше всех? "
-                "Ответ: ans ИМЯ_ФАЙЛА",
+                "Ответ: ans NAME — имя файла (можно и с media/ впереди).",
                 hints=("Размер файлов тоже показывает du: du -sh media/*",
                        "Отсортируй с -h: | sort -h. Без -h sort сравнивает буквы, и 900K у него "
                        "окажется «больше», чем 2M.",
-                       "du -sh media/* | sort -h — самый тяжёлый внизу; сдай ans ИМЯ"),
+                       "du -sh media/* | sort -h — самый тяжёлый внизу; сдай ans NAME"),
                 solution="du -sh media/* | sort -h",
                 solution_script="du -sk media/* | sort -n | tail -1 | cut -f2",
                 wrong=("du -sh media/* | sort | tail -1 | cut -f2",),
                 alternatives=("ls -lS media — у файлов размер видит и ls: -S сортирует по "
                               "размеру, тяжёлые сверху",)),
         Variant("Самую тяжёлую папку здесь уже чистят. Какая папка вторая по весу — тяжелее "
-                "всех, кроме одной? Ответ: ans ИМЯ_ПАПКИ. Две последние строки даёт tail -2, "
+                "всех, кроме одной? Ответ: ans NAME — имя папки. Две последние строки даёт tail -2, "
                 "а первую из них — head -1",
                 hints=("Размеры папок — du -sh *, по порядку — | sort -h.",
                        "Самая тяжёлая — последняя строка, вторая — над ней: | tail -2 | head -1",
@@ -502,24 +507,24 @@ class LsNewest(AnswerTask):
     id = "ls_newest"
     track = "finder"
     title = "По времени изменения"
-    scroll = ("ls -t — свежие файлы сверху (t — time, по времени); ls -tr — наоборот, старые сверху (r — reverse); | "
-              "head -1 — только первая строка (| передаёт вывод следующей команде).\n"
+    scroll = ("ls -t — свежие файлы сверху (t — time, по времени); ls -tr — наоборот, старые "
+              "сверху (r — reverse); ls -t *.pdf — только PDF. | head -1 — оставить одну "
+              "первую строку.\n"
               "Сразу в ответ: ans $(ls -t | head -1)")
     variants = (
-        Variant("Какой файл здесь появился последним? Назови его: ans ИМЯ",
+        Variant("Какой файл здесь появился последним? Назови его: ans NAME — имя файла.",
                 wrong=("ls | head -1",),
                 alternatives=("ls -lt | head -3 — с датами, чтобы видеть разницу",)),
-        Variant("Какой файл здесь самый старый — дольше всех не менялся? Назови его: ans ИМЯ. "
+        Variant("Какой файл здесь самый старый — дольше всех не менялся? Назови его: ans NAME — имя файла. "
                 "Флаг -r у ls переворачивает порядок",
                 hints=("ls -t сортирует по времени: свежие сверху, старые — внизу.",
-                       "-r переворачивает порядок: ls -tr — старые сверху. Или возьми последнюю "
-                       "строку: ls -t | tail -1",
+                       "-r переворачивает порядок: ls -tr — старые сверху.",
                        "ls -tr | head -1 — или сразу ans $(ls -tr | head -1)"),
                 solution="ls -tr | head -1",
                 wrong=("ls -t | head -1",),
                 alternatives=("ls -t | tail -1 — последняя строка списка «свежие сверху»",)),
         Variant("Какой PDF здесь появился последним? Остальные файлы не в счёт. "
-                "Назови его: ans ИМЯ",
+                "Назови его: ans NAME — имя файла.",
                 hints=("ls можно дать маску: ls *.pdf — только PDF.",
                        "Маска и сортировка вместе: ls -t *.pdf — свежие PDF сверху.",
                        "ls -t *.pdf | head -1 — или сразу ans $(ls -t *.pdf | head -1)"),
@@ -583,12 +588,14 @@ class RecentMove(Task):
               "меньше 3 дней назад (m — от modified, «изменён»). Плюс вместо минуса — старше: "
               "*(.m+30); h после m — в часах: *(.mh-5).")
     variants = (
-        Variant("Всё, что появилось за последние 3 дня, — в fresh/. Старое не трогать.",
+        Variant("Всё, что появилось за последние 3 дня, — в fresh/ (папка уже есть). Старое не "
+                "трогать. Сдавать ничего не надо — игра посмотрит, что где лежит.",
                 wrong=("mv * fresh/",),
                 alternatives=("find . -maxdepth 1 -type f -mtime -3 -exec mv {{}} fresh/ \\; "
                               "— то же без zsh",)),
-        Variant("Всё, что не менялось больше 30 дней, — в archive/. Свежее не трогать. "
-                "В скобках маски минус значит «моложе», а плюс — «старше».",
+        Variant("Всё, что не менялось больше 30 дней, — в archive/ (папка уже есть). Свежее "
+                "не трогать. В скобках маски минус значит «моложе», а плюс — «старше». Сдавать "
+                "ничего не надо — игра посмотрит, что где лежит.",
                 hints=("Отбор по дате — уточнение маски в скобках, как *(.m-3).",
                        "Плюс вместо минуса — «старше»: *(.m+30). Проверь: ls -l *(.m+30)",
                        "mv *(.m+30) archive/"),
@@ -597,8 +604,10 @@ class RecentMove(Task):
                 wrong=("mv *(.m-30) archive/",),
                 alternatives=("find . -maxdepth 1 -type f -mtime +30 -exec mv {{}} archive/ \\; "
                               "— то же без zsh",)),
-        Variant("Всё, что изменилось за последние 24 часа, — в fresh/. Остальное не трогать. "
-                "Буква h после m считает в часах: *(.mh-5) — моложе пяти часов.",
+        Variant("Всё, что изменилось за последние 24 часа, — в fresh/ (папка уже есть). "
+                "Остальное не трогать. Буква h после m считает в часах: *(.mh-5) — моложе пяти "
+                "часов, а тебе нужно своё число. Сдавать ничего не надо — игра посмотрит, что "
+                "где лежит.",
                 hints=("Нужны файлы по времени изменения — и считать в часах, а не в днях.",
                        "*(.mh-24) — моложе 24 часов. Проверь: ls -l *(.mh-24)",
                        "mv *(.mh-24) fresh/"),
@@ -686,29 +695,30 @@ class BatchRename(Task):
     id = "batch_rename"
     track = "finder"
     title = "Пакетное переименование"
-    scroll = ('for f in *.JPEG; do echo "$f"; done — команда между do и ; повторится для '
-              'каждого файла, $f — его имя. "${f%.JPEG}" — имя без хвоста .JPEG. Кавычки "$f" '
-              'спасают имена с пробелами.\n'
-              'Проверь без риска: поставь echo перед mv — цикл только напечатает команды.\n'
-              "В zsh есть и zmv: autoload zmv, потом zmv '(*).JPEG' '$1.jpg'")
+    scroll = ('for f in *.txt; do COMMAND; done — COMMAND между do и done повторится для '
+              'каждого файла по маске, $f — имя очередного. Кавычки "$f" спасают имена с '
+              'пробелами. "${f%.JPEG}" — имя без хвоста .JPEG.\n'
+              'Проверь без риска: поставь echo перед mv — цикл только напечатает команды; '
+              'потом убери echo и запусти один раз.')
     variants = (
         Variant("Ко всем .txt здесь допиши спереди 2725_: «report march.txt» → «2725_report "
                 "march.txt». Другие файлы не трогай. Новое имя склеивается прямо в кавычках: "
                 "\"2725_$f\".",
                 wrong=('for f in *; do mv "$f" "2725_$f"; done',),
-                alternatives=("autoload zmv; zmv '(*.txt)' '2725_$1' — то же через zmv",)),
+                alternatives=('for f in *.txt; do cp "$f" "2725_$f" && rm "$f"; done — копия под '
+                              'новым именем, потом старый стереть',)),
         Variant("Снимки пришли как «Photo 12.JPEG». Переименуй все в .jpg — имена "
                 "сохрани, пробелы тоже. Скриншоты .png не трогай.",
                 wrong=("mv *.JPEG *.jpg",),
-                alternatives=("autoload zmv; zmv '(*).JPEG' '$1.jpg' — то же одной строкой",),
+                alternatives=('for f in *.JPEG; do cp "$f" "${{f%.JPEG}}.jpg" && rm "$f"; done — '
+                              'копия под новым именем, потом старый стереть',),
                 hints=("Одной командой mv много файлов не переименовать — нужен цикл for.",
                        "Внутри цикла: mv \"$f\" \"${{f%.JPEG}}.jpg\" — отрезать хвост и "
                        "приклеить новый.",
                        "for f in *.JPEG; do mv \"$f\" \"${{f%.JPEG}}.jpg\"; done"),
                 solution='for f in *.JPEG; do mv "$f" "${{f%.JPEG}}.jpg"; done',
                 explain="Цикл for и отрезанный хвост ${f%.ext} — и сотня файлов переименована "
-                        "без всяких программ. В zsh есть и zmv: autoload zmv; "
-                        "zmv '(*).JPEG' '$1.jpg'"),
+                        "без всяких программ."),
         Variant("Копии пришли с лишним хвостом: «report.txt.bak». Убери у всех хвост .bak — "
                 "должно стать «report.txt». Расширение перед .bak у всех разное, остальные "
                 "файлы не трогай.",
@@ -717,7 +727,8 @@ class BatchRename(Task):
                        "for f in *.bak; do mv \"$f\" \"${{f%.bak}}\"; done"),
                 solution='for f in *.bak; do mv "$f" "${{f%.bak}}"; done',
                 wrong=('for f in *.bak; do mv "$f" "${{f%.bak}}.txt"; done',),
-                alternatives=("autoload zmv; zmv '(*).bak' '$1' — то же через zmv",)),
+                alternatives=('for f in *.bak; do cp "$f" "${{f%.bak}}" && rm "$f"; done — копия '
+                              'под новым именем, потом старый стереть',)),
     )
     par = 75
     hints = ("Много файлов — цикл for по *.txt, как в карточке.",
@@ -798,17 +809,18 @@ class ZipPack(Task):
     id = "zip_pack"
     track = "finder"
     title = "Упаковать в zip"
-    scroll = ("zip -r архив.zip папка — упаковать папку целиком (r — recursive); zip -r архив.zip "
-              "папка -x '*.tmp' — exclude, без файлов по маске. unzip -l архив.zip — list: "
-              "посмотреть, что внутри.\n"
-              "Маску после -x бери в кавычки: её должен разобрать zip, а не zsh. Ошибся — удали "
-              "архив (rm архив.zip) и упакуй заново: zip дописывает в старый архив.")
+    scroll = ("zip -r NAME.zip DIR — упаковать папку целиком (r — recursive); zip -r NAME.zip "
+              "DIR -x '*.tmp' — exclude, без файлов по маске; масок после -x можно несколько. "
+              "unzip -l NAME.zip — list: посмотреть, что внутри.\n"
+              "Маску после -x — в одинарные кавычки. Ошибся — удали архив (rm NAME.zip) и упакуй "
+              "заново: zip дописывает в старый архив.")
     variants = (
-        Variant("Упакуй report/ в report.zip. Мусор Finder .DS_Store в архив не класть.",
+        Variant("Упакуй report/ в report.zip. Архив — здесь, где стоишь; мусор Finder .DS_Store "
+                "(он есть и во вложенных папках) в архив не класть.",
                 wrong=("zip report.zip report",),
                 alternatives=("unzip -l report.zip — проверить посылку перед отправкой",)),
-        Variant("Упакуй project/ в project.zip без временных файлов *.tmp и без папки cache/ со "
-                "всем, что в ней. Папка в -x исключается маской с путём: 'project/cache/*'.",
+        Variant("Упакуй project/ в project.zip (здесь, где стоишь) без временных файлов *.tmp и "
+                "без папки cache/ со всем, что в ней. Папка в -x исключается маской с путём: 'project/cache/*'.",
                 hints=("Как всегда: zip -r для папки, а лишнее — после -x.",
                        "После -x можно перечислить несколько масок подряд, каждую в кавычках.",
                        "zip -r project.zip project -x '*.tmp' 'project/cache/*'"),
@@ -819,7 +831,7 @@ class ZipPack(Task):
                               "и повторить",)),
         Variant("Собери в pdf.zip — здесь, рядом с docs/ — только PDF-файлы из папки docs/, "
                 "больше ничего. Папку целиком паковать не нужно: zip принимает и маску файлов.",
-                hints=("zip архив.zip ФАЙЛЫ — файлы можно перечислить маской, без -r.",
+                hints=("zip NAME.zip FILE… — файлы можно перечислить маской, без -r.",
                        "Маска docs/*.pdf — все PDF в папке docs.",
                        "zip pdf.zip docs/*.pdf"),
                 solution="zip pdf.zip docs/*.pdf",
@@ -833,7 +845,7 @@ class ZipPack(Task):
              "zip -r report.zip report -x '*.DS_Store'")
     solution = "zip -r report.zip report -x '*.DS_Store'"
     explain = "-r — вместе с подпапками, -x — без мусора. Проверить посылку — unzip -l."
-    spell = "zip -r архив.zip папка -x '*.DS_Store' — упаковать без мусора"
+    spell = "zip -r NAME.zip DIR -x '*.DS_Store' — упаковать без мусора"
 
     def setup_variant(self, box, rng, variant):
         if variant == 1:
@@ -910,8 +922,9 @@ class PbcopyList(Task):
     title = "Через буфер обмена"
     uses_clipboard = True
     uses_paste = True       # check читает буфер (kit.read_clipboard), карточка учит pbpaste
-    scroll = ("команда | pbcopy — положить вывод в буфер обмена (потом Cmd+V куда угодно); "
-              "pbpaste — вставить буфер в терминал. pbcopy < файл — в буфер содержимое файла.")
+    scroll = ("COMMAND | pbcopy — положить в буфер обмена то, что напечатала команда (потом "
+              "Cmd+V куда угодно); pbcopy < FILE — в буфер содержимое файла; pbpaste — "
+              "напечатать, что лежит в буфере. Сдавать ничего не надо: игра заглянет в буфер.")
     variants = (
         Variant("Нужен список всех PDF здесь — в буфере обмена, чтобы вставить в письмо. "
                 "(Текст из твоего буфера тренажёр вернёт после задачи.)",
@@ -940,7 +953,7 @@ class PbcopyList(Task):
              "ls *.pdf | pbcopy — проверить: pbpaste")
     solution = "ls *.pdf | pbcopy"
     explain = "pbcopy/pbpaste связывают терминал с обычным буфером Mac — Cmd+C/Cmd+V для команд."
-    spell = "команда | pbcopy — в буфер обмена; pbpaste — из буфера"
+    spell = "COMMAND | pbcopy — в буфер обмена; pbpaste — что в буфере"
 
     def setup_variant(self, box, rng, variant):
         pdfs = [f"{kit.latin(rng)}_{i}.pdf" for i in range(rng.randint(4, 8))]
@@ -997,11 +1010,11 @@ class KillFrozen(Task):
     id = "kill_frozen"
     track = "finder"
     title = "Зависший процесс"
-    scroll = ("ps aux | grep имя — найти процесс (запущенную программу) и его номер (PID, второй столбец). kill PID — "
-              "вежливо попросить завершиться; kill -9 PID — остановить насильно.\n"
-              "Строка с самим grep — не та. Короче: pgrep -fl имя — PID и команда (f — full, по "
-              "полной команде; l — list, с именем); сначала посмотри, что совпало, потом pkill "
-              "-f имя (упрямого — pkill -9 -f имя).")
+    scroll = ("pgrep -fl NAME — найти процесс (запущенную программу) по куску имени: PID в "
+              "начале строки, дальше команда (f — full, по всей команде; l — list). kill PID — "
+              "вежливо попросить завершиться; kill -9 PID — оборвать сразу.\n"
+              "Проверить — тот же pgrep -fl ещё раз; pkill -f NAME гасит всех, в ком есть этот "
+              "кусок, — сначала посмотри через pgrep, кого заденет.")
     variants = (
         Variant("Процесс {name} завис и не отвечает. Найди его и останови.",
                 # ловушка «без -f не видна командная строка»: pgrep без -f сверяет имя процесса
@@ -1009,7 +1022,9 @@ class KillFrozen(Task):
                 # путь песочницы в шаблоне: и неверное решение не заденет чужой stuck_
                 wrong=("pgrep \"$TERMIT_BOX/stuck_\" && kill -9 $(pgrep \"$TERMIT_BOX/stuck_\")",),
                 alternatives=("pgrep -fl stuck_ && pkill -f stuck_ — сначала посмотреть, кого "
-                              "заденет",)),
+                              "заденет",
+                              "ps aux | grep stuck_, kill PID — по-старому: PID во втором "
+                              "столбце ps",)),
         Variant("Зависли два похожих скрипта: {name} и {backup_name}. Останови только {name} — "
                 "резервная копия {backup_name} должна работать дальше.",
                 hints=("Сначала посмотри, что совпадает: pgrep -fl {base}",
@@ -1026,7 +1041,7 @@ class KillFrozen(Task):
                 "вежливый kill не слушает.",
                 hints=("pgrep -fl stuck_ покажет обоих вместе с номерами.",
                        "Упрямого вежливый kill не возьмёт — нужен -9: kill -9 PID или "
-                       "pkill -9 -f имя.",
+                       "pkill -9 -f NAME.",
                        "pgrep -fl stuck_, pkill -9 -f stuck_ (или kill -9 PID1 PID2)"),
                 solution="pgrep -fl stuck_, pkill -9 -f stuck_",
                 solution_script=("kill -9 $(ps aux | grep \"$TERMIT_BOX/stuck_\" | grep -v grep "
@@ -1035,16 +1050,15 @@ class KillFrozen(Task):
                 alternatives=("kill -9 PID1 PID2 — kill принимает несколько номеров сразу",)),
     )
     par = 40
-    hints = ("Список процессов — ps aux; отфильтровать по имени — | grep stuck",
-             "PID — число во втором столбце. Останавливает kill PID.",
-             "ps aux | grep stuck, kill PID (не помогло — kill -9 PID). Короче — по точному "
-             "началу имени: pgrep -fl stuck_, pkill -f stuck_ (упрямого — pkill -9 -f stuck_)")
-    solution = "ps aux | grep stuck, kill PID   (упрямого — kill -9 PID)"
+    hints = ("Процесс по куску имени находит pgrep -fl.",
+             "PID — число в начале строки pgrep. Останавливает kill PID.",
+             "pgrep -fl stuck_, kill PID (не помогло — kill -9 PID)")
+    solution = "pgrep -fl stuck_, kill PID   (упрямого — kill -9 PID)"
     solution_script = ("kill -9 $(ps aux | grep \"$TERMIT_BOX/{name}\" | grep -v grep | "
                        "awk '{{print $2}}')")
-    explain = ("ps и grep выследят процесс, kill его остановит; -9 — для тех, кто по-хорошему "
+    explain = ("pgrep выследит процесс, kill его остановит; -9 — для тех, кто по-хорошему "
                "не понимает.")
-    spell = "ps aux | grep имя — найти процесс; kill PID; kill -9 PID — насильно"
+    spell = "pgrep -fl NAME — найти процесс; kill PID; kill -9 PID — насильно"
 
     LIFE = 900          # секунд висит «зависший»; копия в B живёт дольше — её уход не ошибка игрока
     BACKUP_LIFE = 1800
@@ -1124,11 +1138,10 @@ class TopHog(Task):
     track = "finder"
     title = "Пожиратель ресурсов"
     scroll = ("top -o cpu — живой список процессов, прожорливые сверху (o — order; top -o mem — "
-              "по памяти); PID — номер; q — выход.\n"
-              "В COMMAND у top короткое имя. Сверь полную: ps aux -r | head (r — по загрузке "
-              "CPU; ps aux -m — по памяти, m — memory) — у нужного путь .termit/procs; в трубе "
-              "строка не обрезается.\n"
-              "Убедись, что процесс из песочницы, и только потом kill PID.")
+              "по памяти, M в колонке MEM — мегабайты); q — выход.\n"
+              "ps aux -r | grep procs — то же разом, без прыжков (r — по процессору; ps aux -m — по "
+              "памяти, m — memory): PID — второй столбец, полная команда — в конце, у нужного "
+              "путь .termit/procs. Потом kill PID; двоих — kill PID PID.")
     variants = (
         Variant("Какой-то процесс съедает процессор. Найди его в top и останови. "
                 "Остальных не трогай!",
@@ -1137,14 +1150,15 @@ class TopHog(Task):
                 alternatives=("top -l 1 -o cpu -n 5 — -l 1 — один снимок вместо живого экрана, "
                               "-n 5 — пять верхних строк",)),
         Variant("Какой-то процесс съедает память — сотни мегабайт. Найди его и останови. "
-                "Остальных не трогай! В top сортировка по памяти — top -o mem.",
+                "Остальных не трогай! В top сортировка по памяти — top -o mem; в колонке MEM "
+                "буква M — мегабайты.",
                 hints=("Кто ест память, показывает top -o mem — виновник в первой строке, PID — "
                        "в первом столбце. Выход — q.",
-                       "Сверь кандидата: ps aux -m | head — у нужного в команде путь "
+                       "Сверь кандидата: ps aux -m | grep procs — у нужного в команде путь "
                        ".termit/procs. PID — во втором столбце.",
-                       "top -o mem или ps aux -m | head, строка с .termit/procs наверху, "
+                       "top -o mem или ps aux -m | grep procs, строка с .termit/procs наверху, "
                        "kill PID"),
-                solution=("top -o mem, PID в первой строке; сверка: ps aux -m | head (в команде "
+                solution=("top -o mem, PID в первой строке; сверка: ps aux -m | grep procs (в команде "
                           ".termit/procs), kill PID"),
                 solution_script=("sleep 1; kill $(ps aux -m | grep \"$TERMIT_BOX/.termit/procs\" "
                                  "| grep -v grep | head -1 | awk '{{print $2}}')"),
@@ -1152,14 +1166,14 @@ class TopHog(Task):
                        "grep -v grep | head -1 | awk '{{print $2}}')",),
                 alternatives=("top -l 1 -o mem -n 5 — один снимок вместо живого экрана",)),
         Variant("Процессор едят сразу два процесса. Найди обоих в top и останови. "
-                "Остальных не трогай!",
+                "Остальных не трогай! kill принимает несколько номеров через пробел.",
                 hints=("top -o cpu — прожорливые сверху; сегодня виновников двое — смотри две "
                        "верхние строки. Выход — q.",
-                       "Сверь: ps aux -r | head — у обоих в команде путь .termit/procs. kill "
+                       "Сверь: ps aux -r | grep procs — у обоих в команде путь .termit/procs. kill "
                        "принимает несколько PID сразу.",
-                       "top -o cpu или ps aux -r | head, два PID с .termit/procs наверху, kill "
+                       "top -o cpu или ps aux -r | grep procs, два PID с .termit/procs наверху, kill "
                        "PID1 PID2"),
-                solution=("top -o cpu, два PID сверху; сверка: ps aux -r | head (в команде "
+                solution=("top -o cpu, два PID сверху; сверка: ps aux -r | grep procs (в команде "
                           ".termit/procs), kill PID1 PID2"),
                 solution_script=("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | "
                                  "grep -v grep | head -2 | awk '{{print $2}}')"),
@@ -1171,10 +1185,10 @@ class TopHog(Task):
     par = 45
     hints = ("Кто ест процессор, показывает top -o cpu — виновник в первой строке, PID — в "
              "первом столбце. Выход — q.",
-             "Сверь кандидата: ps aux -r | head — у нужного процесса в команде путь "
+             "Сверь кандидата: ps aux -r | grep procs — у нужного процесса в команде путь "
              ".termit/procs. PID — во втором столбце.",
-             "top -o cpu или ps aux -r | head, строка с .termit/procs наверху, kill PID")
-    solution = ("top -o cpu, PID в первой строке; сверка: ps aux -r | head (в команде "
+             "top -o cpu или ps aux -r | grep procs, строка с .termit/procs наверху, kill PID")
+    solution = ("top -o cpu, PID в первой строке; сверка: ps aux -r | grep procs (в команде "
                 ".termit/procs), kill PID")
     solution_script = ("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
                        "head -1 | awk '{{print $2}}')")
@@ -1291,21 +1305,22 @@ class DiskSweep(Task):
     id = "disk_sweep"
     track = "finder"
     title = "Чистка диска"
-    scroll = ("find папка -type f -empty — пустые файлы, -type d -empty — пустые папки; "
-              "find папка -type f -empty -delete — найдёт и удалит.\n"
-              "ls -S — Size: тяжёлые сверху; | head -1 — первая строка. команда > файл — вывод "
-              "в файл (прежнее пропадёт).\n"
+    scroll = ("ls -S DIR — тяжёлые сверху (S — Size); | head -1 — первая строка; COMMAND > FILE — "
+              "вывод в файл (прежнее пропадёт).\n"
+              "find DIR -type f -empty — пустые файлы, -type d -empty — пустые папки; "
+              "find DIR -type f -empty -delete — найдёт и удалит.\n"
               "Без учёта регистра (zsh): setopt extendedglob, потом ls *.(#i)jpg (i — "
               "insensitive) — и jpg, и JPG.")
     variants = (
         Variant("В папке docs свалены файлы. Запиши имя самого тяжёлого из них в файл "
-                "heavy.txt — рядом с docs, одной строкой.",
+                "heavy.txt — рядом с docs (там, где стоишь, а не внутри docs), одной строкой.",
                 wrong=("ls docs | head -1 > heavy.txt", "ls -S docs | tail -1 > heavy.txt"),
                 alternatives=("ls -lS docs — с размерами, чтобы сверить глазами",)),
         Variant("Диск junk — помойка. Наведи порядок по правилам: недокачанные *.part — "
                 "стереть во всех папках; пустые файлы (0 байт) — стереть, а потом убрать "
-                "опустевшие папки. Имя самого тяжёлого из оставшихся в корне junk файлов "
-                "запиши в heavy.txt рядом со junk.",
+                "опустевшие папки. Имя самого тяжёлого из оставшихся файлов, что лежат прямо в "
+                "junk (не во вложенных папках), запиши в heavy.txt рядом с junk — там, где "
+                "стоишь.",
                 wrong=("find junk -name '*.part' -delete; find junk -type f -empty -delete; "
                        "ls -S junk | head -1 > heavy.txt",
                        "find junk -name '*.part' -delete; find junk -type f -empty -delete; "
@@ -1325,7 +1340,7 @@ class DiskSweep(Task):
                 par=120),
         Variant("В папке mixed снимки вперемешку с документами, а расширения у снимков кто "
                 "как написал: .jpg, .JPG, .Jpg. Перенеси все снимки .jpg любым регистром в "
-                "папку photos (она есть). Остальное не трогай.",
+                "папку photos (она уже есть, рядом с mixed). Остальное не трогай.",
                 hints=("Маска *.jpg видит только маленькие буквы — нужна маска без учёта "
                        "регистра.",
                        "В zsh её включает setopt extendedglob, а (#i) в маске отключает регистр.",
@@ -1345,8 +1360,8 @@ class DiskSweep(Task):
     solution = "ls -S docs | head -1 > heavy.txt"
     explain = ("ls -S ставит тяжёлых сверху, head -1 берёт первую строку, а > сваливает "
                "вывод в файл.")
-    spell = ("find папка -type f -empty -delete — стереть пустышки; ls -S — тяжёлые сверху; "
-             "команда > файл")
+    spell = ("find DIR -type f -empty -delete — стереть пустышки; ls -S — тяжёлые сверху; "
+             "COMMAND > FILE")
 
     def setup_variant(self, box, rng, variant):
         rel = lambda p: str(p.relative_to(box))
@@ -1501,7 +1516,8 @@ class DupSort(Task):
                 alternatives=("rm downloads/*' (1).'* — то же в кавычках",)),
         Variant("В downloads бардак: у части файлов есть дубли «имя (1).расширение» — точные "
                 "копии, их сотри. Потом все снимки .jpg и .png — любым регистром — перенеси в "
-                "новую папку downloads/photos. Папку wallpaper.jpg не трогай: это папка, а не снимок.",
+                "новую папку downloads/photos — её ещё нет, заведи. Папку wallpaper.jpg не "
+                "трогай: это папка, а не снимок.",
                 wrong=("setopt extendedglob; rm downloads/*\\ \\(1\\).*; mkdir downloads/photos; "
                        "mv downloads/*.(#i)(jpg|png) downloads/photos/",
                        "rm downloads/*\\ \\(1\\).*; mkdir downloads/photos; "
@@ -1522,7 +1538,8 @@ class DupSort(Task):
                         "маски оставляет только файлы.",
                 par=120),
         Variant("В downloads документы вперемешку с остальным. Перенеси все .pdf и .docx в "
-                "папку downloads/documents (она есть) одной командой mv. Остальное не трогай.",
+                "папку downloads/documents (она есть) одной командой mv. Расширения у них "
+                "маленькими буквами. Остальное не трогай.",
                 hints=("Две маски можно слить в одну: (a|b) значит «a или b».",
                        "Скобки — вокруг расширений: *.(pdf|docx)",
                        "mv downloads/*.(pdf|docx) downloads/documents/"),
@@ -1655,27 +1672,31 @@ class RgHunt(AnswerTask):
     implant = "rg"
     after = ("grep_r", "boss_finder")
     start_dir = PROJ
-    scroll = ("grep -rn 'текст' . — где встречается, с номером строки (n — number). Чужое "
-              "отрежь: grep -rn 'текст' . --exclude-dir=.git --exclude-dir=vendor\n"
-              "| xargs grep -l 'ещё' — из найденных файлов оставит те, где есть и второе.\n"
-              "Утилита rg -n 'текст' . делает то же сама — мимо .git, скрытого и всего из "
-              ".gitignore. Скобку в шаблоне rg пиши как \\( или ищи флагом -F (Fixed — как "
-              "есть).")
+    scroll = ("grep -rn 'PATTERN' . — где встречается текст: путь:номер строки (n — number); "
+              "чужое отрежь: grep -rn 'PATTERN' . --exclude-dir=.git --exclude-dir=vendor. "
+              "grep -rl … | wc -l — сколько файлов; | xargs grep -l 'TWO' — из найденных "
+              "оставит те, где есть и второе.\n"
+              "rg -n 'PATTERN' . — то же отдельной программой (её ставят отдельно): сама идёт "
+              "мимо .git и всего из .gitignore.")
     variants = (
-        Variant("Ты в проекте proj/. Где определена функция {fn} (кусок кода с именем) — в каком "
-                "файле и на какой строке? .git и vendor/ не в счёт: там старые копии и чужой код. "
-                "Ответ: ans ФАЙЛ:СТРОКА, например ans src/app/main.py:12",
+        Variant("Ты стоишь в проекте proj/. Где определена функция {fn} (кусок кода с именем) — в "
+                "каком файле и на "
+                "какой строке? Определение в Python начинается со слова def — строка вида "
+                "def {fn}(order, rate). "
+                ".git и vendor/ не в счёт: там старые копии и чужой код. Ответ: ans FILE:LINE — "
+                "путь и номер строки через двоеточие, как их печатает grep -n, например ans "
+                "src/app/main.py:12",
                 wrong=("grep -rn 'def {fn}(' . | cut -d: -f1,2",),
                 alternatives=("rg -nF --no-heading 'def {fn}(' . — -F ищет текст как есть, "
-                              "--no-heading печатает ФАЙЛ:СТРОКА в одну строку, как grep",)),
+                              "--no-heading печатает FILE:LINE в одну строку, как grep",)),
         Variant("Сколько файлов проекта proj/ упоминают {fn}( — вызов или определение, "
                 "неважно? Служебная .git и чужой код в vendor/ не считаются. "
-                "Ответ — число: ans ЧИСЛО",
+                "Ты стоишь в proj/. Ответ — число: ans NUMBER",
                 hints=("Список файлов с текстом даёт grep -rl, а | wc -l посчитает строки.",
                        "Ищи вместе со скобкой: '{fn}(' — иначе попадутся похожие имена. "
                        "А .git и vendor/ отрежь --exclude-dir.",
                        "grep -rl --exclude-dir=.git --exclude-dir=vendor '{fn}(' . | wc -l — "
-                       "утилитой: rg -lF '{fn}(' . | wc -l"),
+                       "программой rg: rg -lF '{fn}(' . | wc -l"),
                 solution="grep -rl --exclude-dir=.git --exclude-dir=vendor '{fn}(' . | wc -l",
                 solution_script="grep -rl --exclude-dir=.git --exclude-dir=vendor '{fn}(' . "
                                 "| wc -l",
@@ -1684,13 +1705,14 @@ class RgHunt(AnswerTask):
                        "grep -rl --exclude-dir=.git --exclude-dir=vendor '{fn}' . | wc -l"),
                 alternatives=("rg -c -F '{fn}(' . — -c: сколько раз в каждом файле",)),
         Variant("Нужен файл проекта, где сошлись сразу три настройки: {k1}, {k2} и {k3}. "
-                "Такой один, если не смотреть в .git и vendor/. Где он? Ответ: ans ПУТЬ",
+                "Такой один, если не смотреть в .git и vendor/. Ты стоишь в proj/. Где он? "
+                "Ответ: ans PATH — путь, как его напечатает grep.",
                 hints=("Файлы с первой настройкой даст grep -rl; .git и vendor/ отрежь "
                        "--exclude-dir.",
                        "Список можно процедить ещё раз: | xargs grep -l '{k2}' оставит файлы, "
                        "где есть и вторая. Потом так же третья.",
                        "grep -rl --exclude-dir=.git --exclude-dir=vendor '{k1}' . | xargs grep "
-                       "-l '{k2}' | xargs grep -l '{k3}' — утилитой: rg -l вместо grep -rl"),
+                       "-l '{k2}' | xargs grep -l '{k3}' — программой rg: rg -l вместо grep -rl"),
                 solution="grep -rl --exclude-dir=.git --exclude-dir=vendor '{k1}' . | "
                          "xargs grep -l '{k2}' | xargs grep -l '{k3}'",
                 solution_script="grep -rl --exclude-dir=.git --exclude-dir=vendor '{k1}' . | "
@@ -1699,15 +1721,17 @@ class RgHunt(AnswerTask):
                 wrong=("grep -rl '{k1}' . | xargs grep -l '{k2}' | xargs grep -l '{k3}'",
                        "grep -rl --exclude-dir=.git --exclude-dir=vendor '{k1}' . | "
                        "xargs grep -l '{k2}'"),
-                alternatives=("rg -l '{k1}' . | xargs rg -l '{k2}' | xargs rg -l '{k3}'",)),
+                alternatives=("rg -l '{k1}' . | xargs rg -l '{k2}' | xargs rg -l '{k3}' — "
+                              "программой rg: -l (list) — только пути, .git и vendor/ она "
+                              "обходит сама",)),
     )
     par = 60
     hints = ("Номер строки к находке grep -r добавит флагом -n. Ищи само определение: "
              "'def {fn}('.",
              "grep -r лезет и в .git, и в vendor/ — отрежь их: --exclude-dir=.git "
              "--exclude-dir=vendor.",
-             "grep -rn --exclude-dir=.git --exclude-dir=vendor 'def {fn}(' . — "
-             "утилитой: rg -n --no-heading 'def {fn}\\(' .")
+             "grep -rn --exclude-dir=.git --exclude-dir=vendor 'def {fn}(' . — путь:номер "
+             "сдай: ans FILE:LINE; программой rg: rg -n --no-heading 'def {fn}\\(' .")
     solution = "grep -rn --exclude-dir=.git --exclude-dir=vendor 'def {fn}(' ."
     solution_script = ("grep -rn --exclude-dir=.git --exclude-dir=vendor 'def {fn}(' . "
                        "| cut -d: -f1,2")
@@ -1716,7 +1740,7 @@ class RgHunt(AnswerTask):
                "их отрезают --exclude-dir. rg то же делает сам и быстрее. Видит rg больше, чем "
                "grep, — загляни в ~/.ripgreprc: --hidden и --no-ignore меняют правила, "
                "rg --no-config работает по умолчанию.")
-    spell = "grep -rn --exclude-dir=.git 'текст' . — где в проекте встречается текст"
+    spell = "grep -rn --exclude-dir=.git 'PATTERN' . — где в проекте встречается текст"
 
     FUNCS = ("calc_tax", "send_invoice", "parse_order", "sync_stock", "close_shift",
              "load_prices", "merge_carts", "check_limit")
@@ -1798,7 +1822,7 @@ class RgHunt(AnswerTask):
             return textnorm.same_number(given, exp)
         if v == 2:
             return _proj_match(given, ctx, exp)
-        # ФАЙЛ:СТРОКА — можно с ./ или proj/ и с хвостом строки из вывода grep
+        # FILE:LINE — можно с ./ или proj/ и с хвостом строки из вывода grep
         path, _, line = exp.rpartition(":")
         m = re.match(r"\s*(\S+?):(\d+)(?::.*)?\s*$", textnorm.clean(given or ""))
         return bool(m) and m.group(2) == line and _proj_match(m.group(1), ctx, path)
@@ -1818,7 +1842,7 @@ class RgHunt(AnswerTask):
             return "Это чужая копия — из vendor/ или .git. Нужен свой код проекта."
         if (variant_index(ctx.state.get("_variant"), 3) == 0
                 and re.fullmatch(r"\S+\.py", textnorm.clean(given or ""))):
-            return ("Файл назван, а строки нет: нужно ФАЙЛ:СТРОКА — номер даёт grep -n, "
+            return ("Файл назван, а строки нет: нужно FILE:LINE — номер даёт grep -n, "
                     "допиши его через двоеточие.")
         return super().wrong_message(given, ctx)
 
@@ -1831,19 +1855,20 @@ class FdHunt(AnswerTask):
     after = ("find_name", "boss_finder")
     start_dir = PROJ
     scroll = ("find . -name '*.sql' -not -path '*/node_modules/*' -not -path '*/.*' — мимо "
-              "node_modules и скрытого (имена с точки). find . -size +0 — только непустые.\n"
-              "fd -e sql — то же утилитой: по расширению (e — extension), сама мимо скрытого и "
-              "служебного.")
+              "node_modules и скрытого (имена с точки); -path сверяет маску со всем путём. "
+              "find . -size +0 — только непустые.\n"
+              "fd -e sql — то же отдельной программой (её ставят отдельно): по расширению (e — "
+              "extension), сама мимо скрытого и .gitignore.")
     variants = (
         Variant("Сколько в проекте proj/ файлов .sql? Чужой скачанный код в node_modules и всё "
-                "скрытое (файлы и папки, чьё имя начинается с точки) не считаются. "
-                "Ответ — число: ans ЧИСЛО",
+                "скрытое (файлы и папки, чьё имя начинается с точки) не считаются. Ты стоишь в "
+                "proj/. Ответ — число: ans NUMBER",
                 wrong=("find . -name '*.sql' | wc -l",
                        "find . -name '*.sql' -not -path '*/node_modules/*' | wc -l"),
                 alternatives=("fd -e sql — и посчитать глазами",)),
         Variant("В проекте разбросаны файлы .env.example — образцы настроек. Какой из них "
-                "лежит глубже всех? node_modules не в счёт. "
-                "Ответ: ans ПУТЬ (как его напечатает find)",
+                "лежит глубже всех? node_modules не в счёт. Ты стоишь в proj/. "
+                "Ответ: ans PATH — путь, как его напечатает find.",
                 hints=("Все образцы покажет find . -name .env.example, а node_modules отрежет "
                        "-not -path.",
                        "Глубже всех — путь, где больше всего косых /. Имя начинается с точки: "
@@ -1860,7 +1885,8 @@ class FdHunt(AnswerTask):
                        "tail -1 | cut -d' ' -f2",),
                 alternatives=("fd -H -g .env.example — тот же список короче",)),
         Variant("Сколько непустых логов .log в проекте? Пустые (0 байт), node_modules и "
-                "скрытое (имена с точки) — не в счёт. Ответ — число: ans ЧИСЛО",
+                "скрытое (имена с точки) — не в счёт. Ты стоишь в proj/. Ответ — число: "
+                "ans NUMBER",
                 hints=("Логи найдёт find . -name '*.log'; лишнее отрежь, как всегда: "
                        "-not -path.",
                        "-size +0 оставит только непустые файлы, | wc -l посчитает.",
@@ -1953,9 +1979,10 @@ class BossFinder(Task):
     title = "Уборка Загрузок"
     boss = True
     par = 360
-    scroll = ("Пробел и скобки в имени экранируй (поставь \\ перед знаком) или бери в кавычки: rm Downloads/*\\ \\(1\\).* "
-              "или rm Downloads/*' (1).'*\n"
-              "find папка -type f -empty -delete — удалить пустые файлы, -type d -empty — папки. ls -S — тяжёлые сверху. команда > файл — вывод в файл.\n"
+    scroll = ("Пробел и скобки в имени экранируй (поставь \\ перед знаком) или бери в кавычки: "
+              "rm Downloads/*\\ \\(1\\).* или rm Downloads/*' (1).'*\n"
+              "find DIR -type f -empty -delete — удалить пустые файлы, -type d -empty — папки. "
+              "ls -S — тяжёлые сверху. COMMAND > FILE — вывод в файл.\n"
               "Без учёта регистра (zsh): setopt extendedglob, потом *.(#i)(jpg|png) — "
               "(a|b) значит «a или b»; *(.) — только файлы, без папок.")
     steps = ("удалить все пустые файлы (нулевого размера)",
@@ -1967,20 +1994,21 @@ class BossFinder(Task):
         Variant("Папка Downloads разрослась: пустые файлы, дубли «(1)», всё вперемешку. "
                 "Картинки (jpg, jpeg, png, heic — любым регистром) — в pictures, документы "
                 "(pdf, docx, txt) — в documents, таблицы (csv, xlsx) — в tables, остальное — "
-                "в other. Имя самого тяжёлого файла запиши в biggest.txt рядом с Downloads.",
+                "в other. Имя самого тяжёлого файла запиши в biggest.txt рядом с Downloads (можно "
+                "и путь к нему).",
                 wrong=("rm Downloads/*(1)*",),
                 alternatives=("ls -S Downloads/**/*(.) | head -1 — тяжёлый ищется по всем "
                               "вложенным папкам разом",)),
         Variant("Загрузки забиты мусором браузера. Правила уборки: недокачанные *.crdownload — "
                 "стереть везде, и во вложенных папках тоже; дубли «имя copy.расширение» — стереть, "
                 "это точные копии; пустые папки — убрать. Остальное не трогать. Имя самого "
-                "тяжёлого из оставшихся файлов запиши в biggest.txt рядом с Downloads.",
+                "тяжёлого из оставшихся файлов запиши в biggest.txt рядом с Downloads (можно и путь "
+                "к нему).",
                 hints=("Иди по шагам: недокачанные — find Downloads -name '*.crdownload' -delete; "
                        "дубли — rm Downloads/*\\ copy.*",
                        "Пустые папки — find Downloads -type d -empty -delete. Недокачанные сотри "
                        "раньше: после них опустеют и папки.",
-                       "Самый тяжёлый: ls -S Downloads/**/*(.) | head -1 — имя запиши: "
-                       "echo ИМЯ > biggest.txt"),
+                       "Самый тяжёлый: ls -S Downloads/**/*(.) | head -1 > biggest.txt"),
                 solution=("find Downloads -name '*.crdownload' -delete; rm Downloads/*\\ copy.*; "
                           "find Downloads -type d -empty -delete; "
                           "ls -S Downloads/**/*(.) | head -1 > biggest.txt"),
@@ -2005,14 +2033,13 @@ class BossFinder(Task):
         Variant("Загрузки после фотосессии: снимки вперемешку с документами. Убери дубли «(1)» "
                 "и пустые файлы, все снимки (jpg, jpeg, png, heic — любым регистром) перенеси в "
                 "папку photos, а все остальные файлы оставь в Downloads как есть. Имя самого "
-                "тяжёлого СНИМКА запиши в biggest.txt рядом с Downloads.",
+                "тяжёлого СНИМКА запиши в biggest.txt рядом с Downloads (можно и путь к нему).",
                 hints=("Иди по шагам: дубли — rm Downloads/*\\ \\(1\\).*; пустые — "
                        "find Downloads -type f -empty -delete",
                        "Сначала mkdir Downloads/photos. Регистр расширений разный — маска без учёта "
                        "регистра: setopt extendedglob, потом mv Downloads/*.(#i)(jpg|jpeg|png|heic)"
                        " Downloads/photos/",
-                       "Самый тяжёлый снимок: ls -S Downloads/photos | head -1 — имя запиши: "
-                       "echo ИМЯ > biggest.txt"),
+                       "Самый тяжёлый снимок: ls -S Downloads/photos | head -1 > biggest.txt"),
                 solution=("setopt extendedglob; "
                           "rm Downloads/*\\ \\(1\\).*; find Downloads -type f -empty -delete; "
                           "mkdir Downloads/photos; mv Downloads/*.(#i)(jpg|jpeg|png|heic) "
@@ -2045,14 +2072,14 @@ class BossFinder(Task):
                     "cd ..",
                     "ls -S Downloads/**/*(.) | head -1 | xargs basename > biggest.txt",
                 ])),
-                alternatives=("ls -S Downloads/photos | head -1 > biggest.txt — сразу в файл, "
-                              "без echo",)),
+                alternatives=("ls -S Downloads/photos | head -1 — посмотреть имя, потом echo "
+                              "и это имя > biggest.txt",)),
     )
     hints = ("Иди по шагам: пустые — find Downloads -type f -empty -delete; "
              "дубли — rm Downloads/*\\ \\(1\\).*",
              "Разложить: mkdir нужные папки и mv по маскам. Маска без учёта регистра в zsh: "
              "setopt extendedglob, потом *.(#i)(jpg|jpeg|png|heic)",
-             "Самый тяжёлый: ls -S Downloads/*/* | head -1 — имя запиши: echo ИМЯ > biggest.txt")
+             "Самый тяжёлый: ls -S Downloads/*/* | head -1 > biggest.txt")
     solution = ("find Downloads -type f -empty -delete; rm Downloads/*\\ \\(1\\).*; "
                 "mkdir + mv по маскам *.(#i)(jpg|png|…); ls -S Downloads/*/* | head -1 > biggest.txt")
     solution_script = "\n".join([
@@ -2070,7 +2097,7 @@ class BossFinder(Task):
     ])
     explain = ("find -empty находит пустые, маски с (#i) не смотрят на регистр, ls -S сортирует "
                "по размеру — вместе это генеральная уборка Загрузок за минуту.")
-    spell = "find -empty -delete; mv *.(#i)jpg папка/ (zsh); ls -S — самые тяжёлые сверху"
+    spell = "find -empty -delete; mv *.(#i)jpg DIR/ (zsh); ls -S — самые тяжёлые сверху"
 
     # шаги под вариант (общие steps — для шпаргалки и T002)
     MODE_STEPS = (

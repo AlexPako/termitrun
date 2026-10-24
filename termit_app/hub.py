@@ -1,5 +1,5 @@
 """Убежище — командная строка игры (хаб). Тонкий слой: каждое слово превращается в обычный
-argv и уходит в cli.run_once, как ./termit СЛОВО. Таблица WORDS — единственный источник
+argv и уходит в cli.run_once, как ./termit WORD. Таблица WORDS — единственный источник
 слов: из неё строятся help, Tab, строка подсказки и «может, home?»."""
 import difflib
 import os
@@ -45,11 +45,11 @@ WORDS = (
     Word("board", ("home", "board"), "home", rule="board"),
     Word("prompt", ("home", "prompt"), "home", rule="prompt"),
     Word("palette", ("home", "palette"), "home", "ID", rule="palette"),
-    Word("callsign", ("home", "callsign"), "home", "ИМЯ", rule="callsign"),
+    Word("callsign", ("home", "callsign"), "home", "NAME", rule="callsign"),
     Word("shop", ("shop",), "home", "[ID|all]"),
     Word("deck", ("deck",), "home", "[on|off ID]", rule="deck"),
     Word("case", ("case",), "story", rule="case"),
-    Word("dossier", ("dossier",), "story", "[ИМЯ]", rule="dossier"),
+    Word("dossier", ("dossier",), "story", "[NAME]", rule="dossier"),
     Word("memory", ("memory",), "story", rule="memory"),
     Word("diary", ("diary",), "story", "[N]", rule="diary"),
     Word("map", ("map",), "story"),
@@ -66,14 +66,14 @@ WORDS = (
     Word("style", ("style",), "settings", "[ВИД ID]", rule="style"),
     Word("music", ("music",), "settings", "[play ID]", rule="music"),
     Word("sound", ("sound",), "settings", "[on|off]"),
-    Word("theme", ("theme",), "settings", "[ИМЯ]"),
+    Word("theme", ("theme",), "settings", "[NAME]"),
     Word("owl", ("owl",), "settings", "[on|off]", rule="owl"),
     Word("coach", ("coach",), "settings", "[on|off]"),
     Word("implants", ("implants",), "settings", rule="implants"),
     Word("wheels", ("wheels",), "settings", "[get]", rule="wheels"),
     Word("update", ("update",), "settings"),
     Word("hub", (), "hub", own=True),
-    Word("help", (), "hub", "[СЛОВО]", own=True),
+    Word("help", (), "hub", "[WORD]", own=True),
     Word("clear", (), "hub", own=True),
     Word("quit", (), "hub", aliases=("exit", "q"), own=True),
 )
@@ -85,7 +85,7 @@ HUB_SKIP = {
 }
 
 # короткая расшифровка слова — на пульте и в help рядом со словом (владелец 21.10:
-# «не хватает расшифровки команд»); подробно — help СЛОВО
+# «не хватает расшифровки команд»); подробно — help WORD
 SHORT = {
     "run": "ран дня, ~10 минут",
     "short": "короткий ран",
@@ -172,7 +172,7 @@ TASK_ONLY = {
 HUB_ABOUT = {
     "run": "ран дня на ~10 минут — главное дело дня",
     "hub": "показать пульт заново",
-    "help": "все открытые слова; help СЛОВО — подробно об одном",
+    "help": "все открытые слова; help WORD — подробно об одном",
     "clear": "очистить экран",
     "quit": "выйти из игры (Ctrl+D — то же)",
 }
@@ -375,7 +375,7 @@ def _book_lines(p: dict, name: str) -> List[str]:
 
 
 CLOSED_HEAD = "  Закрыто:"
-CLOSED_TAIL = "help СЛОВО — когда откроется."
+CLOSED_TAIL = "help WORD — когда откроется."
 
 
 def closed_words(p: dict) -> List[Word]:
@@ -385,13 +385,13 @@ def closed_words(p: dict) -> List[Word]:
             and not (w.rule == "report" and not edition.ISSUES_URL)]
 
 
-HELP_HEAD = "Слова убежища (Enter — то, что отмечено ⏎; help СЛОВО — подробно):"
+HELP_HEAD = "Слова убежища (Enter — то, что отмечено ⏎; help WORD — подробно):"
 
 
 def help_lines(p: dict, name: str = "", width: Optional[int] = None, dense: bool = False,
                head: bool = True, closed_rows: Optional[int] = None) -> List[str]:
     """help — открытые слова по группам, у каждого короткая расшифровка (в две колонки, если
-    окно позволяет); закрытые — именами; help СЛОВО — подробно об одном (закрытое объясняет,
+    окно позволяет); закрытые — именами; help WORD — подробно об одном (закрытое объясняет,
     когда откроется); не слово, но есть в книге — строки книги.
     Для пульта (FB19, высота): dense — «слово — что» потоком через точку, а не сеткой;
     head=False — без строки-заголовка; closed_rows — закрытые не больше стольких строк."""

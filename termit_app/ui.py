@@ -27,7 +27,7 @@ def c(code: str, s: str) -> str:
 
 
 # FB5 (владелец: «не понятно, что за команда ./termit home»): когда сообщение игры впервые
-# называет команду ./termit СЛОВО, под ним — строка «что это и когда набирать» (commands.note).
+# называет команду ./termit WORD, под ним — строка «что это и когда набирать» (commands.note).
 # _seen — встреченные команды (progress["cmds_seen"]) на время запуска (cli.main, glossary);
 # None — выключено (тесты модулей, процесс задачи). Строка внутри рамки ждёт её конца.
 _seen = None
@@ -173,6 +173,24 @@ def lesson_block(text: str, width: int = None) -> str:
 
 CODE = re.compile(r"`([^`\n]+)`")
 
+# Р3 (владелец 23.10): карточка — сжато, но весь урок; полный — по слову lesson. Урок по
+# формату (линтер F003–F006): главное — первой фразой абзаца, дальше разжёвывание и примеры
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[А-ЯЁA-Z`0-9«(])")
+SHORT_MIN_SAVED = 0.2       # короче меньше чем на пятую часть — показываем урок целиком
+LESSON_MORE = "полный урок, с пояснениями и примерами, — lesson"
+
+
+def lesson_short(text: str) -> str:
+    """Урок для карточки: из каждого абзаца — первая фраза, «Пригодится, когда…» (живой
+    случай) — только в полном уроке. Сжатие экономит мало — урок как есть."""
+    out = []
+    for para in (p.strip() for p in text.split("\n\n")):
+        if not para or para.startswith("Пригодится"):
+            continue
+        out.append(_SENTENCE_END.split(para, 1)[0])
+    short = "\n\n".join(out)
+    return short if len(short) <= len(text) * (1 - SHORT_MIN_SAVED) else text
+
 
 def code_spans(text: str, cp: tui.Caps) -> str:
     """Команды в `…` — цветом без обратных кавычек: глаз сразу видит, что набирать.
@@ -260,6 +278,9 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         label += f" · {theme.word('urgent_mark')}"
     mode_word = master or theme.word("rehearsal_mode" if rehearsal else
                                      "job_mode" if mode == "job" else "train_mode")
+    step = tier_label(task, state) if not first_time else None
+    if step:
+        mode_word += f" · {step}"
     cp = _framed()
     if cp.level == "plain":     # FB17: длинная шапка в узком окне — переносом
         say("\n".join(c("1", r) for r in tui.fill(label, tui.text_width(cp), "", "   ")))
@@ -284,7 +305,11 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         spell = theme.word("new_spell" if first_time else "remind_spell")
         if lesson:          # урок персонажа вместо сухой шпаргалки
             say(c("36", f"{mark}{spell} · {theme.speaker(task)}:"))
-            say(code_spans(lesson_block(lesson, wide), cp))
+            short = lesson_short(lesson)
+            say(code_spans(lesson_block(short, wide), cp))
+            if short != lesson:
+                say(c("2", LESSON_INDENT + LESSON_MORE))
+            shown_lesson = short
         else:
             say(c("36", mark + spell + ":"))
             say(_wrap(task.scroll_for(state) or task.scroll, width=wide))
@@ -313,9 +338,9 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
             else "hint — подсказка, бесплатно")
     tall = card_rows(task, state, shown_lesson, wide) + len(scene_rows) + CARD_TAIL > CARD_ROWS
     # владелец 21.10: у каждой команды — хотя бы короткая расшифровка
-    keys = (f"task — задание снова · {hint} · ans ОТВЕТ — сдать ответ · quit — выйти из задачи"
+    keys = (f"task — задание снова · {hint} · ans ANSWER — сдать ответ · quit — выйти из задачи"
             if tall else
-            f"task — задание снова · lesson — урок · {hint} · ans ОТВЕТ — сдать ответ · "
+            f"task — задание снова · lesson — урок · {hint} · ans ANSWER — сдать ответ · "
             "reset — собрать задачу заново · giveup — сдаться и посмотреть разбор · "
             "skip — пропустить задачу, вернётся завтра · quit — выйти из задачи · "
             "bug — написать замечание")
@@ -351,9 +376,19 @@ def task_card(n, total, track, task, state, first_time: bool, mode: str = "train
         else:
             say("\n".join(tui.style(r, "dim", c=cp) for r in tui.fill(note, tw, "   ", "   ")))
     if owl:             # мост Совы запущен (Ollama есть и Сова не выключена)
-        say(c("2", f"   ask ВОПРОС — {theme.word('owl')}: наводка, не ответ"))
+        say(c("2", f"   ask QUESTION — {theme.word('owl')}: наводка, не ответ"))
     if tall:            # FB5 п. 43: задание — последний смысловой блок длинной карточки
         say(tui.style(task_reminder(task.text(state), wide), "bold", c=cp))
+
+
+def tier_label(task, state: dict) -> Optional[str]:
+    """Р1: «ступень 2 из 3 — с подвохом» — у задачи с вариантами разных ступеней."""
+    from termit_app.tasks import tiers as tier_table
+    tiers = tier_table.of(task)
+    if len(set(tiers)) < 2:
+        return None
+    t = tiers[variant_index(state.get("_variant"), len(tiers))]
+    return f"ступень {t + 1} из {progress.TIER_TOP + 1} — {progress.TIER_NAMES[t]}"
 
 
 def stage_lines(text: str, width: int = None) -> List[str]:
@@ -464,18 +499,20 @@ def answer_form(task, state) -> Optional[str]:
     except (AttributeError, KeyError, IndexError, ValueError, TypeError):
         return None
     if kind == "number":
-        return "Сдаёшь одно число: ans ЧИСЛО — без слов вокруг."
+        return "Сдаёшь одно число: ans NUMBER — без слов вокруг."
     if kind == "path":
         return None             # путь задание объясняет само (ans $(pwd) и т.п.)
     n = len(textnorm.parts(exp))
-    if n == 1 and "ans ИМЯ" in _text(task, state):     # FB6: задание просит имя, не слово
-        return "Сдаёшь одно имя: ans ИМЯ — целиком, как написано, без остального текста."
+    # FB6: задание просит имя, не слово; заготовки — по-английски (скилл termit-lesson), старые
+    # кириллические — пока их не заменили во всех задачах
+    if n == 1 and re.search(r"ans (?:NAME|NAME)\b", _text(task, state)):
+        return "Сдаёшь одно имя: ans NAME — целиком, как написано, без остального текста."
     if n == 1 and not _cat_taught(task):        # FB6: $( ) и cat ещё не встречались
-        return "Сдаёшь одно слово: ans СЛОВО — без остального текста."
+        return "Сдаёшь одно слово: ans WORD — без остального текста."
     if n == 1:
-        return ("Сдаёшь одно слово: ans СЛОВО — без остального текста (ans $(cat файл) "
+        return ("Сдаёшь одно слово: ans WORD — без остального текста (ans $(cat FILE) "
                 "подойдёт, только если в файле одно это слово).")
-    return f"Сдаёшь {n} {plural(n, 'слово', 'слова', 'слов')} через пробел: ans СЛОВО СЛОВО…"
+    return f"Сдаёшь {n} {plural(n, 'слово', 'слова', 'слов')} через пробел: ans WORD WORD…"
 
 
 REHEARSAL_UNTOUCHED = "🎭 Это была репетиция — прогресс не тронут."
@@ -717,7 +754,7 @@ def hang_lines(text: str, width: int) -> str:
 def answer_guide() -> str:
     """Памятка «как сдавать ответ» — нейтральный текст движка, одинаковый во всех темах."""
     return """Как сдавать ответ:
-  ans ОТВЕТ       — сдать ответ текстом, например: ans /Users/ты/Documents
+  ans ANSWER       — сдать ответ текстом, например: ans /Users/ты/Documents
   ans $(pwd)      — подставить вывод команды прямо в ответ: $( ) выполнит её
   ans $PWD        — то же через переменную: в $PWD лежит путь текущей папки
   pwd | pbcopy    — скопировать вывод в буфер, потом «ans » и Cmd+V
@@ -729,7 +766,7 @@ def answer_guide() -> str:
 # Первая минута (П3.4): одна строка — как сдать, одна — как выбраться. Остальные способы
 # сдачи приходят по мере надобности — в уроках и «можно и так» следующих задач.
 _INTRO_KEYS_HEAD = (
-    "Ответ сдают так: ans ОТВЕТ. Команда повисла и молчит — Ctrl+C.\n"
+    "Ответ сдают так: ans ANSWER. Команда повисла и молчит — Ctrl+C.\n"
     "Застрял — набери hint, это нормально: на тренировке подсказки бесплатны и на "
     "прогресс не влияют.\n"
     "Ещё: reset — собрать задачу заново · skip — отложить на завтра · giveup — "
@@ -739,7 +776,7 @@ _INTRO_KEYS_HEAD = (
     "Ещё урок — new в убежище. Что-то не так — bug, игра спросит текст.\n")
 INTRO_KEYS = (
     _INTRO_KEYS_HEAD
-    # FB5: общее правило про ./termit СЛОВО — один раз и рано
+    # FB5: общее правило про ./termit WORD — один раз и рано
     + "Команды вида ./termit слово (./termit shop, ./termit home …) — команды самой "
     "игры: их набирают не в задаче, а в обычном терминале — после рана или вместо "
     "него. Список всех — ./termit help.")
@@ -919,7 +956,7 @@ KEYS_IN_HUB = "board (набирают в убежище)"
 
 
 def keys_sheet(args=()) -> str:
-    """Шпаргалка клавиш: keys в задаче и ./termit keys. FB10: keys hacks [РАЗДЕЛ] — весь
+    """Шпаргалка клавиш: keys в задаче и ./termit keys. FB10: keys hacks [SECTION] — весь
     каталог лайфхаков (termit_app/lifehacks.py) или один его раздел. FB12: keys iterm —
     экран настройки iTerm2. FB21: keys regex — знаки регулярок. В убежище и в задаче рана из убежища (TERMIT_HUB) — без
     ./termit и без «после рана»."""
@@ -977,7 +1014,7 @@ def extension_notes(lines) -> None:
 def show_intro(text: str, guide: bool = False) -> None:
     """Вступление темы и две строки управления — при первом ране; guide — ещё и памятка
     «как сдавать ответ» (./termit intro). Вступление само говорит, что такое ./termit
-    СЛОВО, — без строк первой встречи."""
+    WORD, — без строк первой встречи."""
     with glossary_off():
         _show_intro(text, guide)
 

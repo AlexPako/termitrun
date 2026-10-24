@@ -324,7 +324,7 @@ def spark(values: Iterable[float], c: Caps = None) -> str:
 
 
 def label(text: str, c: Caps = None) -> str:
-    """Плашка ▌ТЕКСТ▐ (rich) / [ТЕКСТ] (basic) / текст (plain)."""
+    """Плашка ▌TEXT▐ (rich) / [TEXT] (basic) / текст (plain)."""
     c = c or caps()
     if c.level == "rich":
         return style(f"▌{text}▐", "accent", c=c)

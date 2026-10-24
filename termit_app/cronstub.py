@@ -1,11 +1,11 @@
-"""Учебный crontab песочницы: python -I … termit_app.cronstub АРГУМЕНТЫ (FB14).
+"""Учебный crontab песочницы: python -I … termit_app.cronstub ARGS (FB14).
 
 Настоящий crontab -e правит расписание владельца на его Mac — из игры его трогать нельзя.
 Обёртка .termit/bin/crontab есть только у задач с uses_crontab = True и хранит «расписание»
 в файле песочницы .termit/crontab (по нему и проверяет задача). Ничего не запускает по
 времени: только принимает, проверяет и показывает строки.
 
-Ключи как у настоящего: crontab ФАЙЛ (или - — со входа) — поставить расписание из файла,
+Ключи как у настоящего: crontab FILE (или - — со входа) — поставить расписание из файла,
 crontab -l — показать, crontab -r — убрать, crontab -e — открыть в $EDITOR (nano). Строка:
 «минута час день_месяца месяц день_недели команда»; поля — *, числа, a-b, a,b, */n, a-b/n,
 имена месяцев и дней (jan, mon). Ошибка в строке — как у cron на macOS: «"файл":N: bad
@@ -69,7 +69,7 @@ def field_set(text: str, lo: int, hi: int, names: Tuple[str, ...] = ()) -> Optio
 
 
 def parse_line(line: str) -> Tuple[Optional[list], Optional[str], Optional[str]]:
-    """(множества пяти полей, команда, ошибка). Пустая строка, комментарий и ИМЯ=значение —
+    """(множества пяти полей, команда, ошибка). Пустая строка, комментарий и NAME=значение —
     (None, None, None)."""
     s = line.strip()
     if not s or s.startswith("#") or _ENV_LINE.match(s):

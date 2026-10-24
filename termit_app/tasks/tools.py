@@ -55,24 +55,30 @@ class ManFlag(AnswerTask):
     track = "tools"
     title = "Спроси у справки"
     case_sensitive = True
-    scroll = ("man КОМАНДА — полная справка. Внутри: пробел — страница вниз, b — вверх, "
-              "/слово и Enter — искать, n — следующее совпадение, q — выйти.\n"
-              "Поиск различает большие и маленькие буквы. У системных команд macOS нет --help — "
-              "только man.")
+    scroll = ("man COMMAND — полная справка по команде COMMAND. Внутри: пробел — страница вниз, "
+              "b — вверх, /WORD и Enter — искать слово WORD, n — следующее совпадение, q — "
+              "выйти.\n"
+              "Поиск различает большие и маленькие буквы. Флаг — минус и буква в начале строки "
+              "описания; сдают его так: ans, пробел, минус и эта буква.")
     variants = (
-        Variant("Каким флагом {cmd} {what}? Не гадай — найди в справке. "
-                "Ответ: ans ФЛАГ",
+        Variant("Каким флагом {cmd} {what}? Не гадай — найди в справке: man {cmd}, внутри "
+                "ищи «{word}». Сдай флаг — минус и букву: ans -X, где -X — "
+                "найденный флаг",
                 wrong=("print -r -- {decoy}",),
                 alternatives=("man {cmd} | grep -B1 '{word}' — строка со словом и та, что над "
                               "ней (-B1 — одна строка до совпадения), без листания",)),
-        Variant("Какой флаг у {cmd} отвечает за то, что команда {what}? "
-                "Найди в справке и сдай: ans ФЛАГ",
+        Variant("Какой флаг у {cmd} отвечает за то, что команда {what}? Найди в справке: "
+                "man {cmd}, внутри ищи «{word}». Сдай флаг — минус и букву: ans -X, где -X — "
+                "найденный флаг",
                 wrong=("print -r -- {decoy}",),
                 alternatives=("man {cmd} | grep -B1 '{word}' — найти строку, не открывая "
                               "листалку; -B1 добавит строку над совпадением",)),
-        Variant("У {cmd} есть флаг {flag}. Что он делает? Найди его описание в справке и сдай "
-                "одно слово оттуда — по-английски, как в man, то, что называет само действие "
-                "(у du -h это human): ans СЛОВО",
+        Variant("У {cmd} есть флаг {flag}. Что он делает? Открой man {cmd} и найди строку, "
+                "которая начинается с {flag} (поиск: /{flag}). Сдай одно слово из её описания — "
+                "по-английски, как в man, — главное слово: то, что есть только у этого флага. "
+                "Пример: у ls -l описание «List files in the long format» — список ls "
+                "печатает всегда, а long — только с -l: сдают long. Сдают слово, а не флаг: "
+                "ans WORD",
                 hints=("Справка — man {cmd}. Внутри ищи сам флаг: /{flag} и Enter.",
                        "Поиск ловит и куски длинных слов: жми n, пока строка не начнётся "
                        "с {flag}. Большая и маленькая буква — разные флаги.",
@@ -89,11 +95,11 @@ class ManFlag(AnswerTask):
     hints = ("Справка по команде — man {cmd}. Внутри ищи слово через /.",
              "man {cmd}, потом /{word} и Enter; n — следующее совпадение.",
              "Ответ — буква с минусом в начале строки с «{word}» (или строкой выше). "
-             "Сдай: ans -БУКВА")
+             "Сдай: ans -X, где -X — эта буква с минусом")
     solution = "man {cmd}, затем /{word}, n, q"
     solution_script = "print -r -- {answer}"
     explain = "man — главный справочник на Mac. Ищи через / — и не листай минутами."
-    spell = "man команда — справка; внутри /слово — поиск, n — дальше, q — выход"
+    spell = "man COMMAND — справка; внутри /WORD — поиск, n — дальше, q — выход"
 
     def setup_variant(self, box, rng, variant):
         if variant == 2:
@@ -125,7 +131,8 @@ class ManFlag(AnswerTask):
         if re.search(r"[а-яё]", given.casefold()):
             return "Сдай слово из справки — по-английски, как написано в man."
         return (f"Это слово не говорит, что делает {ctx.state['flag']}. Найди строку, которая "
-                f"начинается с {ctx.state['flag']}: какое слово в ней называет само действие?")
+                f"начинается с {ctx.state['flag']}: какое слово в ней есть только у этого "
+                "флага?")
 
 
 class FlagUse(AnswerTask):
@@ -134,27 +141,31 @@ class FlagUse(AnswerTask):
     id = "flag_use"
     track = "tools"
     title = "Найди флаг и примени"
-    scroll = ("Флаг не помнишь — найди сам: man COMMAND, /слово и Enter, q — выйти.\n"
+    scroll = ("Флаг не помнишь — найди сам: man COMMAND, /WORD и Enter, q — выйти.\n"
               "Флаг ставят сразу после имени команды: grep -X PATTERN FILE.\n"
               "Флагу нужно число — оно идёт следом: head -X 5 FILE.")
     variants = (
         Variant("Сколько строк со словом ERROR в server.log? grep умеет сам считать совпавшие "
-                "строки — найди этот флаг в man grep и примени. Ответ: ans ЧИСЛО",
+                "строки — найди этот флаг в man grep и примени. Ответ: ans NUMBER (NUMBER — сюда "
+                "число строк)",
                 wrong=("grep ERROR server.log",),
                 alternatives=("grep ERROR server.log — и сосчитать строки глазами: дольше и "
                               "легко сбиться",)),
         Variant("Пароль — первые {n} символов файла code.txt. head умеет брать не строки, а "
-                "символы (байты): найди флаг в man head и сдай пароль: ans ПАРОЛЬ",
+                "символы (в справке они зовутся bytes, «байты»): найди флаг в man head и сдай "
+                "пароль: ans PASSWORD (PASSWORD — сюда эти символы)",
                 hints=("Нужен флаг head про байты: man head, внутри /bytes.",
                        "Флаг со значением: число символов идёт следом за флагом.",
-                       "head -c {n} code.txt — и ans ПАРОЛЬ"),
+                       "head -c {n} code.txt — и ans PASSWORD, где PASSWORD — эти символы"),
                 solution="head -c {n} code.txt",
                 solution_script="head -c {n} code.txt",
                 wrong=("head -n {n} code.txt",),
                 alternatives=("ans $(head -c {n} code.txt) — подставить сразу",)),
         Variant("ls показывает папку queue по алфавиту. Какое имя окажется первым, если ls "
-                "перевернёт порядок? Флаг «наоборот» найди в man ls. Ответ: ans ИМЯ",
-                hints=("В man ls ищи слово reverse: /reverse и Enter.",
+                "перевернёт порядок? Флаг «наоборот» найди в man ls. Ответ: ans NAME (NAME — сюда "
+                "имя файла, как ls его напечатал)",
+                hints=("В man ls ищи слово Reverse — с большой R, как в справке: /Reverse и "
+                       "Enter.",
                        "Флаг переворачивает любой порядок ls — и по алфавиту тоже.",
                        "ls -r queue — первое имя сверху, его и сдай"),
                 solution="ls -r queue",
@@ -167,11 +178,11 @@ class FlagUse(AnswerTask):
     par = 45
     hints = ("Флаг для подсчёта — в справке: man grep, внутри /count.",
              "Нашёл строку «-c …» — это он. Выйди из man (q) и примени флаг к файлу.",
-             "grep -c ERROR server.log — и ans ЧИСЛО")
+             "grep -c ERROR server.log — и ans NUMBER, где NUMBER — число, что напечатал grep")
     solution = "grep -c ERROR server.log"
-    explain = ("Флага нет на карточке — не беда: man КОМАНДА и /слово выудят его за "
+    explain = ("Флага нет на карточке — не беда: man COMMAND и /WORD выудят его за "
                "полминуты. Бывает, флаг ждёт значение — head -c 5 — его пишут следом.")
-    spell = "man команда, /слово — найти флаг; флаг со значением: head -c 5"
+    spell = "man COMMAND, /WORD — найти флаг; флаг со значением: head -c 5"
     trap_messages = {"all": "Это все строки файла, а нужны только строки с ERROR.",
                      "first": "Это первое имя по алфавиту. Нужно первое, когда ls перевернёт "
                               "порядок.",
@@ -212,22 +223,23 @@ class LessSearch(AnswerTask):
     id = "less_search"
     track = "tools"
     title = "Иголка в логе"
-    scroll = ("less ФАЙЛ — листать большой файл. Пробел — страница вниз, /слово — поиск, "
-              "n — следующее, G — в конец, g — в начало, q — выход.\n"
-              "Опытные часто обходятся без листания: grep СЛОВО файл — только строки со словом; "
-              "tail -1 файл — последняя строка.")
+    scroll = ("less FILE — листать большой файл FILE. Пробел — страница вниз, b — вверх, "
+              "/WORD и Enter — поиск, n — следующее, Shift+G — в конец, g — в начало, q — "
+              "выход.")
     variants = (
         Variant("В логе server.log больше {n} строк. В строке с CRITICAL в конце стоит "
                 "число — какое? И какое слово стоит после «Signature:» в самой последней строке? "
-                "Ответ: ans ЧИСЛО СЛОВО",
+                "Сдай оба через пробел: ans NUMBER WORD (NUMBER — то число, WORD — то слово)",
                 wrong=("grep CRITICAL server.log | cut -c1-5; tail -1 server.log | cut -d' ' -f2",),
-                alternatives=("grep CRITICAL server.log и tail -1 server.log — без листания",)),
+                alternatives=("grep CRITICAL server.log и grep Signature server.log — обе строки без "
+                              "листания",)),
         Variant("В логе server.log больше {n} строк, каждая начинается с пятизначного номера. "
-                "Найди ПЕРВУЮ строку с WARN и сдай её номер: ans НОМЕР",
+                "Найди ПЕРВУЮ строку с WARN и сдай её номер: ans NUMBER (NUMBER — эти пять "
+                "цифр)",
                 hints=("Лог огромный — открывай в less, руками его не пролистать.",
                        "В less: /WARN и Enter прыгнет к первому совпадению. n — уже второе, "
                        "оно не нужно.",
-                       "less server.log, /WARN, первые 5 цифр строки, q, ans НОМЕР"),
+                       "less server.log, /WARN, первые 5 цифр строки, q, ans и эти цифры"),
                 solution="less server.log, /WARN, номер строки, q",
                 solution_script="grep -m1 WARN server.log | cut -c1-5",
                 wrong=("grep WARN server.log | sed -n 2p | cut -c1-5",),
@@ -235,10 +247,10 @@ class LessSearch(AnswerTask):
                               "находке",)),
         Variant("В логе server.log больше {n} строк, и где-то в нём сервис перезапускался — "
                 "строка с RESTART. Какое событие записано сразу после неё? Сдай его без "
-                "номера строки: ans СОБЫТИЕ",
+                "номера строки: ans EVENT (EVENT — текст той строки после номера)",
                 hints=("Открой лог в less и найди перезапуск поиском.",
                        "/RESTART и Enter — курсор на нужной строке; ответ — строка под ней.",
-                       "less server.log, /RESTART, строка ниже, без номера, q, ans СОБЫТИЕ"),
+                       "less server.log, /RESTART, строка ниже, без номера, q, ans и её текст"),
                 solution="less server.log, /RESTART, строка ниже, q",
                 solution_script="grep -A1 RESTART server.log | tail -1 | cut -d' ' -f2-",
                 wrong=("grep -B1 RESTART server.log | head -1 | cut -d' ' -f2-",),
@@ -247,13 +259,13 @@ class LessSearch(AnswerTask):
     )
     par = 50
     hints = ("Открой лог в less: cat вывалит на экран простыню, которой не видно конца.",
-             "В less: /CRITICAL и Enter — найти; G — прыгнуть в самый конец.",
-             "less server.log, /CRITICAL, запомни число, G, слово в последней строке, q")
-    solution = "less server.log, /CRITICAL, G, q"
+             "В less: /CRITICAL и Enter — найти; Shift+G — прыгнуть в самый конец.",
+             "less server.log, /CRITICAL, запомни число, Shift+G, слово в последней строке, q")
+    solution = "less server.log, /CRITICAL, Shift+G, q"
     solution_script = ("grep CRITICAL server.log | grep -oE '[0-9]+$'; "
                        "tail -1 server.log | cut -d' ' -f2")
     explain = "less не тащит файл целиком и умеет искать — им и читают логи на миллион строк."
-    spell = "less файл — листать; /слово — поиск, n — дальше, G — конец, q — выход"
+    spell = "less FILE — листать; /WORD — поиск, n — дальше, Shift+G — конец, q — выход"
 
     EVENTS = ["INFO backup done", "INFO user login", "INFO cache cleared", "INFO cron ok",
               "WARN slow query", "INFO sync done", "INFO health ok"]
@@ -326,27 +338,28 @@ class NanoConfig(Task):
     id = "nano_config"
     track = "tools"
     title = "Конфиг в nano"
-    scroll = ("nano ФАЙЛ — простой редактор (на Mac это pico). Внизу подсказки, ^ — это Ctrl. "
-              "Ctrl+W — поиск, Ctrl+K — вырезать строку, Ctrl+O и Enter — сохранить, Ctrl+X — выйти.\n"
+    scroll = ("nano FILE — простой редактор для файла FILE. Внизу подсказки, ^ — это Ctrl. "
+              "Ctrl+W — поиск, Ctrl+K — вырезать строку, Ctrl+X — выйти.\n"
               "Ctrl+W и сразу Enter — искать то же слово дальше. Ctrl+X по несохранённому файлу "
-              "спросит, сохранить ли: Y — да.")
+              "спросит, сохранить ли: Y, потом Enter. Сохранил — игра сама сверит файл.")
     variants = (
         Variant("В конфиге app.conf замени port 5432 на 6432 (строка «port = 5432») и удали "
-                "строку с debug. "
-                "backup_port не трогай. Редактор — nano.",
+                "строку с debug. backup_port не трогай. Открой файл в nano: nano app.conf — "
+                "и сохрани, ans не нужен.",
                 wrong=("sed -i '' -e 's/5432/6432/' -e '/^debug = /d' app.conf",),
                 alternatives=("nano app.conf, Ctrl+W port и Enter — прыжок прямо к нужной "
                               "строке, без листания",)),
         Variant("В db.ini поменяй пользователя: user = test должно стать user = admin. И допиши "
-                "в самый конец файла новую строку timeout = 30. Остальное не трогай. "
-                "Редактор — nano.",
+                "в самый конец файла новую строку timeout = 30: стрелкой вниз, пока курсор не "
+                "встанет на пустую строку под последней. Остальное не трогай. Открой файл в "
+                "nano: nano db.ini — и сохрани, ans не нужен.",
                 hints=("Открой файл: nano db.ini",
                        "Ctrl+W user — найти строку, исправь test на admin; потом стрелкой вниз "
                        "до самого конца файла и напечатай новую строку.",
                        "nano db.ini, в строке user исправить test на admin, в конце файла "
-                       "дописать timeout = 30, Ctrl+O, Enter, Ctrl+X"),
+                       "дописать timeout = 30, Ctrl+X, Y, Enter"),
                 solution="nano db.ini, в строке user исправить test на admin, в конце "
-                         "дописать timeout = 30, Ctrl+O, Enter, Ctrl+X",
+                         "дописать timeout = 30, Ctrl+X, Y, Enter",
                 solution_script=("sed -i '' 's/^user = test$/user = admin/' db.ini && "
                                  "echo 'timeout = 30' >> db.ini"),
                 wrong=("sed -i '' 's/test/admin/' db.ini && echo 'timeout = 30' >> db.ini",
@@ -355,14 +368,15 @@ class NanoConfig(Task):
                               "файла без редактора",)),
         Variant("В web.conf закомментируй строку ssl = off — поставь в её начало решётку, чтобы "
                 "вышло «# ssl = off». И замени workers = {workers} на workers = {new_workers}. "
-                "ssl_cert и max_workers не трогай. Редактор — nano.",
+                "ssl_cert и max_workers не трогай. Решётку набирай в английской раскладке: "
+                "Shift+3. Открой файл в nano: nano web.conf — и сохрани, ans не нужен.",
                 hints=("Открой файл: nano web.conf",
                        "Решётка ставится в самое начало строки: встань на ssl = off, Ctrl+A — в "
                        "начало строки, набери # и пробел. workers ищи через Ctrl+W.",
                        "nano web.conf, в начало строки ssl = off дописать # и пробел, в "
-                       "строке workers число {new_workers}, Ctrl+O, Enter, Ctrl+X"),
+                       "строке workers число {new_workers}, Ctrl+X, Y, Enter"),
                 solution="nano web.conf, закомментировать ssl = off, в строке workers "
-                         "поставить {new_workers}, Ctrl+O, Enter, Ctrl+X",
+                         "поставить {new_workers}, Ctrl+X, Y, Enter",
                 solution_script=("sed -i '' -e 's/^ssl = off$/# ssl = off/' "
                                  "-e 's/^workers = {workers}$/workers = {new_workers}/' web.conf"),
                 wrong=("sed -i '' -e 's/^ssl = off$/# ssl = off/' "
@@ -376,12 +390,12 @@ class NanoConfig(Task):
     hints = ("Открой файл: nano app.conf",
              "Ctrl+W port — найти строку (попал на backup_port — Ctrl+W и Enter ищут дальше); "
              "исправь число; на строке debug нажми Ctrl+K.",
-             "nano app.conf: исправь port, Ctrl+K на строке debug, Ctrl+O, Enter — сохранить, "
-             "Ctrl+X — выйти. Проверить: cat app.conf")
-    solution = "nano app.conf, исправить port, Ctrl+K на строке debug, Ctrl+O, Enter, Ctrl+X"
+             "nano app.conf: исправь port, Ctrl+K на строке debug, Ctrl+X, Y, Enter — "
+             "сохранить и выйти. Проверить: cat app.conf")
+    solution = "nano app.conf, исправить port, Ctrl+K на строке debug, Ctrl+X, Y, Enter"
     solution_script = "sed -i '' -e 's/^port = 5432$/port = 6432/' -e '/^debug = /d' app.conf"
     explain = "Так конфиги на серверах и правят: открыл, нашёл, поправил, сохранил."
-    spell = "nano файл — редактор: Ctrl+W поиск, Ctrl+K вырезать строку, Ctrl+O сохранить, Ctrl+X выход"
+    spell = "nano FILE — редактор: Ctrl+W поиск, Ctrl+K вырезать строку, Ctrl+X, Y, Enter — сохранить и выйти"
 
     def setup_variant(self, box, rng, variant):
         if variant == 1:
@@ -478,16 +492,16 @@ class VimTrap(Task):
     autorun = "./commit.sh"
     scroll = VIM_SCROLL
     variants = (
-        Variant("Как только нажмёшь Enter, откроется vim — так же его сами открывают и другие "
-                "программы, когда ждут от тебя текст. "
-                "Впиши на первой строке «Signed: {name}» (подписано) и выйди С сохранением. "
-                "Не вышло — запусти ./commit.sh снова.",
+        Variant("Впиши в vim строку «Signed: {name}» (подписано) и выйди С сохранением. Игра "
+                "попросит нажать Enter и сама запустит скрипт ./commit.sh — он откроет vim, "
+                "как это делают и другие программы, когда ждут от тебя текст. Первая строка "
+                "там пустая — пиши в неё. Не вышло — набери ./commit.sh и Enter, начни снова.",
                 wrong=("TERMIT_VIM_EX='q!' ./commit.sh",),
                 alternatives=("ZZ — то же, что :wq, без двоеточия",)),
-        Variant("Нажми Enter — откроется vim, а в сообщении вместо текста заглушка TODO. "
-                "Замени строку TODO одной строкой своего текста — любой, хоть одним словом — "
-                "и выйди с сохранением. В vim: S (Shift+s) — стереть строку под курсором и сразу "
-                "печатать. Не вышло — запусти ./commit.sh снова.",
+        Variant("Замени в vim строку-заглушку TODO одной строкой своего текста — любой, хоть "
+                "одним словом — и выйди с сохранением. Нажми Enter, когда игра попросит, — "
+                "откроется vim, курсор уже на строке TODO. В vim: S (Shift+s) — стереть строку "
+                "под курсором и сразу печатать. Не вышло — набери ./commit.sh и Enter.",
                 hints=("Ты в vim, курсор уже на строке TODO. Её нужно стереть и напечатать своё.",
                        "Не вышло с S — то же делает cc. Или по-простому: A (Shift+a) — печатать "
                        "в конце строки, потом Backspace четыре раза.",
@@ -497,15 +511,15 @@ class VimTrap(Task):
                 wrong=("TERMIT_VIM_EX='q!' ./commit.sh",
                        "TERMIT_VIM_EX='1s/^/Done /' ./commit.sh"),
                 alternatives=("cc — то же, что S: стереть строку и печатать заново",)),
-        Variant("Нажми Enter — откроется vim с готовым сообщением. Допиши в самый конец, "
-                "последней строкой, «Checked: {name}» (проверено) и выйди с сохранением. "
-                "В vim: G — на последнюю строку, o — новая строка под ней и сразу печать. "
-                "Не вышло — запусти ./commit.sh снова.",
+        Variant("Допиши в vim последней строкой «Checked: {name}» (проверено) и выйди с "
+                "сохранением. Нажми Enter, когда игра попросит, — откроется vim с готовым "
+                "сообщением. В vim: большая G — на последнюю строку (это Shift+G), o — новая "
+                "строка под ней и сразу печать. Не вышло — набери ./commit.sh и Enter.",
                 hints=("Ты в vim. Чтобы писать в конце, сначала прыгни на последнюю строку.",
-                       "Без G и o тоже можно: стрелками вниз до последней строки, A — печатать "
+                       "Без Shift+G и o тоже можно: стрелками вниз до последней строки, A — печатать "
                        "в её конце, Enter — новая строка.",
-                       "./commit.sh, G, o, «Checked: {name}», Esc, :wq, Enter"),
-                solution="G, o, «Checked: {name}», Esc, :wq",
+                       "./commit.sh, Shift+G, o, «Checked: {name}», Esc, :wq, Enter"),
+                solution="Shift+G, o, «Checked: {name}», Esc, :wq",
                 solution_script="TERMIT_VIM_EX='normal GoChecked: {name}' ./commit.sh",
                 wrong=("TERMIT_VIM_EX='q!' ./commit.sh",
                        "TERMIT_VIM_EX='normal ggOChecked: {name}' ./commit.sh"),
@@ -632,20 +646,20 @@ class VimPurge(Task):
     id = "vim_purge"
     track = "tools"
     title = "Чистка строк в vim"
-    scroll = ("vim ФАЙЛ — открыть файл. В режиме команд: /слово и Enter — поиск, n — следующее, "
-              "dd — удалить строку, u — отменить последнее, :wq — сохранить и выйти.\n"
+    scroll = ("vim FILE — открыть файл FILE. В режиме команд: /WORD и Enter — поиск, n — "
+              "следующее, dd — удалить строку, u — отменить последнее, :wq — сохранить и выйти.\n"
               "Не знаешь, в каком ты режиме, — нажми Esc. ^ в поиске — начало строки: /^# найдёт "
               "только строки, которые начинаются с #. Пробел в поиске — тоже символ.")
     variants = (
-        Variant("В rules.txt завёлся спам: строки, начинающиеся с «SPAM » (с пробелом). "
-                "Вычисти их в vim. Строку «SPAM: filter enabled» (фильтр включён) не трогать — "
-                "удалил по ошибке, верни через u.",
+        Variant("В rules.txt завёлся спам: строки, начинающиеся с «SPAM » — SPAM и пробел. "
+                "Вычисти их в vim и сохрани (ans не нужен). Строку «SPAM: filter enabled» "
+                "(фильтр включён) не трогать — удалил по ошибке, верни через u.",
                 wrong=("vim -Es -u NONE '+g/SPAM/d' +wq rules.txt",),
                 alternatives=(":g/^SPAM /d — vim сам удалит все строки по образцу, одной "
                               "командой",)),
         Variant("В list.txt некоторые строки повторяются дважды подряд. Удали в vim вторые "
-                "копии — каждая такая строка должна остаться один раз. Строки «---» "
-                "повторяются не подряд: это разделители, их не трогай.",
+                "копии — каждая такая строка должна остаться один раз — и сохрани (ans не "
+                "нужен). Строки «---» повторяются не подряд: это разделители, их не трогай.",
                 hints=("vim list.txt — повторы видно глазами: листай вниз стрелкой или j "
                        "(в vim это тоже «вниз»).",
                        "Встань на вторую копию и нажми dd; удалил не то — u.",
@@ -657,12 +671,13 @@ class VimPurge(Task):
                 alternatives=("uniq list.txt > t.txt && mv t.txt list.txt — uniq убирает "
                               "повторы подряд без редактора, > t.txt пишет вывод в файл t.txt",)),
         Variant("В script.sh слишком много комментариев. Удали в vim все строки, которые "
-                "начинаются с #. Первую строку #!/bin/sh оставь: это не комментарий, а "
-                "указание, чем запускать скрипт. Решётку внутри строки тоже не трогай.",
+                "начинаются с #, и сохрани (ans не нужен). Первую строку #!/bin/sh оставь: это "
+                "не комментарий, а указание, чем запускать скрипт. Решётку внутри строки тоже "
+                "не трогай.",
                 hints=("vim script.sh, потом /^# — ^ значит «начало строки»: найдутся только "
                        "строки, которые начинаются с #.",
-                       "dd — удалить строку, n — к следующей находке. До #!/bin/sh поиск тоже "
-                       "дойдёт — её пропусти.",
+                       "dd — удалить строку; под курсором снова комментарий — снова dd, нет — "
+                       "n к следующей находке. До #!/bin/sh поиск тоже дойдёт — её пропусти.",
                        "vim script.sh, /^#, dd, n, dd … (#!/bin/sh пропустить), :wq"),
                 solution="vim script.sh, /^#, dd, n, … (кроме #!/bin/sh), :wq",
                 solution_script="vim -Es -u NONE '+2,$g/^#/d' +wq script.sh",
@@ -672,13 +687,13 @@ class VimPurge(Task):
                               "начинается с #",)),
     )
     par = 90
-    hints = ("vim rules.txt, потом /SPAM — найти первую.",
+    hints = ("vim rules.txt, потом /^SPAM, пробел и Enter — найти первую.",
              "dd — удалить строку, n — к следующей находке.",
-             "vim rules.txt, /SPAM, dd, n, dd … (нужную строку удалил — u), :wq")
-    solution = "vim rules.txt, /SPAM, dd, n, …, :wq"
+             "vim rules.txt, /^SPAM, пробел, Enter, dd, n, dd … (нужную строку удалил — u), :wq")
+    solution = "vim rules.txt, /^SPAM и пробел, dd, n, …, :wq"
     solution_script = "vim -Es -u NONE '+g/^SPAM /d' +wq rules.txt"
     explain = "Поиск, dd, n — и строки чистятся пачкой; промахнулся — u спасёт."
-    spell = "vim: /слово — поиск, n — дальше, dd — удалить строку, u — отменить"
+    spell = "vim: /WORD — поиск, n — дальше, dd — удалить строку, u — отменить"
 
     def setup_variant(self, box, rng, variant):
         if variant == 1:
@@ -785,36 +800,38 @@ class BrewLesson(AnswerTask):
     id = "brew_lesson"
     track = "tools"
     title = "Склад программ"
-    scroll = ("brew search ТЕКСТ — пакеты (программы Homebrew) по имени, brew search --desc "
-              "ТЕКСТ (description) — по описанию. brew info ФОРМУЛА — карточка (Replacement — "
-              "замена). brew which-formula КОМАНДА — чья (rg — из ripgrep).\n"
-              "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА — без обновления списка; brew "
-              "list — что стоит; which КОМАНДА — где лежит. Тут brew учебный, без сети: "
-              "/opt/homebrew/bin/brew не сработает.")
+    scroll = ("brew info FORMULA — карточка формулы FORMULA (Replacement — замена). Homebrew — "
+              "склад пакетов (программ для Mac), формула — карточка одной из них. "
+              "brew which-formula COMMAND — из какой формулы команда COMMAND (rg — из "
+              "ripgrep).\n"
+              "HOMEBREW_NO_AUTO_UPDATE=1 brew install FORMULA — поставить, не обновляя список "
+              "формул. Тут brew учебный: сети нет, он только делает вид, что ставит.")
     variants = (
-        Variant("Нужна команда tldr. Формулу с таким же именем Homebrew отключил. Что он сам "
-                "советует поставить взамен? Загляни в карточку формулы и сдай: ans ФОРМУЛА",
+        Variant("Нужна команда tldr. Формулу с таким же именем Homebrew отключил — больше её "
+                "не ставит. Что он сам советует поставить взамен? Загляни в карточку формулы "
+                "tldr и сдай имя замены: ans FORMULA (FORMULA — сюда имя формулы)",
                 wrong=("print -r -- tldr", "print -r -- tealdeer"),
                 alternatives=("HOMEBREW_NO_AUTO_UPDATE=1 brew install tldr — откажет, и в ошибке будет та же замена",)),
         Variant("Нужна команда {cmd} — {what}. Ставят её формулой с другим именем. Узнай, "
-                "какой, и сдай: ans ФОРМУЛА",
+                "какой, и сдай: ans FORMULA (FORMULA — сюда имя формулы)",
                 hints=("Имя команды и имя формулы бывают разные. brew умеет искать формулу "
                        "по команде.",
-                       "brew which-formula КОМАНДА — какая формула её ставит.",
+                       "brew which-formula COMMAND — какая формула ставит команду COMMAND.",
                        "brew which-formula {cmd}, в выводе {answer}, ans {answer}"),
                 solution="brew which-formula {cmd}, ans {answer}",
                 solution_script="brew which-formula {cmd}",
                 wrong=("print -r -- {cmd}",),
-                alternatives=("brew search --desc '{desc}' — поиск по описаниям: {answer} "
-                              "найдётся по тому, что делает",)),
-        Variant("Поставь (учебно) {formula} так, чтобы brew не полез обновлять список формул: сети "
-                "тут нет. Установка выдаст квитанцию (строка Receipt) — её номер и сдай: ans НОМЕР",
+                alternatives=("brew search --desc '{desc}' (--desc — искать по описаниям): "
+                              "{answer} найдётся по тому, что делает",)),
+        Variant("Поставь учебную формулу {formula} так, чтобы brew не полез обновлять список "
+                "формул: сети тут нет. В конце установка напечатает квитанцию — строку "
+                "«Receipt: …» с числом (receipt — квитанция). Сдай это число: ans NUMBER",
                 hints=("Попробуй просто brew install {formula} и прочти, на чём он обрывается.",
                        "Переменная перед командой действует только на неё: "
-                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА",
-                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula}, номер из строки "
-                       "«Receipt», ans НОМЕР"),
-                solution="HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula}, ans НОМЕР",
+                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install FORMULA",
+                       "HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula}, число из строки "
+                       "«Receipt», ans и это число"),
+                solution="HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula}, число из строки «Receipt»",
                 solution_script=("HOMEBREW_NO_AUTO_UPDATE=1 brew install {formula} "
                                  "| sed -n 's/^Receipt: //p'"),
                 wrong=("brew install {formula} >/dev/null 2>&1; print -r -- {receipt}",
@@ -825,7 +842,7 @@ class BrewLesson(AnswerTask):
                               "треке про переменные",)),
     )
     par = 45
-    hints = ("Карточка формулы — brew info ИМЯ. У отключённой там написано, почему и чем "
+    hints = ("Карточка формулы — brew info FORMULA. У отключённой там написано, почему и чем "
              "заменить.",
              "Ищи в выводе строку Replacement: под ней команда установки замены.",
              "brew info tldr, Replacement: brew install tlrc, ans tlrc")
@@ -834,8 +851,8 @@ class BrewLesson(AnswerTask):
     explain = ("Homebrew — склад программ для Mac: search ищет формулу по имени, which-formula — "
                "по команде, info показывает карточку, а с HOMEBREW_NO_AUTO_UPDATE=1 brew не тратит "
                "минуту на обновление списка формул.")
-    spell = ("brew search ТЕКСТ / --desc; brew info ФОРМУЛА; brew which-formula КОМАНДА; "
-             "HOMEBREW_NO_AUTO_UPDATE=1 brew install ФОРМУЛА")
+    spell = ("brew info FORMULA; brew which-formula COMMAND; "
+             "HOMEBREW_NO_AUTO_UPDATE=1 brew install FORMULA")
 
     def setup_variant(self, box, rng, variant):
         state = {"brew_list": sorted(rng.sample(BREW_LISTED, rng.randint(1, 3)))}
@@ -880,25 +897,28 @@ class TldrTar(Task):
     track = "tools"
     title = "tldr и архив"
     implant = "tldr"      # близнец: решается и без tldr (man tar), tldr — подарок после
-    scroll = ("tldr КОМАНДА — живые примеры вместо длинного man (нет tldr — man tar, /extract). "
-              "tar -xzf архив.tar.gz -C папка — распаковать в папку; tar -tzf архив.tar.gz — "
-              "оглавление; tar -xzf архив.tar.gz ПУТЬ — один файл; tar -czf архив.tar.gz папка "
-              "— собрать. -C — Change directory; x — extract, c — create, t — table, z — gzip, "
+    scroll = ("tldr COMMAND — живые примеры (нет tldr — man tar, /extract). "
+              "tar -xzf ARCHIVE -C DIR — распаковать архив ARCHIVE в папку DIR; tar -tzf "
+              "ARCHIVE — оглавление; tar -xzf ARCHIVE PATH — один файл; tar -czf ARCHIVE DIR — "
+              "собрать. -C — Change directory; x — extract, c — create, t — table, z — gzip, "
               "f — file.\n"
-              "В tldr {{…}} или path/to/… — твоё имя; --wildcards — для Linux.")
+              "В tldr {{…}} или path/to/… — твоё имя; --wildcards — для Linux, на Mac не нужен.")
     variants = (
-        Variant("В backup.tar.gz — архив с файлами. Распакуй его в папку backup/ — как "
-                "именно, подскажет tldr tar, а если tldr не стоит — man tar.",
+        Variant("В backup.tar.gz — архив с файлами. Распакуй его в папку backup/ — она уже "
+                "есть, рядом. Как именно, подскажет tldr tar, а если tldr не стоит — man tar. "
+                "Сдавать ничего не надо: игра проверит папку сама.",
                 wrong=("tar -xzf backup.tar.gz",),
                 alternatives=("cd backup && tar -xzf ../backup.tar.gz — зайти и распаковать "
                               "на месте",)),
         Variant("В release.tar.gz целый проект, а нужен один файл — readme.txt, он лежит "
-                "где-то внутри. Достань сюда только его: путь из архива пишется после имени "
-                "архива. Где он лежит, покажет оглавление архива, а как распаковывать вообще — "
-                "tldr tar или man tar.",
+                "где-то внутри. Достань только его в текущую папку: путь из архива пишется "
+                "после имени архива, и файл ляжет вместе с папками из этого пути. Где он "
+                "лежит, покажет оглавление архива, а как распаковывать вообще — tldr tar или "
+                "man tar. Сдавать ничего не надо.",
                 hints=("Сначала оглавление: tar -tzf release.tar.gz — там виден полный путь к "
                        "readme.txt.",
-                       "Этот путь целиком допиши после имени архива: tar -xzf release.tar.gz ПУТЬ",
+                       "Этот путь целиком допиши после имени архива: tar -xzf release.tar.gz PATH, "
+                       "где PATH — путь из оглавления",
                        "tar -tzf release.tar.gz, затем tar -xzf release.tar.gz {path} "
                        "(примеры — в tldr tar или man tar)"),
                 solution="tar -tzf release.tar.gz, tar -xzf release.tar.gz {path}",
@@ -906,8 +926,9 @@ class TldrTar(Task):
                 wrong=("tar -xzf release.tar.gz", "tar -xzf release.tar.gz readme.txt"),
                 alternatives=("tar -xzf release.tar.gz '*/readme.txt' — tar на Mac понимает "
                               "шаблон и без --wildcards",)),
-        Variant("Собери из папки notes/ сжатый архив notes.tar.gz — здесь, рядом с папкой. "
-                "Как — подскажет tldr tar, а если tldr не стоит — man tar.",
+        Variant("Собери из папки notes сжатый архив notes.tar.gz — здесь, рядом с папкой. "
+                "Как — подскажет tldr tar, а если tldr не стоит — man tar. Сдавать ничего не "
+                "надо: игра заглянет в архив сама.",
                 hints=("tldr tar — короткие примеры, ищи create; если tldr не стоит — man tar, "
                        "/create",
                        "c — создать, z — сжать gzip, f — имя архива; за ним — что упаковать.",
@@ -925,7 +946,7 @@ class TldrTar(Task):
     solution = "tldr tar (или man tar), tar -xzf backup.tar.gz -C backup"
     solution_script = "tar -xzf backup.tar.gz -C backup"
     explain = "x — извлечь, z — gzip, f — файл архива, -C — куда. tldr выдаст это за пару секунд."
-    spell = "tldr команда — примеры; tar -xzf архив.tar.gz -C папка — распаковать"
+    spell = "tldr COMMAND — примеры; tar -xzf ARCHIVE -C DIR — распаковать"
 
     def _files(self, rng, folder, names):
         shas = {}
@@ -1019,26 +1040,30 @@ class BatLines(AnswerTask):
     title = "Строка по номеру"
     implant = "bat"
     after = ("less_search", "boss_tools")
-    scroll = ("cat -n ФАЙЛ — с номерами строк (n — number); grep -n 'слово' ФАЙЛ — номер "
-              "строки, где нашлось; grep -n -e 'a' -e 'b' — два шаблона (e — expression).\n"
-              "sed -n '12p' ФАЙЛ — только строка 12 (-n — no print: остальные не печатать); "
-              "grep -n '' a b — строки нескольких файлов: имя:номер:текст.\n"
-              "Утилита bat -n ФАЙЛ — номера и подсветка, bat -r 12:12 — range, только строка "
-              "12.")
+    scroll = ("cat -n FILE — файл FILE с номерами строк (n — number); grep -n WORD FILE — "
+              "номера строк, где нашлось слово WORD.\n"
+              "sed -n '12p' FILE — только строка 12 (у sed -n — no print: остальные не "
+              "печатать).\n"
+              "Утилита bat, если стоит: bat -n FILE — номера и подсветка, bat -r 12:12 FILE — "
+              "range, только строка 12.")
     variants = (
-        Variant("В config.yaml несколько блоков настроек, и в каждом есть свой timeout. "
-                "На какой строке файла стоит timeout блока {block}? Ответ: ans НОМЕР",
+        Variant("В config.yaml несколько блоков настроек: блок — заголовок без отступа, "
+                "например «{block}:», и строки с отступом под ним. В каждом блоке есть свой "
+                "timeout. На какой строке файла стоит timeout блока {block}? Ответ: ans NUMBER "
+                "(NUMBER — номер строки)",
                 wrong=("grep -n timeout config.yaml | head -1 | cut -d: -f1",),
-                alternatives=("grep -n -e '^[a-z]' -e timeout config.yaml — только заголовки "
-                              "блоков и их timeout, по порядку (e — expression, ^[a-z] — "
-                              "строка с буквы, без отступа)",
+                alternatives=("grep -n -e '^[a-z]' -e timeout config.yaml (-e — ещё один "
+                              "шаблон, expression; ^[a-z] — строка с буквы, без отступа) — "
+                              "только заголовки блоков и их timeout, по порядку",
                               "less -N config.yaml — -N покажет номера строк прямо в less")),
         Variant("В events.log {total} строк, и все разные. Какая из них стоит под номером "
-                "{n}? Сдай её целиком: ans СТРОКА",
+                "{n}? Сдай её целиком, как есть: ans и сама строка, через пробел — например "
+                "ans red fox",
                 hints=("Считать строки глазами не нужно — номера печатает cat -n.",
                        "Одну строку по номеру вырежет sed -n '{n}p': p — напечатать, -n — "
                        "молчать про остальные.",
-                       "sed -n '{n}p' events.log — утилитой: bat -r {n}:{n} events.log"),
+                       "sed -n '{n}p' events.log, и ans с этой строкой — утилитой: "
+                       "bat -r {n}:{n} events.log"),
                 solution="sed -n '{n}p' events.log",
                 solution_script="sed -n '{n}p' events.log",
                 implant_script="bat -pp -r {n}:{n} events.log",
@@ -1046,28 +1071,30 @@ class BatLines(AnswerTask):
                 alternatives=("head -n {n} events.log | tail -1 — head -n {n} даст первые {n} "
                               "строк, tail -1 — последнюю из них",)),
         Variant("Вот три копии одного конфига: {f1}, {f2} и {f3}. В одной из них строка {n} "
-                "не такая, как в двух других. В какой? Ответ: ans ИМЯ_ФАЙЛА",
-                hints=("Строку {n} одного файла покажет sed -n '{n}p' ФАЙЛ — сравни все три по "
-                       "очереди.",
-                       "Или разом: grep -n '' печатает каждую строку как файл:номер:текст — "
-                       "останется отобрать ':{n}:'.",
-                       "grep -n '' {f1} {f2} {f3} | grep ':{n}:' — утилитой: "
-                       "bat -r {n}:{n} {f1} {f2} {f3}"),
-                solution="grep -n '' {f1} {f2} {f3} | grep ':{n}:'",
+                "не такая, как в двух других. В какой? Ответ: ans FILE (FILE — имя того "
+                "файла)",
+                hints=("Строку {n} одного файла покажет sed -n '{n}p' FILE — так узнаешь, какая "
+                       "настройка стоит на строке {n}.",
+                       "Имя этой настройки ищи сразу в трёх файлах: grep -n печатает перед "
+                       "каждой находкой имя файла и номер строки.",
+                       "sed -n '{n}p' {f1}, затем grep -n '^{key} =' {f1} {f2} {f3} — где "
+                       "значение другое, тот файл; утилитой: bat -r {n}:{n} {f1} {f2} {f3}"),
+                solution="sed -n '{n}p' {f1}; grep -n '^{key} =' {f1} {f2} {f3}",
                 solution_script="grep -lxF \"$(for f in {f1} {f2} {f3}; do sed -n '{n}p' $f; "
                                 "done | sort | uniq -u)\" {f1} {f2} {f3}",
                 implant_script="grep -lxF \"$(bat -pp -r {n}:{n} {f1} {f2} {f3} | sort | "
                                "uniq -u)\" {f1} {f2} {f3}",
                 wrong=("grep -lxF \"$(for f in {f1} {f2} {f3}; do sed -n '{m}p' $f; done | "
                        "sort | uniq -u)\" {f1} {f2} {f3}",),
-                alternatives=("sed -n '{n}p' {f1}; sed -n '{n}p' {f2}; sed -n '{n}p' {f3} — "
-                              "по очереди",)),
+                alternatives=("bat -r {n}:{n} {f1} {f2} {f3} — утилитой bat, если стоит: "
+                              "строка {n} всех трёх файлов разом",)),
     )
     par = 45
     hints = ("Номера строк печатает cat -n — весь файл с номерами слева.",
              "timeout есть в каждом блоке: найди глазами заголовок {block}: (строка без "
              "отступа) и первый timeout под ним.",
-             "cat -n config.yaml — номер timeout под {block}:; утилитой: bat -n config.yaml")
+             "cat -n config.yaml — номер timeout под {block}:, и ans с этим номером; "
+             "утилитой: bat -n config.yaml")
     solution = "cat -n config.yaml"
     solution_script = ("grep -n -e '^{block}:' -e 'timeout:' config.yaml | grep -A1 '{block}:' "
                        "| tail -1 | cut -d: -f1")
@@ -1075,7 +1102,7 @@ class BatLines(AnswerTask):
                       "sed -n '/ {block}:/,$p' | grep -m1 'timeout:' | awk '{{print $1}}'")
     explain = ("Номера строк покажут cat -n, grep -n и less -N, а одну строку по номеру "
                "выдернет sed -n 'Np'. bat — то же самое, только нагляднее.")
-    spell = "sed -n '12p' файл — строка номер 12; grep -n — номера найденных строк"
+    spell = "sed -n '12p' FILE — строка номер 12; cat -n — файл с номерами строк"
 
     BLOCKS = ("database", "cache", "queue", "mailer", "search")
     KEYS = ("host", "port", "timeout", "retries", "user")
@@ -1103,6 +1130,7 @@ class BatLines(AnswerTask):
                     lines[m - 1] = f"{keys[m - 1]} = {rng.randint(91, 99)}"
                 kit.write(box / name, "\n".join(lines) + "\n")
             return {"f1": names[0], "f2": names[1], "f3": names[2], "n": n, "m": m,
+                    "key": keys[n - 1],
                     "answer": names[odd], "traps": [["other", names[other]]]}
         blocks = rng.sample(self.BLOCKS, rng.randint(3, 5))
         target = rng.choice(blocks[1:])
@@ -1171,22 +1199,23 @@ class JsonCheck(AnswerTask):
     id = "json_check"
     track = "tools"
     title = "Проверка JSON"
-    scroll = ("jq . файл.json — проверить JSON: цел — jq напечатает его красиво, сломан — "
+    scroll = ("jq . FILE — проверить JSON-файл FILE: цел — jq напечатает его красиво, сломан — "
               "скажет parse error … at line N. N — строка, где jq споткнулся: ошибка в ней "
               "или строкой выше.\n"
               "Правила JSON: текст и ключи — в двойных кавычках, числа и true/false — без "
-              "кавычек, между элементами запятая, после последнего — нет.")
+              "кавычек, между парами запятая, после последней — нет.")
     secret_keys = AnswerTask.secret_keys + ("fixed", "good", "bad1")
     variants = (
         Variant("Конфиг {file} не грузится — где-то в нём ошибка. Спроси у jq, на какой строке "
-                "он споткнулся, и сдай номер: ans НОМЕР",
+                "он споткнулся, и сдай номер из его сообщения — число после at line: ans "
+                "NUMBER",
                 wrong=("wc -l < {file}",),
                 alternatives=("jq . {file} 2>&1 | grep -o 'line [0-9]*' — 2>&1 пускает в трубу "
                               "и сообщение об ошибке, [0-9]* — цифры подряд, -o оставит "
                               "только совпадение",)),
         Variant("Из трёх конфигов {f1}, {f2} и {f3} цел только один — два других jq не "
-                "читает. Какой цел? Ответ: ans ИМЯ_ФАЙЛА",
-                hints=("Проверь каждый файл: jq . ИМЯ — цел, если напечатал его красиво.",
+                "читает. Какой цел? Ответ: ans FILE (FILE — сюда имя файла)",
+                hints=("Проверь каждый файл: jq . FILE — цел, если напечатал его красиво.",
                        "Сломанный файл jq не печатает, а пишет parse error. Таких два.",
                        "jq . {f1}; jq . {f2}; jq . {f3} — сдай тот, что без parse error"),
                 solution="jq . {f1}; jq . {f2}; jq . {f3}, цел тот, что без parse error",
@@ -1196,11 +1225,12 @@ class JsonCheck(AnswerTask):
                 alternatives=("jq . {f1} >/dev/null — >/dev/null выбросит вывод файла: цел — "
                               "молчит, сломан — пишет parse error",)),
         Variant("{file} сломан одной ошибкой — jq . его не читает. Почини файл в nano или vim, "
-                "чтобы jq . читал его без ошибок. Значения не меняй.",
+                "чтобы jq . читал его без ошибок, и сохрани. Значения не меняй. Сдавать ничего "
+                "не надо: игра проверит файл сама.",
                 hints=("Сначала спроси jq: jq . {file} — он назовёт строку, где споткнулся.",
                        "Ошибка в той строке или строкой выше. Сверь с правилами: кавычки "
-                       "двойные, true/false маленькими, запятая между элементами, после "
-                       "последнего — нет.",
+                       "двойные, true/false маленькими, запятая между парами, после "
+                       "последней — нет.",
                        "nano {file}, исправить строку, которую назвал jq, сохранить, "
                        "jq . {file}"),
                 solution="nano {file}, исправить ошибку в строке, которую назвал jq, "
@@ -1211,14 +1241,14 @@ class JsonCheck(AnswerTask):
                               "курсором",)),
     )
     par = 40
-    hints = ("JSON проверяет jq: jq . ФАЙЛ.",
+    hints = ("JSON проверяет jq: jq . FILE.",
              "Сломанный файл jq не печатает, а пишет parse error … at line N.",
-             "jq . {file}, номер после «at line», ans НОМЕР")
-    solution = "jq . {file}, номер после «at line», ans НОМЕР"
+             "jq . {file}, номер после «at line», ans и этот номер")
+    solution = "jq . {file}, номер после «at line»"
     solution_script = "jq . {file} 2>&1 | grep -o 'line [0-9]*' | cut -d' ' -f2"
     explain = ("jq . — быстрая проверка JSON: цел — напечатает красиво, сломан — назовёт "
                "строку, где споткнулся; ошибка там или строкой выше.")
-    spell = "jq . файл.json — цел ли JSON (сломан — at line N)"
+    spell = "jq . FILE — цел ли JSON (сломан — at line N)"
 
     # вариант 2: ошибка → (как испортить строку, подсказка не нужна — её назовёт jq)
     BREAKS = ("quotes", "case", "trailing")
@@ -1313,25 +1343,25 @@ class BossTools(Task):
     title = "Сломанный конфиг"
     boss = True
     par = 300
-    scroll = ("jq . файл.json — проверить JSON: сломан — jq скажет, где: at line N (номер строки); "
+    scroll = ("jq . FILE — проверить JSON: сломан — jq скажет, где: at line N (номер строки); "
               "цел — напечатает его красиво.\n"
               "Правила JSON: текст — в двойных кавычках, числа и true/false — без кавычек, "
               "между элементами запятая, после последнего — нет.\n"
-              "Править — в nano или vim, как в прошлых задачах; после правки снова jq . файл.json")
+              "Править — в nano или vim, как в прошлых задачах; после правки снова jq . FILE")
     steps = ("файл снова читается: jq . без ошибок",
              "число из записки note.txt — на месте и без кавычек",
              "остальное по записке и правилам JSON исправлено",
              "то, что велено не трогать, — на месте")
     variants = (
         Variant("Конфиг service.json сломан — в нём 4 ошибки. Почини его в nano или vim "
-                "по записке note.txt. name и workers не трогай.",
+                "по записке note.txt и сохрани — ans не нужен. name и workers не трогай.",
                 wrong=("print -r -- '{{}}' > service.json",
                        "print -r -- '{half}' > service.json"),
                 alternatives=("vim service.json — тот же ремонт в vim: x удаляет символ под "
                               "курсором",)),
         Variant("База не стартует: db.json сломан. В нём три ошибки JSON, а ещё два значения "
-                "расходятся с запиской note.txt. Почини файл в nano или vim. name и "
-                "replicas не трогай.",
+                "расходятся с запиской note.txt. Почини файл в nano или vim и сохрани — ans не "
+                "нужен. name и replicas не трогай.",
                 hints=("Начни с проверки: jq . db.json — он покажет строку, где JSON сломан.",
                        "Ключи и текст в JSON — только в двойных кавычках, после последнего "
                        "элемента запятой нет. Числа и true/false — без кавычек.",
@@ -1347,8 +1377,8 @@ class BossTools(Task):
                 alternatives=("jq . db.json после каждой правки — ошибка сдвинется на "
                               "следующую строку",)),
         Variant("api.json сломан: в нём три ошибки JSON, а записка note.txt требует "
-                "добавить ещё одно поле. Почини файл в nano или vim. name, port и paths "
-                "не трогай.",
+                "добавить ещё одно поле — новую пару «ключ: значение». Почини файл в nano или "
+                "vim и сохрани — ans не нужен. name, port и paths не трогай.",
                 hints=("Начни с проверки: jq . api.json — покажет строку с первой ошибкой. "
                        "Исправил — проверь снова.",
                        "Между элементами — запятая, после последнего — нет; true пишется "
@@ -1525,7 +1555,7 @@ class JobControl(Task):
     id = "job_control"
     track = "tools"
     title = "Задачи в фоне"
-    scroll = ("Ctrl+Z — приостановить то, что заняло экран (vim, less, скрипт); fg — вернуть "
+    scroll = ("Ctrl+Z — приостановить то, что заняло экран (vim, скрипт); fg — вернуть "
               "на экран.\n"
               "bg — пусть работает в фоне; команда & — сразу в фоне. jobs — задачи с "
               "номерами.\n"
@@ -1534,16 +1564,17 @@ class JobControl(Task):
     variants = (
         Variant("Запусти ./build.sh — он будет ждать файл config.txt. Не закрывай его и не "
                 "открывай новую вкладку: Ctrl+Z, сделай файл из образца командой cp "
-                "config.example config.txt, потом fg — сборка доделает своё.",
+                "config.example config.txt, потом fg — сборка доделает своё. Сдавать ничего "
+                "не надо: игра увидит готовую сборку сама.",
                 wrong=("cp config.example config.txt",),
                 alternatives=("./build.sh & — сразу в фоне, потом cp config.example "
                               "config.txt и fg",)),
         Variant("./pack.sh пакует долго, секунд {dur}. Ждать не надо: запусти его в фоне "
-                "(./pack.sh &) и, пока он работает, создай папку notes. jobs покажет, что он "
-                "ещё идёт.",
+                "(./pack.sh &) и, пока он работает, создай папку notes. Сдавать ничего не "
+                "надо: скрипт сам заметит папку.",
                 hints=("Команда с & на конце уходит в фон, приглашение — сразу твоё.",
-                       "Уже запустил без &? Ctrl+Z, потом bg — то же самое.",
-                       "./pack.sh &, затем mkdir notes; дождаться конца — wait"),
+                       "Знак & — в самом конце строки, через пробел: ./pack.sh &",
+                       "./pack.sh &, затем mkdir notes"),
                 solution="./pack.sh &, mkdir notes",
                 solution_script="./pack.sh & sleep 2; mkdir notes; wait",
                 wrong=("mkdir notes",),
@@ -1551,7 +1582,8 @@ class JobControl(Task):
                               "отпустить в фон",)),
         Variant("Запусти в фоне два скрипта: ./fetch.sh & и ./spam.sh &. spam.sh лишний и "
                 "только мусорит на экран — найди его номер в jobs и останови: kill %N. "
-                "fetch.sh пусть доработает, это секунд {dur}.",
+                "fetch.sh пусть доработает, это секунд {dur}. Сдавать ничего не надо: игра "
+                "увидит сама.",
                 hints=("Каждая команда с & — своя задача в фоне. jobs покажет их с номерами.",
                        "kill %N останавливает задачу по номеру из jobs. Номер spam.sh — в "
                        "квадратных скобках.",

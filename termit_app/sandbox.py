@@ -350,7 +350,7 @@ def create(task, seed: int, root=None, defer_spawn: bool = True,
 
 
 # --- Окружение задачи (часть 7, A7) ---------------------------------------------------------
-# Task.env_for → .termit/env.zsh: строки «export ИМЯ=<shlex.quote>». Пишет родитель при create
+# Task.env_for → .termit/env.zsh: строки «export NAME=<shlex.quote>». Пишет родитель при create
 # и хук при reset (rebuild); песочный .zshrc подключает файл после своих настроек и чистки
 # секретов. Служебные переменные игры и песочницы задача не переопределяет.
 ENV_FILE = ".termit/env.zsh"

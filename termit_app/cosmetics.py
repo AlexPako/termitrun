@@ -483,7 +483,7 @@ TITLE_NAMES: Dict[str, str] = {
 SETUP_HINTS = {
     "palette": "Палитра — цвет пути в приглашении: ./termit home palette",
     "glyph_pack": "Знак перед курсором: ./termit home prompt glyph (☠ стоит сразу)",
-    "callsign": "Задай позывной: ./termit home callsign ИМЯ",
+    "callsign": "Задай позывной: ./termit home callsign NAME",
 }
 
 

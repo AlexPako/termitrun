@@ -94,7 +94,7 @@ def places(p: dict) -> List[str]:
 
 
 def commands_of(p: dict) -> List[str]:
-    """Команды для train КОМАНДА — только из задач, которые отработка берёт (drillable): без
+    """Команды для train COMMAND — только из задач, которые отработка берёт (drillable): без
     стражей и несобираемых, иначе тема честно пуста, но с неверной причиной."""
     tasks = registry.all_tasks()
     out = []

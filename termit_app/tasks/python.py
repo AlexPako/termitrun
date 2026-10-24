@@ -65,21 +65,21 @@ class PyRun(AnswerTask):
               "строка line N.")
     variants = (
         Variant("Скрипт count.py считает сумму заказов в файле — что он печатает для "
-                "orders.txt? ans ЧИСЛО",
+                "orders.txt? ans NUMBER",
                 hints=("Скрипт запускают так: python3 имя.py, а файл для него — следом через "
                        "пробел.",
                        "Без имени файла count.py упадёт: ему нечего читать.",
-                       "python3 count.py orders.txt → ans ЧИСЛО"),
+                       "python3 count.py orders.txt → ans NUMBER"),
                 solution="python3 count.py orders.txt",
                 wrong=("python3 count.py", "wc -l < orders.txt"),
                 alternatives=("cd не нужен: скрипт и файл лежат рядом, в этой папке",),
                 key="argv"),
-        Variant("Скрипт broken.py падает. С какой ошибкой и на какой строке? ans ТИП НОМЕР",
+        Variant("Скрипт broken.py падает. С какой ошибкой и на какой строке? ans TYPE NUMBER",
                 hints=("Запусти его: python3 broken.py — он упадёт и напечатает traceback.",
                        "Traceback читают снизу: последняя строка — тип ошибки (до двоеточия), "
                        "ближайшая над кодом — File …, line N.",
                        "python3 broken.py → тип из последней строки и N из последней «line N» "
-                       "→ ans ТИП N"),
+                       "→ ans TYPE N"),
                 solution="python3 broken.py",
                 solution_script=("t=$(python3 broken.py 2>&1 | tail -n 1 | cut -d: -f1); "
                                  "n=$(python3 broken.py 2>&1 | grep -o 'line [0-9]*' | "
@@ -87,10 +87,10 @@ class PyRun(AnswerTask):
                 wrong=("python3 broken.py 2>&1 | grep -o 'line [0-9]*' | head -n 1",),
                 alternatives=("python3 broken.py 2>&1 | tail -n 3 — только хвост traceback",),
                 key="traceback"),
-        Variant('Что напечатает python3 -c "print({a} * {b} + {k})"? ans ЧИСЛО',
+        Variant('Что напечатает python3 -c "print({a} * {b} + {k})"? ans NUMBER',
                 hints=("python3 -c выполняет код Python прямо из строки — запусти её.",
                        "Набери команду из задания как есть — кавычки тоже.",
-                       'python3 -c "print({a} * {b} + {k})" → ans ЧИСЛО'),
+                       'python3 -c "print({a} * {b} + {k})" → ans NUMBER'),
                 solution='python3 -c "print({a} * {b} + {k})"',
                 wrong=('python3 -c "print({a} * ({b} + {k}))"',),
                 alternatives=("python3, а в нём >>> {a} * {b} + {k} — то же в интерактивном "
@@ -699,13 +699,13 @@ class PyRepl(AnswerTask):
               "Команды игры — ans, hint — внутри >>> не работают: сначала exit() или Ctrl+D.\n"
               "Имена внутри модуля: dir(x); справка: help(x), выход из неё — q.")
     variants = (
-        Variant("В .venv стоит пакет {mod} — сколько в нём {ask}? Смотри dir(). ans ЧИСЛО",
+        Variant("В .venv стоит пакет {mod} — сколько в нём {ask}? Смотри dir(). ans NUMBER",
                 hints=("Включи окружение: source .venv/bin/activate, затем python3 — "
                        "появится >>>.",
                        ">>> import {mod}, потом >>> dir({mod}) — считай имена {which}; "
                        "выход — exit().",
                        "source .venv/bin/activate && python3 -c 'import {mod}; "
-                       "print(dir({mod}))' → сосчитай имена {which} → ans ЧИСЛО"),
+                       "print(dir({mod}))' → сосчитай имена {which} → ans NUMBER"),
                 solution="source .venv/bin/activate && python3 -c 'import {mod}; "
                          "print(dir({mod}))'",
                 # имена — по одному в строке силами оболочки: sep= в print ещё не учили
@@ -716,12 +716,12 @@ class PyRepl(AnswerTask):
                               "в живом Python",),
                 key="dir"),
         Variant("Как называется {nth} параметр функции {mod}.{fn} (первый — {first})? "
-                "Подсмотри в help(). Пакет — в .venv. ans ИМЯ",
+                "Подсмотри в help(). Пакет — в .venv. ans NAME",
                 hints=("Включи окружение: source .venv/bin/activate, затем python3.",
                        ">>> import {mod}, потом >>> help({mod}.{fn}) — в первой строке "
                        "параметры по порядку; выход из справки — q.",
                        "source .venv/bin/activate && python3 -c 'import {mod}; "
-                       "help({mod}.{fn})' → {nth} параметр по порядку → ans ИМЯ"),
+                       "help({mod}.{fn})' → {nth} параметр по порядку → ans NAME"),
                 solution="source .venv/bin/activate && python3 -c 'import {mod}; "
                          "help({mod}.{fn})'",
                 solution_script=(".venv/bin/python -c 'import {mod}; help({mod}.{fn})' | "
@@ -733,11 +733,11 @@ class PyRepl(AnswerTask):
                 key="help"),
         Variant("Сколько записей в списке items файла items.json? Посчитай Python в "
                 "конвейере: cat … | python3 -c '…' — там json.load(sys.stdin) читает JSON, "
-                "пришедший по |, а len(x) — длина списка. ans ЧИСЛО",
+                "пришедший по |, а len(x) — длина списка. ans NUMBER",
                 hints=("Код в конвейере: cat items.json | python3 -c 'import json, sys; …'.",
                        "Список лежит по ключу \"items\": json.load(sys.stdin)[\"items\"].",
                        "cat items.json | python3 -c 'import json, sys; "
-                       "print(len(json.load(sys.stdin)[\"items\"]))' → ans ЧИСЛО"),
+                       "print(len(json.load(sys.stdin)[\"items\"]))' → ans NUMBER"),
                 solution="cat items.json | python3 -c 'import json, sys; "
                          "print(len(json.load(sys.stdin)[\"items\"]))'",
                 wrong=("wc -l < items.json",),
@@ -1152,10 +1152,10 @@ class PyFiles(pykit.PyEditTask):
                 alternatives=(py("grep -c 'E[0-9]\\{3\\}' app.log — то же в оболочке"),),
                 key="search"),
         Variant("Какие отчёты в reports старше {cutoff} (cutoff в files.py)? Дата — в имени "
-                "файла, report-ГГГГ-ММ-ДД.txt. Допиши files.py: имена по алфавиту, по одному в "
+                "файла, report-YYYY-MM-DD.txt. Допиши files.py: имена по алфавиту, по одному в "
                 "строке, — в out.txt: python3 files.py > out.txt",
                 hints=("Открой files.py: nano files.py — две строки # TODO.",
-                       "Цикл — по sorted(…glob(\"report-*.txt\")); даты ГГГГ-ММ-ДД сравнивают "
+                       "Цикл — по sorted(…glob(\"report-*.txt\")); даты YYYY-MM-DD сравнивают "
                        "как строки: «раньше» — это <."),
                 wrong=("python3 files.py > out.txt",),
                 alternatives=("ls reports | sort — посмотреть имена глазами",),

@@ -981,7 +981,7 @@ def files_data(rng, variant: int) -> dict:
     """py_files: A — суммарный размер *.log в logs/ с подпапками (ловушки: только верхний
     уровень — glob; все файлы, и .txt тоже); B — сколько строк app.log с кодом E и три цифры
     где угодно (ловушки: только с начала строки — re.match; все строки с буквой E); C —
-    отчёты reports/report-ДАТА.txt старше cutoff (ловушки: вместе с днём cutoff — <=; новые).
+    отчёты reports/report-DATE.txt старше cutoff (ловушки: вместе с днём cutoff — <=; новые).
     files — {путь: текст}; размеры считаются по байтам текста."""
     files = {}
     if variant == 0:
@@ -1091,7 +1091,7 @@ def stock_items(rng, n: int) -> List[dict]:
 
 
 def stock_handler(items: List[dict], per_page: int):
-    """Обработчик GET /stock учебного API: ?city=ГОРОД — фильтр, ?page=N — страница (по
+    """Обработчик GET /stock учебного API: ?city=CITY — фильтр, ?page=N — страница (по
     per_page строк); ответ {"page", "next" (номер следующей или null), "items"}. Чужая
     страница — 404, не число — 400. Данные — из state задачи, из песочницы ничего не читает."""
     import math

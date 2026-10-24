@@ -107,11 +107,11 @@ CATALOG: Dict[str, List[Hack]] = {
         _h("Ctrl+U", "стереть всю строку (в bash — только до курсора)",
            "набрал не то — начни строку с чистого листа",
            "не Undo: у драйвера терминала Ctrl+U — символ kill (ASCII NAK), «сотри строку»",
-           "line_edit", Z, PTY, 1, "home_tilde"),
+           LEARN_CATALOG, Z, PTY, 1, "home_tilde"),
         _h("Ctrl+K", "стереть от курсора до конца строки",
            "хвост команды лишний, а начало верное",
            "K — Kill: в Emacs «убить» текст — вырезать его, он не пропадает",
-           "line_edit", Z, PTY, 1, "line_edit"),
+           "cut_paste", Z, PTY, 1, "line_edit"),
         _h("Ctrl+Y", "вставить последнее стёртое Ctrl+W, Ctrl+U или Ctrl+K",
            "стёр лишнее — или нужно перенести кусок строки в другое место",
            "Y — Yank, «выдернуть» назад: в Emacs стёртое ложится в «кольцо» (kill ring)",
@@ -200,7 +200,7 @@ CATALOG: Dict[str, List[Hack]] = {
            "touch a b c, потом ls -l !* — те же три файла",
            "^ — «начало», * — «всё», как в масках и регулярках", LEARN_CATALOG, Z, PTY, 2,
            "quick_fix"),
-        _h("^старое^новое", "повторить прошлую команду, заменив кусок",
+        _h("^OLD^NEW", "повторить прошлую команду, заменив кусок",
            "cp q1.txt archive/ — теперь то же для q2: ^q1^q2",
            "быстрая замена из csh: ^ — «крышка», знак вставки", "quick_fix", Z, PTY, 1,
            "quick_fix"),
@@ -244,11 +244,11 @@ CATALOG: Dict[str, List[Hack]] = {
     "dirs": [
         _h("cd -", "вернуться в папку, где был до этого",
            "прыгаешь между двумя папками туда-обратно",
-           "минус — «предыдущая»; та же папка лежит в переменной OLDPWD", "back_up", Z, PTY,
-           1, "back_up"),
+           "минус — «предыдущая»; та же папка лежит в переменной OLDPWD", LEARN_CATALOG, Z,
+           PTY, 1, "back_up"),
         _h("cd", "без пути — домой (то же, что cd ~)",
            "заблудился — домой одной командой", "~ — дом: на клавиатуре терминала ADM-3A "
-           "тильда и Home были на одной клавише", "home_tilde", Z, PTY, 1, "home_tilde"),
+           "тильда и Home были на одной клавише", "back_up", Z, PTY, 1, "home_tilde"),
         _h("dirs -v, cd ~2", "стопка недавних папок с номерами и прыжок по номеру",
            "прыгнуть на три папки назад, а не на одну", "v — verbose, «подробно»",
            "z_jump", Z, PTY, 2, "z_jump",
@@ -334,10 +334,10 @@ CATALOG: Dict[str, List[Hack]] = {
            "экран вдруг замер и не печатает — скорее всего, нажал Ctrl+S: жми Ctrl+Q",
            "XOFF и XON — коды телетайпов «стоп, лента» и «давай дальше»", LEARN_CATALOG, Z,
            PTY, 2, "screen_scroll"),
-        _h("ps aux | grep имя, kill PID", "найти процесс и остановить его",
+        _h("pgrep -fl NAME, kill PID", "найти процесс и остановить его",
            "программа зависла, а Ctrl+C до неё не достаёт",
-           "ps — process status; kill — «убить», хотя шлёт вежливый сигнал", "kill_frozen",
-           Z, PTY, 2, "kill_frozen"),
+           "pgrep — process grep, «поиск процесса»; kill — «убить», хотя шлёт вежливый сигнал",
+           "kill_frozen", Z, PTY, 2, "kill_frozen"),
         _h("time команда", "сколько шла команда", "сравнить, какой способ быстрее",
            "time — «время»; total в конце — сколько прошло по часам", LEARN_CATALOG, Z, PTY,
            2, "job_control"),
@@ -545,7 +545,7 @@ def summary_line(p: dict, turn: int) -> str:
 
 # --- показ: короткий раздел в keys и весь каталог в keys hacks ----------------------------
 
-SHORT = ("Esc .", "Ctrl+Y", "Ctrl+_", "^старое^новое", "Ctrl+Z", "Cmd+F, Cmd+G",
+SHORT = ("Esc .", "Ctrl+Y", "Ctrl+_", "^OLD^NEW", "Ctrl+Z", "Cmd+F, Cmd+G",
          "Cmd+Shift+↑ ↓")
 SHEET_CMD = "keys hacks"
 
@@ -586,7 +586,7 @@ def sheet(section: Optional[str] = None) -> str:
     где учится и что настроить."""
     out = [_fill("Лайфхаки терминала — опыт тех, кто сидит в нём годами. Пробуй сразу: в "
                  "задаче или в обычном окне. Длинно — листай: keys hacks | less", ""),
-           _fill("Один раздел — keys hacks РАЗДЕЛ: " + ", ".join(SECTIONS) +
+           _fill("Один раздел — keys hacks SECTION: " + ", ".join(SECTIONS) +
                  " (имя раздела — в конце его заголовка).", "")]
     keys = [section] if section in SECTIONS else list(SECTIONS)
     for key in keys:
@@ -604,7 +604,7 @@ def sheet(section: Optional[str] = None) -> str:
 
 
 def sections_of(words: Iterable[str]) -> Optional[str]:
-    """`keys hacks РАЗДЕЛ`: ключ раздела по слову (line, history…) или None — весь каталог."""
+    """`keys hacks SECTION`: ключ раздела по слову (line, history…) или None — весь каталог."""
     for word in words:
         if word in SECTIONS:
             return word

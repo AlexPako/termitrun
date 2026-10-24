@@ -128,28 +128,28 @@ class RegexMask(_RegexAnswer):
               "одинарных кавычках, иначе zsh примет * за маску файлов: no matches found.")
     variants = (
         Variant("В app.log сколько строк, где стоит метка svc={svc}, а где-то дальше в той же "
-                "строке — слово timeout? Ответ: ans ЧИСЛО",
+                "строке — слово timeout? Ответ: ans NUMBER",
                 wrong=("grep -c 'svc={svc}*timeout' app.log", "grep -c timeout app.log"),
                 alternatives=("grep svc={svc} app.log | grep -c timeout — то же двумя "
                               "звеньями конвейера",)),
         Variant("Сколько заказов в orders.csv из города {city} со статусом refund? Между "
-                "городом и статусом в строке стоят другие колонки. Ответ: ans ЧИСЛО",
+                "городом и статусом в строке стоят другие колонки. Ответ: ans NUMBER",
                 hints=("Город и статус — в одной строке, между ними что угодно: в регулярке "
                        "это .*",
                        "Колонки ищи с запятыми по краям: ',{city},' и ',refund,' — так не "
                        "зацепится заметка «refund requested» в последней колонке.",
-                       "grep -c ',{city},.*,refund,' orders.csv → ans ЧИСЛО"),
+                       "grep -c ',{city},.*,refund,' orders.csv → ans NUMBER"),
                 solution="grep -c ',{city},.*,refund,' orders.csv",
                 wrong=("grep -c ',{city},*,refund,' orders.csv", "grep -c ',{city},' orders.csv"),
                 alternatives=("grep ',{city},' orders.csv | grep -c ',refund,' — то же двумя "
                               "звеньями конвейера",)),
         Variant("В chat.txt болельщики кричат гол: goal, gooal, goooooal — o сколько угодно, "
                 "но хоть одна. Сколько строк с таким криком? Слова вроде gala и legal не в "
-                "счёт. Ответ: ans ЧИСЛО",
+                "счёт. Ответ: ans NUMBER",
                 hints=("* повторяет знак перед собой: o* — сколько угодно o, хоть ни одной.",
                        "Хоть одну o напиши саму, а за ней — o*: тогда подойдёт и goal, и "
                        "goooal, а gal — нет.",
-                       "grep -c 'goo*al' chat.txt → ans ЧИСЛО"),
+                       "grep -c 'goo*al' chat.txt → ans NUMBER"),
                 solution="grep -c 'goo*al' chat.txt",
                 wrong=("grep -c 'go*al' chat.txt", "grep -c goal chat.txt"),
                 alternatives=("grep -ic 'goo*al' chat.txt — то же и без учёта регистра",),
@@ -159,7 +159,7 @@ class RegexMask(_RegexAnswer):
     hints = ("Шаблон регулярки: сначала svc={svc}, потом «что угодно», потом timeout.",
              "«Что угодно» в регулярке — точка и звёздочка: .* ; одна * повторяет только знак "
              "перед собой.",
-             "grep -c 'svc={svc}.*timeout' app.log → ans ЧИСЛО")
+             "grep -c 'svc={svc}.*timeout' app.log → ans NUMBER")
     solution = "grep -c 'svc={svc}.*timeout' app.log"
     explain = ("В маске имён * значит «что угодно», а в регулярке «что угодно» — это .* : точка "
                "— любой знак, * — повтори его сколько угодно. Одна * повторяет только знак перед "
@@ -225,24 +225,24 @@ class RegexAnchor(_RegexAnswer):
               "строка целиком, без ничего вокруг: grep -c '^yes$' answers.txt.")
     variants = (
         Variant("Сколько строк в app.log за {date} — эта дата стоит в начале строки? В "
-                "сообщениях бывают ссылки на этот день из других дней. Ответ: ans ЧИСЛО",
+                "сообщениях бывают ссылки на этот день из других дней. Ответ: ans NUMBER",
                 wrong=("grep -c {date} app.log", "grep -c '{date}$' app.log"),
                 alternatives=("grep '^{date}' app.log | wc -l — то же через подсчёт строк",)),
         Variant("Сколько строк в app.log кончаются именем сервиса {svc}: «… calling {svc}», «… "
-                "by {svc}»? Строки, где {svc} стоит в середине, не в счёт. Ответ: ans ЧИСЛО",
+                "by {svc}»? Строки, где {svc} стоит в середине, не в счёт. Ответ: ans NUMBER",
                 hints=("Конец строки в регулярке — знак $ в конце шаблона.",
                        "Сначала слово, потом $: '{svc}$' — после имени в строке ничего нет.",
-                       "grep -c '{svc}$' app.log → ans ЧИСЛО"),
+                       "grep -c '{svc}$' app.log → ans NUMBER"),
                 solution="grep -c '{svc}$' app.log",
                 wrong=("grep -c {svc} app.log", "grep -c '^{svc}' app.log"),
                 alternatives=("grep '{svc}$' app.log | wc -l — то же через подсчёт строк",)),
         Variant("В cities.txt по городу в строке, но есть и мусор: {city} north, new {city}, "
                 "{city} с пробелом в конце. Сколько строк — ровно {city}, и больше ничего? "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("Строка целиком — шаблон между ^ и $.",
                        "^ — строка начинается так, $ — кончается так: между ними только имя "
                        "города, и ни пробела.",
-                       "grep -c '^{city}$' cities.txt → ans ЧИСЛО"),
+                       "grep -c '^{city}$' cities.txt → ans NUMBER"),
                 solution="grep -c '^{city}$' cities.txt",
                 wrong=("grep -c {city} cities.txt", "grep -c '^{city}' cities.txt"),
                 alternatives=("grep '^{city}$' cities.txt | wc -l — то же через подсчёт "
@@ -253,7 +253,7 @@ class RegexAnchor(_RegexAnswer):
     hints = ("Начало строки в регулярке — знак ^ в начале шаблона.",
              "Дата в начале строки — когда строка появилась, а дата в тексте — просто ссылка: "
              "'^{date}'.",
-             "grep -c '^{date}' app.log → ans ЧИСЛО")
+             "grep -c '^{date}' app.log → ans NUMBER")
     solution = "grep -c '^{date}' app.log"
     explain = ("^ привязывает шаблон к началу строки, $ — к концу. Дата в начале строки лога — "
                "её время; та же дата в тексте — только упоминание, и голый шаблон её цепляет.")
@@ -342,27 +342,27 @@ class RegexClass(_RegexAnswer):
     variants = (
         Variant("У части ошибок в app.log есть код: буква E и три цифры, вроде E404 или E503. "
                 "Сколько строк с таким кодом? Обрывки с двумя цифрами (E12) не в счёт. "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 wrong=("grep -c 'E[0-9]' app.log", "grep -c E app.log"),
                 alternatives=("grep -c 'code=E[0-9][0-9][0-9]' app.log — то же с меткой "
                               "поля",)),
         Variant("Номер тикета в tickets.txt начинается с префикса и дефиса. Сколько тикетов, где "
                 "префикс — ровно две маленькие латинские буквы, как в ab-1043? AB-1043, a1-1043 "
-                "и abc-1043 не подходят. Ответ: ans ЧИСЛО",
+                "и abc-1043 не подходят. Ответ: ans NUMBER",
                 hints=("Каждую букву префикса задаёт класс [a-z] — один знак.",
                        "Две буквы — два класса подряд, потом дефис; ^ держит начало строки, "
                        "чтобы abc- не прошёл.",
-                       "grep -c '^[a-z][a-z]-' tickets.txt → ans ЧИСЛО"),
+                       "grep -c '^[a-z][a-z]-' tickets.txt → ans NUMBER"),
                 solution="grep -c '^[a-z][a-z]-' tickets.txt",
                 wrong=("grep -c '[a-z][a-z]-' tickets.txt", "grep -ic '^[a-z][a-z]-' tickets.txt"),
                 alternatives=("grep -c '^[a-z][a-z]-[0-9]' tickets.txt — то же, цифра после "
                               "дефиса",)),
         Variant("В phones.txt телефоны написаны кто как: одними цифрами и с дефисами, скобками, "
                 "пробелами. Сколько строк, где есть хоть один знак, кроме цифры? "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("«Любой знак, кроме цифры» — класс с крышкой внутри.",
                        "[^0-9] — один знак, который не цифра: хватит одного такого в строке.",
-                       "grep -c '[^0-9]' phones.txt → ans ЧИСЛО"),
+                       "grep -c '[^0-9]' phones.txt → ans NUMBER"),
                 solution="grep -c '[^0-9]' phones.txt",
                 wrong=("grep -vc '[0-9]' phones.txt", "grep -c '[0-9]' phones.txt"),
                 alternatives=("grep -vc '^[0-9]*$' phones.txt — то же наоборот: строки, где не "
@@ -372,7 +372,7 @@ class RegexClass(_RegexAnswer):
     )
     hints = ("Цифру в регулярке задаёт класс [0-9] — ровно один знак.",
              "Три цифры — три класса подряд, перед ними буква E.",
-             "grep -c 'E[0-9][0-9][0-9]' app.log → ans ЧИСЛО")
+             "grep -c 'E[0-9][0-9][0-9]' app.log → ans NUMBER")
     solution = "grep -c 'E[0-9][0-9][0-9]' app.log"
     explain = ("Класс [ ] — один знак из набора: [0-9][0-9][0-9] — ровно три цифры подряд. "
                "Обрывок E12 не прошёл, а ERROR без цифры не прошёл никогда.")
@@ -455,27 +455,27 @@ class RegexRepeat(_RegexAnswer):
               "знаки и молча найдёт не то.")
     variants = (
         Variant("В shipping.txt строки вида «order #7 shipped», «order #1042 packed». Номер — "
-                "цифры, сколько угодно, но хоть одна. Сколько строк «order #НОМЕР shipped»? "
-                "Номера вроде #x12 — опечатки, не в счёт. Ответ: ans ЧИСЛО",
+                "цифры, сколько угодно, но хоть одна. Сколько строк «order #NUMBER shipped»? "
+                "Номера вроде #x12 — опечатки, не в счёт. Ответ: ans NUMBER",
                 wrong=("grep -Ec '#[0-9] shipped' shipping.txt",
                        "grep -c '#[0-9]+ shipped' shipping.txt"),
                 alternatives=("grep -c '#[0-9][0-9]* shipped' shipping.txt — то же без -E: "
                               "цифра, а за ней сколько угодно цифр",)),
         Variant("В phones.txt телефоны кто как написал. Сколько строк — ровно десять цифр, и "
-                "ничего больше в строке? Ответ: ans ЧИСЛО",
+                "ничего больше в строке? Ответ: ans NUMBER",
                 hints=("Сколько раз повторить класс, говорят фигурные скобки: {{10}}.",
                        "Строка целиком — между ^ и $, внутри — класс цифры с {{10}}; это "
                        "grep -E.",
-                       "grep -Ec '^[0-9]{{10}}$' phones.txt → ans ЧИСЛО"),
+                       "grep -Ec '^[0-9]{{10}}$' phones.txt → ans NUMBER"),
                 solution="grep -Ec '^[0-9]{{10}}$' phones.txt",
                 wrong=("grep -Ec '[0-9]{{10}}' phones.txt", "grep -Ec '^[0-9]+$' phones.txt"),
                 alternatives=("grep -E '^[0-9]{{10}}$' phones.txt | wc -l — то же через "
                               "подсчёт строк",)),
         Variant("В notes.txt пишут то color, то colour. Сколько строк, где есть хоть одно из "
-                "двух написаний? Ответ: ans ЧИСЛО",
+                "двух написаний? Ответ: ans NUMBER",
                 hints=("Разница — одна буква u: она то есть, то нет.",
                        "? после знака — «ноль или одно»: u? — u есть или нет. Это grep -E.",
-                       "grep -Ec 'colou?r' notes.txt → ans ЧИСЛО"),
+                       "grep -Ec 'colou?r' notes.txt → ans NUMBER"),
                 solution="grep -Ec 'colou?r' notes.txt",
                 wrong=("grep -c color notes.txt", "grep -c 'colou?r' notes.txt"),
                 alternatives=("grep -Ec 'color|colour' notes.txt — оба написания через «или» "
@@ -483,7 +483,7 @@ class RegexRepeat(_RegexAnswer):
     )
     hints = ("«Одна цифра или больше» — класс [0-9] и знак + после него; это grep -E.",
              "За номером — пробел и shipped: так packed и lost не попадут, а #x12 не пройдёт.",
-             "grep -Ec '#[0-9]+ shipped' shipping.txt → ans ЧИСЛО")
+             "grep -Ec '#[0-9]+ shipped' shipping.txt → ans NUMBER")
     solution = "grep -Ec '#[0-9]+ shipped' shipping.txt"
     explain = ("+ — одно или больше: [0-9]+ берёт номер любой длины, а [0-9] — ровно одну "
                "цифру. Знаки повторов работают с grep -E; без него grep ищет сам знак +.")
@@ -551,15 +551,15 @@ class RegexGroup(_RegexAnswer):
               "121212.")
     variants = (
         Variant("Сколько строк в app.log уровня WARN или ERROR — всё, кроме обычной болтовни? "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 wrong=("grep -c WARN app.log", "grep -c 'WARN|ERROR' app.log"),
                 alternatives=("grep -vc INFO app.log — то же наоборот: все, кроме INFO",)),
         Variant("Сколько заказов в orders.csv со статусом refund или cancel? В заметках бывает "
-                "«refund requested» — это не статус. Ответ: ans ЧИСЛО",
+                "«refund requested» — это не статус. Ответ: ans NUMBER",
                 hints=("Два статуса — «или» в grep -E; колонку держат запятые по краям.",
                        "Или — внутри скобок, чтобы запятые остались по обе стороны: "
                        "',(…|…),'.",
-                       "grep -Ec ',(refund|cancel),' orders.csv → ans ЧИСЛО"),
+                       "grep -Ec ',(refund|cancel),' orders.csv → ans NUMBER"),
                 solution="grep -Ec ',(refund|cancel),' orders.csv",
                 wrong=("grep -Ec ',refund|cancel,' orders.csv",
                        "grep -Ec 'refund|cancel' orders.csv"),
@@ -567,10 +567,10 @@ class RegexGroup(_RegexAnswer):
                               "через -e (expression)",)),
         Variant("В chat.txt одни смеются, другие болтают. Сколько строк целиком из смеха: ha, "
                 "haha, hahaha — ha сколько угодно раз и ничего больше? haaa и aha не в счёт. "
-                "Ответ: ans ЧИСЛО",
+                "Ответ: ans NUMBER",
                 hints=("Повторить надо два знака сразу — собери их в группу ( ).",
                        "(ha)+ — ha один раз или больше; строка целиком — между ^ и $.",
-                       "grep -Ec '^(ha)+$' chat.txt → ans ЧИСЛО"),
+                       "grep -Ec '^(ha)+$' chat.txt → ans NUMBER"),
                 solution="grep -Ec '^(ha)+$' chat.txt",
                 wrong=("grep -Ec '^ha+$' chat.txt", "grep -c ha chat.txt"),
                 alternatives=("grep -E '^(ha)+$' chat.txt | wc -l — то же через подсчёт "
@@ -580,7 +580,7 @@ class RegexGroup(_RegexAnswer):
     )
     hints = ("Два уровня сразу — «или»: знак | в grep -E.",
              "Шаблон 'WARN|ERROR' — строки с тем или другим; без -E | — обычный знак.",
-             "grep -Ec 'WARN|ERROR' app.log → ans ЧИСЛО")
+             "grep -Ec 'WARN|ERROR' app.log → ans NUMBER")
     solution = "grep -Ec 'WARN|ERROR' app.log"
     explain = ("| в grep -E — «или»: одна команда вместо двух. Скобки собирают кусок шаблона, "
                "чтобы «или» не разрезало весь шаблон пополам.")
@@ -655,17 +655,17 @@ class GrepOnly(_RegexAnswer):
               "встретилось каждое.")
     variants = (
         Variant("У ошибок в app.log есть коды: E и три цифры, у некоторых строк — по два кода. "
-                "Сколько кодов всего — не строк, а самих кодов? Ответ: ans ЧИСЛО",
+                "Сколько кодов всего — не строк, а самих кодов? Ответ: ans NUMBER",
                 wrong=("grep -c 'E[0-9][0-9][0-9]' app.log",),
                 alternatives=("grep -Eo 'E[0-9]{{3}}' app.log | wc -l — то же с повтором "
                               "{{3}}",)),
         Variant("Какой код ошибки (E и три цифры) встречается в app.log чаще всех и сколько раз? "
-                "Ответ: ans КОД ЧИСЛО",
+                "Ответ: ans CODE NUMBER",
                 hints=("Сначала вытащи сами коды — grep -o, каждый строкой.",
                        "Коды посчитает знакомый конвейер: sort | uniq -c | sort -rn — частые "
                        "сверху, head -1 — самый частый.",
                        "grep -Eo 'E[0-9]{{3}}' app.log | sort | uniq -c | sort -rn | head -1 → "
-                       "ans КОД ЧИСЛО"),
+                       "ans CODE NUMBER"),
                 solution="grep -Eo 'E[0-9]{{3}}' app.log | sort | uniq -c | sort -rn | head -1",
                 solution_script="grep -Eo 'E[0-9]{{3}}' app.log | sort | uniq -c | sort -rn | "
                                 "head -1 | awk '{{print $2, $1}}'",
@@ -674,11 +674,11 @@ class GrepOnly(_RegexAnswer):
                 alternatives=("grep -o 'E[0-9][0-9][0-9]' app.log | sort | uniq -c | sort -rn "
                               "— тот же счёт без -E",)),
         Variant("В contacts.txt — письма с адресами, в строке бывает два адреса. Сколько разных "
-                "почтовых доменов — того, что после @? Ответ: ans ЧИСЛО",
+                "почтовых доменов — того, что после @? Ответ: ans NUMBER",
                 hints=("Вытащи из строк только домены: grep -o с шаблоном «@ и буквы с точками».",
                        "Домен — @, потом [a-z.]+ ; одинаковые схлопнет sort | uniq, а "
                        "посчитает wc -l.",
-                       "grep -Eo '@[a-z.]+' contacts.txt | sort | uniq | wc -l → ans ЧИСЛО"),
+                       "grep -Eo '@[a-z.]+' contacts.txt | sort | uniq | wc -l → ans NUMBER"),
                 solution="grep -Eo '@[a-z.]+' contacts.txt | sort | uniq | wc -l",
                 wrong=("grep -Eo '@[a-z.]+' contacts.txt | wc -l", "grep -c @ contacts.txt"),
                 alternatives=("cut -d@ -f2 contacts.txt — не годится: у строк с двумя "
@@ -687,7 +687,7 @@ class GrepOnly(_RegexAnswer):
     hints = ("grep -c считает строки, а в строке бывает два кода. Каждое совпадение строкой "
              "печатает grep -o.",
              "Коды строками — посчитай их wc -l.",
-             "grep -o 'E[0-9][0-9][0-9]' app.log | wc -l → ans ЧИСЛО")
+             "grep -o 'E[0-9][0-9][0-9]' app.log | wc -l → ans NUMBER")
     solution = "grep -o 'E[0-9][0-9][0-9]' app.log | wc -l"
     explain = ("grep -c отвечает «сколько строк», а grep -o выдаёт сами совпадения — по одному "
                "в строке. Так из лога вытаскивают коды, номера заказов, адреса, а дальше их "
@@ -902,17 +902,17 @@ class RegexClean(_RegexAnswer):
     variants = (
         Variant("dirty.txt — выгрузка поддержки: заказы, телефоны, мусор. Номер заказа — ORD- и "
                 "ровно пять цифр; обрывки с четырьмя цифрами — опечатки. Сколько разных "
-                "заказов упомянуто? Один заказ упоминают по нескольку раз. Ответ: ans ЧИСЛО",
+                "заказов упомянуто? Один заказ упоминают по нескольку раз. Ответ: ans NUMBER",
                 wrong=("grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | wc -l",
                        "grep -Eo 'ORD-[0-9]+' dirty.txt | sort | uniq | wc -l"),
                 alternatives=("grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort -u | wc -l — "
                               "sort -u (unique) схлопывает повторы сам",)),
         Variant("В dirty.txt номера заказов — ORD- и ровно пять цифр. Какой заказ упоминают чаще "
-                "всех и сколько раз? Ответ: ans НОМЕР ЧИСЛО",
+                "всех и сколько раз? Ответ: ans NUMBER NUMBER",
                 hints=("Вытащи номера grep -Eo, дальше — знакомый счёт.",
                        "sort | uniq -c | sort -rn — частые сверху, head -1 — самый частый.",
                        "grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort | uniq -c | sort -rn | head -1 "
-                       "→ ans НОМЕР ЧИСЛО"),
+                       "→ ans NUMBER NUMBER"),
                 solution="grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort | uniq -c | sort -rn | "
                          "head -1",
                 solution_script="grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort | uniq -c | "
@@ -923,14 +923,14 @@ class RegexClean(_RegexAnswer):
                               "-c | sort -rn | head -1 — то же без -E",)),
         Variant("В dirty.txt телефоны идут после tel: и написаны кто как: 4155550134, "
                 "415-555-0134, (415) 555-0134, 415 555 0134. Сколько разных телефонов, если "
-                "один номер в разном виде — один телефон? Ответ: ans ЧИСЛО",
+                "один номер в разном виде — один телефон? Ответ: ans NUMBER",
                 hints=("Цепочка: вытащить телефоны, оставить в них одни цифры, посчитать "
                        "разные.",
                        "grep -Eo 'tel: [0-9() -]+' — кусок с телефоном (в классе скобки и "
                        "пробел — обычные знаки); sed -E 's/[^0-9]//g' — убрать всё, кроме "
                        "цифр.",
                        "grep -Eo 'tel: [0-9() -]+' dirty.txt | sed -E 's/[^0-9]//g' | sort | "
-                       "uniq | wc -l → ans ЧИСЛО"),
+                       "uniq | wc -l → ans NUMBER"),
                 solution="grep -Eo 'tel: [0-9() -]+' dirty.txt | sed -E 's/[^0-9]//g' | sort | "
                          "uniq | wc -l",
                 wrong=("grep -Eo 'tel: [0-9() -]+' dirty.txt | sort | uniq | wc -l",
@@ -943,7 +943,7 @@ class RegexClean(_RegexAnswer):
     )
     hints = ("Вытащи номера grep -Eo: ORD- и ровно пять цифр, {{5}}.",
              "Разные — после sort | uniq, посчитает wc -l.",
-             "grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort | uniq | wc -l → ans ЧИСЛО")
+             "grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort | uniq | wc -l → ans NUMBER")
     solution = "grep -Eo 'ORD-[0-9]{{5}}' dirty.txt | sort | uniq | wc -l"
     explain = ("Грязь не чистят руками: grep -Eo вытащил ровно пятизначные номера, мимо "
                "опечаток, а sort | uniq схлопнул повторы. Каждое звено можно проверить "

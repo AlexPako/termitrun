@@ -247,18 +247,20 @@ class CsvByHand(_Sheet):
     title = "Выгрузка без Excel"
     after = ("boss_finder",)
     scroll = ("head -3 orders.csv — заголовок и первые строки; head -1 orders.csv | tr , '\\n' "
-              "| grep -n имя_колонки — какая она по счёту (n — number).\n"
+              "| grep -n NAME — какая по счёту колонка NAME (n — number).\n"
               "grep -c ',Kazan,' orders.csv — count строк с ячейкой ровно Kazan (не "
-              "Kazanskaya). \"ul. Mira, 5\" в кавычках — одна ячейка, хоть в ней и есть запятая.")
+              "Kazanskaya). \"ul. Mira, 5\" в кавычках — одна ячейка со своей запятой; поиску "
+              "',Kazan,' она не мешает.")
     variants = (
-        Variant("Выгрузка заказов orders.csv — десятки тысяч строк, глазами не пересчитать. "
-                "Сколько в ней заказов из города {city}? Ответ — число: ans ЧИСЛО",
+        Variant("Выгрузка заказов orders.csv лежит здесь — десятки тысяч строк, глазами не "
+                "пересчитать. Сколько в ней заказов из города {city}? Ответ — число: "
+                "ans NUMBER",
                 wrong=("grep -c '{city}' orders.csv",
                        "cut -d, -f5 orders.csv | grep -c '{city}'"),
                 alternatives=("grep ',{city},' orders.csv | wc -l — то же через подсчёт строк",)),
         Variant("В выгрузку orders.csv добавили колонок, и порядок поехал. Какая по счёту "
                 "колонка amount (сумма заказа)? Считай слева, первая — 1. Ответ — число: "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Имена колонок — в первой строке: head -1 orders.csv.",
                        "tr , '\\n' поставит каждое имя на свою строку, а grep -n пронумерует "
                        "найденное.",
@@ -273,7 +275,7 @@ class CsvByHand(_Sheet):
                               "строки: все имена разом",)),
         Variant("Сколько заказов в orders.csv со статусом ровно cancelled? Похожие статусы — "
                 "например cancelled_by_bank — это другое, их не считай. Ответ — число: "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("Статус — одна из колонок; head -3 orders.csv покажет, какие бывают.",
                        "grep -c 'cancelled' зацепит и cancelled_by_bank. Ищи ячейку целиком — "
                        "с запятыми по краям.",
@@ -293,7 +295,7 @@ class CsvByHand(_Sheet):
     explain = ("CSV — текст, где ячейки разделены запятыми. Запятые по краям ',Kazan,' "
                "находят ячейку целиком. Но ячейка в кавычках может прятать свою запятую — "
                "тогда cut считает колонки неверно, и всё правее съезжает.")
-    spell = "grep -c ',ячейка,' файл.csv — сколько строк с ячейкой ровно такой"
+    spell = "grep -c ',CELL,' FILE — сколько строк с ячейкой ровно такой"
 
     def setup_variant(self, box, rng, variant):
         rows = orders(rng)
@@ -354,15 +356,16 @@ class CsvTop(_Sheet):
     implant = "qsv"
     after = ("csv_by_hand", "boss_finder")
     kinds = ("text", "number", "text")
-    scroll = ("sort | uniq -c | sort -n | tail -1 — самое частое: uniq -c (count) считает "
-              "повторы подряд, потому сначала sort; sort -n — numeric, как числа; sort -u — unique.\n"
-              "Колонка: cut -d, -f5 orders.csv (d — delimiter, f — fields); tail -n +2 срежет шапку "
-              "(n — number). Запятые в кавычках ломают cut — тогда справа: awk -F, "
-              "'{ print $(NF-1) }' (F — Field separator).\n"
-              "Утилита qsv понимает кавычки сама: qsv frequency -s city orders.csv (s — select)")
+    scroll = ("cut -d, -f5 FILE — колонка 5 (d — delimiter, f — fields; номер — по шапке "
+              "head -1); | sort | uniq -c | sort -n | tail -1 — самое частое (c — count, n — "
+              "numeric); sort -u — каждое по разу (u — unique); tail -n +2 — без шапки (n — "
+              "number).\n"
+              "Запятые в кавычках ломают cut — тогда справа: awk -F, '{ print $(NF-1) }' (F — "
+              "Field separator). qsv frequency -s city FILE (s — select) — то же отдельной "
+              "программой.")
     variants = (
         Variant("В orders.csv — заказы за полгода. Из какого города заказывают чаще всего? "
-                "Ответ — название, как в таблице: ans ГОРОД",
+                "Ответ — название, как в таблице: ans CITY",
                 wrong=("cut -d, -f5 orders.csv | tail -n +2 | sort | uniq -c | sort -n | "
                        "head -1 | awk '{{print $2}}'",),
                 alternatives=("qsv frequency -s city orders.csv — частоты колонки сразу",
@@ -370,7 +373,7 @@ class CsvTop(_Sheet):
                               "справа: выручит, когда в адресах будут кавычки")),
         Variant("Сколько разных клиентов в orders.csv? Клиент — код в колонке customer. Гостевой "
                 "заказ без кода (пустая ячейка) — не клиент, заголовок — тоже. Ответ — число: "
-                "ans ЧИСЛО",
+                "ans NUMBER",
                 hints=("customer — третья колонка, левее адреса с кавычками: тут cut -d, -f3 не "
                        "врёт.",
                        "sort -u оставит каждого по разу; заголовок срежет tail -n +2, а grep -c . "
@@ -389,7 +392,8 @@ class CsvTop(_Sheet):
                 explain="customer левее адреса с кавычками — тут cut не врёт; sort -u "
                         "оставляет каждого по разу, grep -c . считает только непустые."),
         Variant("Какой статус чаще всего у заказов за {month}? Дата — в колонке date, вид "
-                "ГГГГ-ММ-ДД. Ответ — статус, как в таблице: ans СТАТУС",
+                "YYYY-MM-DD (год-месяц-день), статус — в колонке status. Ответ — статус, как в "
+                "таблице: ans STATUS",
                 hints=("Заказы месяца оставит grep ',{month}-': дата — вторая колонка, перед ней "
                        "запятая.",
                        "Статус правее адреса с кавычками — считай справа: awk -F, "
@@ -414,13 +418,12 @@ class CsvTop(_Sheet):
                         "колонках — нужен разборщик CSV: qsv или duckdb."),
     )
     par = 90
-    hints = ("Самое частое значение колонки: вырежи её (city — пятая: cut -d, -f5) и срежь "
-             "заголовок — tail -n +2.",
+    hints = ("Самое частое значение колонки: вырежи её — city пятая: cut -d, -f5.",
              "sort | uniq -c посчитает одинаковые, sort -n поставит самое частое в конец, "
              "tail -1 — последняя строка.",
-             "cut -d, -f5 orders.csv | tail -n +2 | sort | uniq -c | sort -n | tail -1 — "
-             "утилитой: qsv frequency -s city orders.csv")
-    solution = "cut -d, -f5 orders.csv | tail -n +2 | sort | uniq -c | sort -n | tail -1"
+             "cut -d, -f5 orders.csv | sort | uniq -c | sort -n | tail -1 — "
+             "программой qsv: qsv frequency -s city orders.csv")
+    solution = "cut -d, -f5 orders.csv | sort | uniq -c | sort -n | tail -1"
     solution_script = solution + " | awk '{{print $2}}'"
     # без --limit: значений меньше 10 (лимит по умолчанию), строки Other нет; вывод — по
     # убыванию, вторая строка (после шапки field,value,count,…) — лидер
@@ -479,15 +482,14 @@ class CsvSum(_Sheet):
     implant = "duckdb"
     after = ("csv_top", "boss_finder")
     kinds = ("number", "text", "number")
-    scroll = ("awk -F, '$(NF-2)==\"Kazan\" { s += $NF } END { print s }' f — отбор строк, "
-              "копилка, итог в END; $NF у нас — amount, сумма заказа.\n"
-              "s[ключ] += $NF — копилка на ключ, END { for (k in s) print s[k], k } — обход. "
+    scroll = ("awk -F, '$(NF-2)==\"Kazan\" { s += $NF } END { print s }' FILE — отбор строк, "
+              "копилка, итог в END; $NF у нас — колонка amount, сумма заказа; считай справа.\n"
+              "s[KEY] += $NF — копилка на ключ, END { for (k in s) print s[k], k } — обход. "
               "NR>1 — без заголовка, substr($2,1,7) — 7 знаков.\n"
-              "Утилита duckdb спрашивает файл на SQL: duckdb -c \"SELECT sum(amount) FROM "
-              "'orders.csv'\" (c — command)")
+              "duckdb — то же отдельной программой, языком запросов SQL (ставится отдельно).")
     variants = (
         Variant("Сколько денег принесли заказы из города {city}? Сложи колонку amount по всем "
-                "его заказам, статус не важен. Ответ — число: ans ЧИСЛО",
+                "его заказам, статус не важен. Ответ — число: ans NUMBER",
                 wrong=("awk -F, '$5==\"{city}\" {{s+=$7}} END {{print s}}' orders.csv",
                        "grep '{city}' orders.csv | awk -F, '{{s+=$NF}} END {{print s}}'"),
                 implant_script="duckdb -noheader -list -c \"SELECT sum(amount) FROM "
@@ -495,7 +497,7 @@ class CsvSum(_Sheet):
                 alternatives=("duckdb -c \"SELECT sum(amount) FROM 'orders.csv' WHERE "
                               "city = '{city}'\"",)),
         Variant("В каком месяце выручка — сумма amount всех заказов месяца — была больше всего? "
-                "Ответ — месяц, как в датах: ans ГГГГ-ММ",
+                "Ответ — месяц, как в датах: ans YYYY-MM (год-месяц, например 2725-11)",
                 hints=("Копилка на каждый месяц — массив awk: s[ключ]+=$NF. Месяц — первые 7 "
                        "знаков даты: substr($2,1,7).",
                        "В END обойди копилки: for (m in s) print s[m], m — а sort -n поставит "
@@ -515,7 +517,7 @@ class CsvSum(_Sheet):
                 alternatives=("duckdb -c \"SELECT left(CAST(date AS VARCHAR), 7) m, "
                               "sum(amount) FROM 'orders.csv' GROUP BY m ORDER BY 2\"",)),
         Variant("Какой средний чек у клиента {cust}? Средний чек — сумма amount его заказов, "
-                "делённая на их число. Ответ — число: ans ЧИСЛО",
+                "делённая на их число. Ответ — число: ans NUMBER",
                 hints=("Клиент — третья колонка: условие $3==\"{cust}\" отберёт его строки.",
                        "Копи сумму и счётчик: {{s+=$NF; n++}}, а в END подели: print s/n. "
                        "amount — последнее поле, $NF.",
@@ -540,7 +542,7 @@ class CsvSum(_Sheet):
     explain = ("awk — маленький язык для колонок: условие { действие }, END — в конце. "
                "Копилка s[ключ] даёт итоги по группам. Кавычек BSD awk не понимает — считай "
                "справа. duckdb читает CSV по правилам и отвечает на SQL.")
-    spell = "awk -F, '{s+=$NF} END {print s}' f.csv — сумма последней колонки"
+    spell = "awk -F, '{s+=$NF} END {print s}' FILE — сумма последней колонки"
 
     def setup_variant(self, box, rng, variant):
         rows = orders(rng)

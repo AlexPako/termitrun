@@ -316,8 +316,8 @@ KIND_REQUIRES = {"hidden": "hidden_cache", "log_tail": "less_search", "deep_mem"
                  "script_line": "script_audit"}
 SHARD_META = ".termit/shard"        # пишет родитель: что лежит в этой песочнице
 CLAIMED = ".termit/claimed"         # пишет хук: игрок сдал верный код
-EMPTY = "Пусто. loot КОДОВОЕ_СЛОВО — сдать находку (или loot ПУТЬ_К_ФАЙЛУ)"
-NO_ARG = ("Сдать находку: loot КОДОВОЕ_СЛОВО. Найденные осколки — после задачи: "
+EMPTY = "Пусто. loot CODEWORD — сдать находку (или loot PATH)"
+NO_ARG = ("Сдать находку: loot CODEWORD. Найденные осколки — после задачи: "
           "./termit memory")
 
 
@@ -484,7 +484,7 @@ HUNT_FLAGS = {"shard_hint": "hidden_cache", "nol_hint": "grep_count",
 # карточка доски «охота» (hideout, card hunt): по строке на каждую услышанную подсказку
 HUNT_CARD = {
     "paydata_hint": "хабар *.pd в скрытой .cache/.pd (кэш — склад временных заготовок) — "
-                    "find . -name '*.pd', сдать: loot ПУТЬ",
+                    "find . -name '*.pd', сдать: loot PATH",
     "shard_hint": "осколки памяти — лишний файл в песочнице: прочитал — сохранится сам",
     "nol_hint": "метка NOL: в ~/old_logs — grep NOL",
     "db_hint": "метка NOL: в ~/archive, таблица notes — LIKE 'NOL:%'",
@@ -782,10 +782,10 @@ HOW = {   # чем открыть покупку: навык, который у�
     "_2": "gunzip -c ~/{path} (или zcat < ~/{path})",
     "_3": "tar -xzf ~/{path} -C ~/{drop} && cat ~/{drop}/{stem}.txt",
     "half_1": "в скрытых папках ~/{drop}: ls -laR ~/{drop} (или print -l ~/{drop}/**/*(D)), "
-              "потом cat ПУТЬ",
+              "потом cat PATH",
     "half_2": "tar -tzf ~/{path} | grep half, потом tar -xzf ~/{path} -C ~/{drop}, "
               "потом cat ~/{drop}/{stem}.txt",
-    "half_3": "среди мусора в ~/{drop}/junk: find ~/{drop} -name '*.mem', потом cat ПУТЬ",
+    "half_3": "среди мусора в ~/{drop}/junk: find ~/{drop} -name '*.mem', потом cat PATH",
     "half_4": "сводка одной строкой JSON: jq -r '.lines[]' ~/{path}",
     "half_5": "база SQLite: sqlite3 ~/{path} \"SELECT body FROM lines ORDER BY id\"",
     "half_6": "файл команд SQL: cd ~/{drop} && sqlite3 :memory: \".read {stem}.sql\" "
@@ -795,12 +795,12 @@ HOW = {   # чем открыть покупку: навык, который у�
 
 EXPLAIN = {   # одна строка объяснения: навык мог ещё не встретиться в уроках
     "_2": "gunzip -c — распаковать .gz и вывести на экран; сам архив остаётся как был.",
-    "_3": "tar -xzf АРХИВ -C ПАПКА — распаковать tar.gz в папку: x — извлечь, z — gzip, "
+    "_3": "tar -xzf ARCHIVE -C DIR — распаковать tar.gz в папку: x — извлечь, z — gzip, "
           "f — вот этот файл, -C — куда.",
     "half_1": "ls -laR — все файлы, и скрытые (на точку), во всех вложенных папках сразу.",
-    "half_2": "tar -tzf — только список файлов архива, без распаковки; -xzf … -C ПАПКА — "
+    "half_2": "tar -tzf — только список файлов архива, без распаковки; -xzf … -C DIR — "
               "распаковать в папку.",
-    "half_3": "find ПАПКА -name 'маска' — искать файл по имени во всех вложенных папках.",
+    "half_3": "find DIR -name 'маска' — искать файл по имени во всех вложенных папках.",
     "half_4": "jq -r '.lines[]' — каждый элемент списка lines отдельной строкой, без кавычек.",
     "half_5": "sqlite3 база \"SELECT …\" — запрос к базе; ORDER BY id — строки по порядку.",
     "half_6": "sqlite3 :memory: — база в памяти; \".read файл\" выполнит команды из файла, "
@@ -872,7 +872,7 @@ def dossier_count(p: dict) -> Tuple[int, int]:
 
 
 def dossier_lines(p: dict, who: Optional[str] = None) -> List[str]:
-    """./termit dossier [ИМЯ]: список персонажей или страницы одного."""
+    """./termit dossier [NAME]: список персонажей или страницы одного."""
     dossiers = theme.story("dossiers")
     if not dossiers:
         return [NO_CASE]

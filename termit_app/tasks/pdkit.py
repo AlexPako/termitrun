@@ -342,7 +342,7 @@ def money_frac(cents: int) -> str:
 def dates_data(rng, variant: int) -> dict:
     """A — сумма за месяц m (ловушка — день месяца m: .dt.day вместо .dt.month); B —
     наибольший помесячный итог (ловушки — наименьший месяц и итог дня — daily); C — даты
-    ДД.ММ.ГГГГ: переводов с первого числа месяца a по 28-е месяца a+2 включительно (ловушки —
+    DD.MM.YYYY: переводов с первого числа месяца a по 28-е месяца a+2 включительно (ловушки —
     сравнение строк без to_datetime и границы без «=»)."""
     rows = transfers(rng, rng.randint(32, 56), rng.sample(CITIES, 5))
     out = {"header": header_of(()), "rows": rows}
@@ -386,7 +386,7 @@ def dates_data(rng, variant: int) -> dict:
         outside = [r for r in rows if not lo <= r["date"] <= hi]
         _set_date(outside.pop(), a, 1)
         _set_date(outside.pop(), b, 28)
-        # постройкой: строка, которую сравнение строк «ДД.ММ.ГГГГ» берёт зря: день между
+        # постройкой: строка, которую сравнение строк «DD.MM.YYYY» берёт зря: день между
         # 01 и 28, а месяц — вне окна (строки сравниваются с дня)
         _set_date(outside.pop(), 9 if b < 9 else 1, rng.randint(2, 27))
         del inside

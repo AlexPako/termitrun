@@ -1,4 +1,4 @@
-"""Учебный clamscan песочницы: python -I … termit_app.avstub АРГУМЕНТЫ (часть 7, A6).
+"""Учебный clamscan песочницы: python -I … termit_app.avstub ARGS (часть 7, A6).
 
 Обёртка .termit/bin/clamscan есть только у задач с uses_av = True (настоящий ClamAV в
 других задачах не перекрываем). Повторяет вывод ClamAV на урезанных настоящих форматах баз:

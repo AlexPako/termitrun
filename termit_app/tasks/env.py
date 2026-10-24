@@ -27,39 +27,39 @@ from termit_app.tasks.base import memo_marks as base_memo_marks
 # --- E5 -------------------------------------------------------------------------------------
 
 class EnvVars(AnswerTask):
-    """env, echo $ИМЯ, printenv, env | grep: переменные задачи — в .termit/env.zsh."""
+    """env, echo $NAME, printenv, env | grep: переменные задачи — в .termit/env.zsh."""
     id = "env_vars"
     track = "env"
     title = "Что в окружении"
     par = 45
     scroll = ("Окружение — переменные, которые оболочка отдаёт каждой запущенной программе. "
-              "env — все они, по строке ИМЯ=значение. echo $HOME — значение "
+              "env — все они, по строке NAME=значение. echo $HOME — значение "
               "одной (знак $ перед именем); printenv HOME — то же без $.\n"
               "env | grep APP_ — только нужные. Переменные — настройки, которые программа "
               "читает при запуске.")
     variants = (
         Variant("В окружении этой оболочки есть переменная APP_REGION. Какое у неё значение? "
-                "ans ЗНАЧЕНИЕ",
-                hints=("Все переменные печатает env, одну — echo $ИМЯ.",
+                "ans VALUE",
+                hints=("Все переменные печатает env, одну — echo $NAME.",
                        "Перед именем — знак $: без него echo напечатает само имя.",
-                       "echo $APP_REGION, затем ans ЗНАЧЕНИЕ"),
+                       "echo $APP_REGION, затем ans VALUE"),
                 solution="echo $APP_REGION",
                 wrong=("echo APP_REGION", "echo $REGION"),
                 alternatives=("printenv APP_REGION — то же без знака $",
                               "env | grep APP_REGION — строка целиком, значение после =")),
-        Variant("Сколько переменных окружения начинаются с APP_? ans ЧИСЛО",
+        Variant("Сколько переменных окружения начинаются с APP_? ans NUMBER",
                 hints=("Все переменные печатает env, по строке на каждую.",
                        "Отфильтруй env через grep: строки, которые НАЧИНАЮТСЯ с APP_, — знак ^ "
                        "в шаблоне; -c сосчитает.",
-                       "env | grep -c '^APP_', затем ans ЧИСЛО"),
+                       "env | grep -c '^APP_', затем ans NUMBER"),
                 solution="env | grep -c '^APP_'",
                 wrong=("env | grep -c APP_",),
                 alternatives=("env | cut -d= -f1 | grep -c '^APP_' — то же по одним именам",)),
         Variant("Одна из переменных окружения хранит значение {needle}. Как она называется? "
-                "ans ИМЯ",
-                hints=("env печатает строки ИМЯ=значение — найди нужную.",
+                "ans NAME",
+                hints=("env печатает строки NAME=значение — найди нужную.",
                        "Отфильтруй env через grep по значению; имя — то, что до знака =.",
-                       "env | grep {needle} | cut -d= -f1, затем ans ИМЯ"),
+                       "env | grep {needle} | cut -d= -f1, затем ans NAME"),
                 solution="env | grep {needle} | cut -d= -f1",
                 wrong=("env | grep {needle}",),
                 alternatives=("env | grep {needle} — строка целиком, имя до знака =",)),
@@ -68,7 +68,7 @@ class EnvVars(AnswerTask):
     solution = variants[0].solution
     explain = ("Окружение — пачка настроек, которую оболочка вручает каждой программе при "
                "запуске. Программа заглядывает туда, как в записку: где дом, какой язык.")
-    spell = "env — все переменные; echo $ИМЯ — одна; env | grep ИМЯ — поиск"
+    spell = "env — все переменные; echo $NAME — одна; env | grep NAME — поиск"
     env_clear = ("APP_",)       # APP_* из ~/.zshrc владельца не сбивают счёт варианта B
     # ответ варианта A (значение APP_REGION) знает и окружение — не секрет (правило 16)
     secret_keys = ("answer", "traps")
@@ -84,7 +84,7 @@ class EnvVars(AnswerTask):
     MSG_NEEDLE = ("Это само значение из условия, а спрашивают имя переменной: в строке env оно "
                   "стоит до знака =.")
     FALLBACKS = (
-        "Не то. Значение одной переменной печатает echo $ИМЯ — со знаком $ и именем целиком.",
+        "Не то. Значение одной переменной печатает echo $NAME — со знаком $ и именем целиком.",
         "Не то. Считай строки env, которые НАЧИНАЮТСЯ с APP_.",
         "Не то. Найди строку с этим значением (env | grep) — имя стоит до знака =.",
     )
@@ -163,15 +163,15 @@ LANGS = ("ru", "en", "de", "fr", "es", "it", "fi", "pt")
 
 
 class ExportChild(Task):
-    """export, разовое ИМЯ=значение ./cmd, unset: дочерний скрипт видит только окружение."""
+    """export, разовое NAME=значение ./cmd, unset: дочерний скрипт видит только окружение."""
     id = "export_child"
     track = "env"
     title = "Наследство"
     par = 60
-    scroll = ("ИМЯ=значение — переменная только этой оболочки; запущенная программа её не "
-              "видит. export ИМЯ=значение — передать её всем, кого запустишь.\n"
-              "Разово: ИМЯ=значение ./скрипт. unset ИМЯ — убрать переменную.\n"
-              "Задают без пробелов у = и без $ перед именем: $ИМЯ — это уже значение.")
+    scroll = ("NAME=значение — переменная только этой оболочки; запущенная программа её не "
+              "видит. export NAME=значение — передать её всем, кого запустишь.\n"
+              "Разово: NAME=значение ./скрипт. unset NAME — убрать переменную.\n"
+              "Задают без пробелов у = и без $ перед именем: $NAME — это уже значение.")
     variants = (
         Variant("./greet.sh пишет в greet.txt то, что видит в MODE и LANG_CODE. Сделай, чтобы "
                 "там было mode={mode} lang={lang}.",
@@ -205,13 +205,13 @@ class ExportChild(Task):
     solution = variants[0].solution
     explain = ("Программа получает от оболочки только экспортированные переменные. Запись перед "
                "командой — разовый подарок одной программе, unset — забрать насовсем.")
-    spell = "export ИМЯ=знач — передать детям; ИМЯ=знач ./cmd — разово; unset ИМЯ"
+    spell = "export NAME=знач — передать детям; NAME=знач ./cmd — разово; unset NAME"
     OUT = "greet.txt"
     MSG_NOT_SET = ("greet.sh не видит MODE и LANG_CODE: задай их и передай скрипту — export или "
                    "запись перед командой.")
     MSG_DEBUG = "В окружении осталась DEBUG, и greet.sh отказался работать: unset DEBUG"
     MSG_LEFT = ("В greet.txt верно, но {names} {verb} в оболочке, а просили разово: "
-                "ИМЯ=значение ./greet.sh. Убрать сейчас — unset {plain}.")
+                "NAME=значение ./greet.sh. Убрать сейчас — unset {plain}.")
     MSG_OTHER = "В greet.txt другие значения, а нужно mode={mode} lang={lang}."
     # E24a, I9: промахи формы присваивания и отклик по каждой переменной
     MSG_SPACES = "Пробелы вокруг = нельзя: MODE=значение слитно — иначе zsh ищет команду MODE."
@@ -346,7 +346,7 @@ def _alias_rc(mode: str) -> str:
 
 
 class AliasRc(Task):
-    """alias ИМЯ='команда' в ~/.zshrc песочницы, source ~/.zshrc, функция mkcd."""
+    """alias NAME='команда' в ~/.zshrc песочницы, source ~/.zshrc, функция mkcd."""
     id = "alias_rc"
     track = "env"
     title = "Короткое имя"
@@ -386,7 +386,7 @@ class AliasRc(Task):
                 alternatives=("nano ~/.zshrc — убрать пробелы вокруг = руками (Ctrl+O, "
                               "Enter, Ctrl+X), потом source ~/.zshrc",)),
         Variant("Заведи в ~/.zshrc функцию mkcd (короткое имя, которое принимает слова): "
-                "mkcd ПАПКА создаёт папку со всеми родителями и сразу в неё заходит. "
+                "mkcd DIR создаёт папку со всеми родителями и сразу в неё заходит. "
                 "Перечитай файл и сделай mkcd {target}.",
                 hints=("alias не умеет вставлять слово в середину команды, функция (имя со "
                        "словами) умеет: $1 — первое слово после её имени.",
@@ -406,7 +406,7 @@ class AliasRc(Task):
     explain = ("alias — короткое имя для длинной команды, функция — короткое имя, которое "
                "принимает слова ($1). Набранное в окне живёт до его закрытия; строка в "
                "~/.zshrc — в каждом новом окне, а source ~/.zshrc перечитывает файл сразу.")
-    spell = "alias ИМЯ='команда' — короткое имя; в ~/.zshrc — насовсем; source ~/.zshrc"
+    spell = "alias NAME='команда' — короткое имя; в ~/.zshrc — насовсем; source ~/.zshrc"
     RC = ".termit/home/.zshrc"
     OUT = "report.txt"
     MSG_NO_REPORT = "report.txt нет: его пишет отчёт, когда ты запускаешь rep."
@@ -535,10 +535,10 @@ class PermBasics(AnswerTask):
               "admin); id — «identity», всё с номерами. root — суперпользователь, ему можно всё; sudo — "
               "«superuser do», команда от его имени.")
     variants = (
-        Variant("Под каким именем тебя знает система? Сдай его: ans ИМЯ",
+        Variant("Под каким именем тебя знает система? Сдай его: ans NAME",
                 hints=("Имя в системе спрашивают командой «кто я».",
                        "who am i — пишется слитно: whoami.",
-                       "whoami, потом ans ИМЯ"),
+                       "whoami, потом ans NAME"),
                 solution="whoami",
                 wrong=("groups | awk '{{print $1}}'",),
                 alternatives=("id -un — то же: -u — user, -n — name, имя вместо номера",)),
@@ -553,7 +553,7 @@ class PermBasics(AnswerTask):
                 explain=("На Mac основная группа — обычно staff, «сотрудники»: в неё входят "
                          "все обычные пользователи. admin — те, кому можно sudo.")),
         Variant("У каждого пользователя есть номер — uid, user id. Найди свой в выводе id и "
-                "сдай: ans ЧИСЛО",
+                "сдай: ans NUMBER",
                 hints=("id печатает строку вида uid=…(имя) gid=…(группа) groups=….",
                        "Нужно число сразу после uid=, а не после gid=.",
                        "id, потом ans и число после uid="),
@@ -567,7 +567,7 @@ class PermBasics(AnswerTask):
     par = 30
     hints = ("Имя в системе спрашивают командой «кто я».",
              "who am i — пишется слитно: whoami.",
-             "whoami, потом ans ИМЯ")
+             "whoami, потом ans NAME")
     solution = "whoami"
     explain = ("Права есть у каждого файла: владелец, группа и остальные. Кто ты в этих кругах "
                "— скажут whoami, groups и id.")
@@ -608,28 +608,28 @@ class PermRwx(AnswerTask):
               "chmod +r, chmod +w, chmod +x — дать право, как chmod +x у скрипта.")
     variants = (
         Variant("cat {file} отвечает Permission denied: читать файл нельзя даже тебе. Дай "
-                "себе право читать и сдай слово из файла: ans СЛОВО",
+                "себе право читать и сдай слово из файла: ans WORD",
                 hints=("Читать — буква r.",
                        "Право дают так же, как запуск скрипту: chmod +буква.",
-                       "chmod +r {file}; cat {file}, потом ans СЛОВО"),
+                       "chmod +r {file}; cat {file}, потом ans WORD"),
                 solution="chmod +r {file}; cat {file}",
                 wrong=("cat {file}",),
                 alternatives=("chmod u+r {file} — только себе: u — user, владелец",)),
         Variant("Файл {dir}/{file} есть, но cat {dir}/{file} отвечает Permission denied, и cd "
-                "{dir} тоже. Почини папку и сдай слово из файла: ans СЛОВО",
+                "{dir} тоже. Почини папку и сдай слово из файла: ans WORD",
                 hints=("Не пускает папка, а не файл. Заходить в папку — какая буква?",
                        "У папки x — заходить и открывать файлы внутри.",
-                       "chmod +x {dir}; cat {dir}/{file}, потом ans СЛОВО"),
+                       "chmod +x {dir}; cat {dir}/{file}, потом ans WORD"),
                 solution="chmod +x {dir}; cat {dir}/{file}",
                 wrong=("chmod +r {dir}/{file}; cat {dir}/{file}",),
                 alternatives=("chmod u+x {dir} — только себе",),
                 explain=("У папки x — пропуск внутрь: без него не открыть ни один файл в ней, "
                          "даже с правом r у самого файла.")),
         Variant("ls {dir} отвечает Permission denied: список папки скрыт. Верни право "
-                "смотреть список и сдай, сколько в папке файлов: ans ЧИСЛО",
+                "смотреть список и сдай, сколько в папке файлов: ans NUMBER",
                 hints=("Смотреть список папки — буква r.",
                        "chmod +r {dir}, потом ls {dir}.",
-                       "chmod +r {dir}; ls {dir}, сосчитай имена: ans ЧИСЛО"),
+                       "chmod +r {dir}; ls {dir}, сосчитай имена: ans NUMBER"),
                 solution="chmod +r {dir}; ls {dir}",
                 solution_script="chmod +r {dir}; ls {dir} | wc -l",
                 wrong=("ls {dir} | wc -l",),
@@ -641,7 +641,7 @@ class PermRwx(AnswerTask):
     par = 40
     hints = ("Читать — буква r.",
              "Право дают так же, как запуск скрипту: chmod +буква.",
-             "chmod +r ИМЯ; cat ИМЯ, потом ans СЛОВО")
+             "chmod +r NAME; cat NAME, потом ans WORD")
     solution = "chmod +r {file}; cat {file}"
     explain = ("Permission denied — не поломка, а замок: глянь, какой буквы не хватает, и "
                "дай её chmod.")
@@ -710,25 +710,25 @@ class ReadLongList(AnswerTask):
               "ls -lh — то же, но с K и M вместо байтов (h — human-readable).")
     variants = (
         Variant("Один файл в этой папке можно запускать. Найди его по правам в ls -l и сдай "
-                "имя: ans ИМЯ",
+                "имя: ans NAME",
                 wrong=("ls -l | grep '^d' | awk '{{print $NF}}'",),
                 alternatives=("ls -lh — то же, размеры в K и M: -h — human-readable, "
                               "«для людей»",)),
         Variant("Один файл здесь менять может только владелец, а читать — все остальные. "
-                "Найди его по правам и сдай имя: ans ИМЯ",
+                "Найди его по правам и сдай имя: ans NAME",
                 hints=("Права — девять букв после первого знака: три тройки — владелец, "
                        "группа, остальные.",
                        "Нужно w только в первой тройке, а r — во всех трёх: rw-r--r--.",
-                       "ls -l, найди строку -rw-r--r-- и сдай имя из её конца: ans ИМЯ"),
+                       "ls -l, найди строку -rw-r--r-- и сдай имя из её конца: ans NAME"),
                 solution="ls -l",
                 solution_script="ls -l | grep '^-rw-r--r--' | awk '{{print $NF}}'",
                 wrong=("ls -l | grep '^-rw-------' | awk '{{print $NF}}'",
                        "ls -l | grep '^-rw-rw-r--' | awk '{{print $NF}}'"),
                 alternatives=("ls -l *.txt — то же, только файлы с хвостом .txt",)),
-        Variant("Кто владелец файла {file}? Сдай имя владельца: ans ИМЯ",
+        Variant("Кто владелец файла {file}? Сдай имя владельца: ans NAME",
                 hints=("Владелец стоит в строке ls -l сразу после прав и числа ссылок.",
                        "Колонки: права, число ссылок, владелец, группа, размер, дата, имя.",
-                       "ls -l {file} — третья колонка и есть владелец: ans ИМЯ"),
+                       "ls -l {file} — третья колонка и есть владелец: ans NAME"),
                 solution="ls -l {file}",
                 solution_script="ls -l {file} | awk '{{print $3}}'",
                 wrong=("ls -l {file} | awk '{{print $4}}'",),
@@ -739,7 +739,7 @@ class ReadLongList(AnswerTask):
     par = 30
     hints = ("Право на запуск — буква x в правах, это девять букв после первого знака.",
              "Строка папки начинается с d, файла — с прочерка. Нужен файл с x.",
-             "ls -l, найди строку вроде -rwxr-xr-x и сдай имя из её конца: ans ИМЯ")
+             "ls -l, найди строку вроде -rwxr-xr-x и сдай имя из её конца: ans NAME")
     solution = "ls -l"
     solution_script = "ls -l | grep '^-..x' | awk '{{print $NF}}'"
     explain = ("Строка ls -l читается слева направо: тип, права трёх троек, ссылки, владелец, "
@@ -875,7 +875,7 @@ class PermDigits(Task):
     par = 30
     hints = ("В тройке r — 4, w — 2, x — 1, их складывают.",
              "Тебе — 4 + 2, группе и остальным — ноль: 600.",
-             "chmod 600 ИМЯ")
+             "chmod 600 NAME")
     solution = "chmod 600 {file}"
     explain = "Права цифрами: r — 4, w — 2, x — 1, сумма на каждую тройку."
     spell = "chmod 755 — rwxr-xr-x, 644 — rw-r--r--, 600 — только себе; go-w — убрать запись"
@@ -962,7 +962,7 @@ class Dotenv(Task):
     track = "env"
     title = "Ключи в .env"
     par = 90
-    scroll = (".env — настройки и секреты ИМЯ=значение, без пробелов у =. В оболочку: set -a; "
+    scroll = (".env — настройки и секреты NAME=значение, без пробелов у =. В оболочку: set -a; "
               "source .env; set +a (set -a — all export: экспортировать прочитанное).\n"
               "chmod 600 .env — читать только тебе. .gitignore — что git (система версий кода) "
               "не берёт: строка .env там обязательна.\n"
@@ -993,7 +993,7 @@ class Dotenv(Task):
                 alternatives=("export $(cat .env) — тоже загрузит, пока в значениях нет "
                               "пробелов",)),
     )
-    hints = ("Три строки ИМЯ=значение в .env; права — chmod; .gitignore — обычный текстовый "
+    hints = ("Три строки NAME=значение в .env; права — chmod; .gitignore — обычный текстовый "
              "файл.",
              "Загрузка с экспортом: set -a; source .env; set +a. Потом ./app.sh.",
              _H3)
@@ -1002,8 +1002,8 @@ class Dotenv(Task):
                ".gitignore — от истории git, а set -a раздаёт значения запущенным программам.")
     spell = "set -a; source .env; set +a — загрузить .env; chmod 600 .env; .env — в .gitignore"
     NAMES = ("DB_HOST", "DB_USER", "DB_PASS")
-    MSG_SPACE = "Пробел вокруг = — source споткнётся: пиши ИМЯ=значение слитно."
-    MSG_JUNK = "В .env лишняя строка — нужны только строки вида ИМЯ=значение."
+    MSG_SPACE = "Пробел вокруг = — source споткнётся: пиши NAME=значение слитно."
+    MSG_JUNK = "В .env лишняя строка — нужны только строки вида NAME=значение."
     MSG_VALUE = "В .env {name} не совпадает с note.txt — сверь значение."
     MSG_LOG = "В app.log не та строка подключения — проверь значения в .env и загрузи его заново."
     MSG_SET_A = ("source без set -a: переменные есть в оболочке, но app.sh их не видит. "
@@ -1093,7 +1093,7 @@ class PathWhich(Task):
     title = "Где живут команды"
     par = 75
     scroll = ("PATH — список папок через двоеточие, где оболочка ищет команды: echo $PATH | tr "
-              ": '\\n' — по строке. which ИМЯ — какой файл запустится; which -a — all, все "
+              ": '\\n' — по строке. which NAME — какой файл запустится; which -a — all, все "
               "одноимённые, первый побеждает.\n"
               "export PATH=\"$HOME/tools/bin:$PATH\" — папку вперёд, до закрытия окна.\n"
               "Забыл $PATH — пропадут ls и cat; вернёт export PATH=/usr/bin:/bin:$PATH.")
@@ -1133,7 +1133,7 @@ class PathWhich(Task):
     solution = variants[0].solution
     explain = ("Оболочка ищет команду по папкам PATH слева направо и берёт первую найденную. "
                "Своя папка впереди — и команда твоя; навсегда — только строкой в ~/.zshrc.")
-    spell = 'which -a ИМЯ — откуда команда; export PATH="папка:$PATH" — папку вперёд'
+    spell = 'which -a NAME — откуда команда; export PATH="папка:$PATH" — папку вперёд'
     OUT = "stamp.txt"
     RC = ".termit/home/.zshrc"
     MSG_OLD = "v1 — первой нашлась старая: новая папка должна стоять в PATH впереди."
@@ -1522,10 +1522,10 @@ class ExitCodes(AnswerTask):
               "A && B — B только если A успешна; A || B — B только если A упала; A ; B — B в "
               "любом случае.")
     variants = (
-        Variant("С каким кодом завершается ./check.sh? ans ЧИСЛО",
+        Variant("С каким кодом завершается ./check.sh? ans NUMBER",
                 hints=("Код последней команды лежит в $?.",
                        "Запусти ./check.sh и сразу за ним — echo $?.",
-                       "./check.sh; echo $?, затем ans ЧИСЛО"),
+                       "./check.sh; echo $?, затем ans NUMBER"),
                 solution="./check.sh; echo $?",
                 wrong=("./check.sh; echo hi > /dev/null; echo $?",
                        "./check.sh 2>&1 | cut -d: -f4"),
@@ -1674,7 +1674,7 @@ _FULL_PATH = re.compile(r"^(?:/|~/|\$HOME/|\$\{HOME\}/)")
 
 
 class CronLine(Task):
-    """crontab ФАЙЛ, crontab -l: строка из пяти полей и команды; */n, a-b; полный путь."""
+    """crontab FILE, crontab -l: строка из пяти полей и команды; */n, a-b; полный путь."""
     id = "cron_line"
     track = "env"
     title = "По расписанию"
@@ -2083,35 +2083,35 @@ class ScriptAudit(AnswerTask):
               "Безопасен ли — решаешь ты, читая.")
     variants = (
         Variant("В downloads/ — скрипты, скачанные из сети. Один из них портит настройки "
-                "оболочки. Как он называется? ans ИМЯ",
+                "оболочки. Как он называется? ans NAME",
                 hints=("Не запускай — читай: grep по всем файлам сразу.",
                        "grep -n -E 'curl|\\.zshrc' downloads/* — кто из них пишет в ~/.zshrc?",
-                       "grep -n -E 'curl|wget|eval|\\.zshrc' downloads/*, затем ans ИМЯ"),
+                       "grep -n -E 'curl|wget|eval|\\.zshrc' downloads/*, затем ans NAME"),
                 solution="grep -n -E 'curl|wget|eval|\\.zshrc' downloads/*",
                 solution_script="cd downloads; grep -l '\\.zshrc' *",
                 wrong=("cd downloads; shasum -a 256 -c SHA256SUMS 2>/dev/null | grep FAILED | "
                        "cut -d: -f1",),
-                alternatives=("less downloads/ИМЯ и /zshrc — поиск внутри less",)),
+                alternatives=("less downloads/NAME и /zshrc — поиск внутри less",)),
         Variant("В downloads/ рядом со скриптами лежит SHA256SUMS — отпечатки от автора. Какой "
-                "файл не совпадает с опубликованным отпечатком? ans ИМЯ",
+                "файл не совпадает с опубликованным отпечатком? ans NAME",
                 hints=("Отпечаток печатает shasum -a 256, а весь список разом сверит флаг -c (check).",
                        "Сверяй из папки downloads: имена в SHA256SUMS — без пути. FAILED покажет "
                        "чужака.",
-                       "cd downloads; shasum -a 256 -c SHA256SUMS, затем ans ИМЯ"),
+                       "cd downloads; shasum -a 256 -c SHA256SUMS, затем ans NAME"),
                 solution="cd downloads; shasum -a 256 -c SHA256SUMS",
                 solution_script="cd downloads; shasum -a 256 -c SHA256SUMS 2>/dev/null | grep "
                                 "FAILED | cut -d: -f1",
                 wrong=("cd downloads; grep -l '\\.zshrc' *",),
                 alternatives=("shasum -a 256 downloads/* — отпечатки всех и сверка глазами",)),
         Variant("Какой скрипт из downloads/ пишет в ~/.zshrc и на какой строке? Назови оба: "
-                "ans ИМЯ НОМЕР",
+                "ans NAME NUMBER",
                 hints=("grep -n печатает номер строки перед её текстом.",
                        "Ищи по всем файлам разом: grep -n по шаблону .zshrc (точку — через \\.).",
-                       "grep -n '\\.zshrc' downloads/*, затем ans ИМЯ НОМЕР"),
+                       "grep -n '\\.zshrc' downloads/*, затем ans NAME NUMBER"),
                 solution="grep -n '\\.zshrc' downloads/*",
                 solution_script="cd downloads; grep -n '\\.zshrc' * | cut -d: -f1,2 | tr : ' '",
                 wrong=("cd downloads; grep -n curl * | cut -d: -f1,2 | tr : ' '",),
-                alternatives=("head -n 20 downloads/ИМЯ — строки по порядку, считать глазами",)),
+                alternatives=("head -n 20 downloads/NAME — строки по порядку, считать глазами",)),
     )
     hints = variants[0].hints
     solution = variants[0].solution
@@ -2954,7 +2954,7 @@ LIGHT_NAMES = ("datapeek", "sockhttp", "tabprint")      # учебные пак�
 
 
 def _install(segment_args, name: str) -> bool:
-    """В аргументах pip install есть пакет name (ИМЯ, ИМЯ==…, ИМЯ>=…; без ключей)."""
+    """В аргументах pip install есть пакет name (NAME, NAME==…, NAME>=…; без ключей)."""
     for a in segment_args:
         if not a.startswith("-") and envkit.canon(re.split(r"[=<>!~\[;]", a, 1)[0]) == name:
             return True
@@ -3007,7 +3007,7 @@ def _reports_tabprint(seg: str, active) -> bool:
 
 class PipOffline(AnswerTask):
     """pip install --no-index --find-links, зависимости, консольный скрипт, pip list и show,
-    ИМЯ==версия, pip uninstall -y. A и C — «сделай», B — «найди и назови» (ans). Что стоит в
+    NAME==версия, pip uninstall -y. A и C — «сделай», B — «найди и назови» (ans). Что стоит в
     .venv, родитель видит по именам папок dist-info; сводку datapeek считает тем же кодом
     пакета из src/ на данных генератора (pylibs.peek), а не запуском из песочницы."""
     id = "pip_offline"
@@ -3016,9 +3016,9 @@ class PipOffline(AnswerTask):
     par = 105
     pinned_python = True
     stock = "wheels"
-    scroll = ("pip install --no-index --find-links ~/wheels ИМЯ — пакет из папки, без сети.\n"
+    scroll = ("pip install --no-index --find-links ~/wheels NAME — пакет из папки, без сети.\n"
               "pip ставит во включённый venv и сам тянет зависимости — то, что нужно пакету.\n"
-              "pip list — что стоит; pip uninstall -y ИМЯ — убрать пакет (y — yes, без "
+              "pip list — что стоит; pip uninstall -y NAME — убрать пакет (y — yes, без "
               "вопроса).")
     variants = (
         Variant("Поставь в .venv пакет datapeek из папки ~/wheels (сети нет) и сохрани его "
@@ -3041,13 +3041,13 @@ class PipOffline(AnswerTask):
                               "— pip окружения и без activate",)),
         Variant("Какие пакеты потянул за собой datapeek? Поставь его в .venv из ~/wheels (что ему "
                 "нужно, покажет pip show datapeek — строка Requires) и сдай имя зависимости и её "
-                "версию: ans ИМЯ ВЕРСИЯ.",
+                "версию: ans NAME VERSION.",
                 hints=("Включи .venv и поставь datapeek, потом pip list: что появилось, кроме "
                        "него самого, pip и setuptools?",
                        "pip show datapeek — строка Requires называет зависимость; версию "
                        "покажет pip list.",
                        "source .venv/bin/activate; pip install --no-index --find-links ~/wheels "
-                       "datapeek; pip list, затем ans ИМЯ ВЕРСИЯ"),
+                       "datapeek; pip list, затем ans NAME VERSION"),
                 solution="source .venv/bin/activate; pip install --no-index --find-links "
                          "~/wheels datapeek; pip list",
                 solution_script="source .venv/bin/activate; pip install --no-index "
@@ -3081,7 +3081,7 @@ class PipOffline(AnswerTask):
     explain = ("pip ставит пакет и всё, что тот просит (зависимости), во включённое "
                "окружение. Без сети годится папка с колёсами: --no-index --find-links. Без "
                "== pip берёт самую новую версию.")
-    spell = "pip install --no-index --find-links ПАПКА ИМЯ — без сети; pip list; pip show ИМЯ"
+    spell = "pip install --no-index --find-links DIR NAME — без сети; pip list; pip show NAME"
     secret_keys = ("want",)
     MSG_NET = ("Сети здесь нет, и не нужна: pip install --no-index --find-links ~/wheels "
                "{name}")
@@ -3104,7 +3104,7 @@ class PipOffline(AnswerTask):
                  "установки.")
     MSG_SELF = "Это сам datapeek, а спрашивают, что он потянул за собой."
     MSG_REQUIRES = ("Requires называет только имя, а нужны имя и версия: версию покажет pip "
-                    "list. Сдай без слова Requires: ans ИМЯ ВЕРСИЯ")
+                    "list. Сдай без слова Requires: ans NAME VERSION")
     MSG_BASE = "pip и setuptools есть в любом окружении — их ставит venv, а не datapeek."
     MSG_NEWEST = ("pip взял самую новую. Версию задают так: pip install --no-index "
                   "--find-links ~/wheels tabprint==1.0.0")
@@ -3164,7 +3164,7 @@ class PipOffline(AnswerTask):
             return self.MSG_BASE
         if words and words[0].casefold().rstrip(":") == "requires":
             return self.MSG_REQUIRES
-        return self.common_mistake(given, ctx) or self.fallback
+        return self.common_mistake(given, ctx) or self.near_miss(given, ctx) or self.fallback
 
     def check(self, ctx) -> Verdict:
         v = self._v(ctx.state)
@@ -3306,14 +3306,14 @@ class PipFreeze(Task):
     par = 90
     pinned_python = True
     stock = "wheels"
-    scroll = ("pip freeze > requirements.txt — точный список пакетов venv: ИМЯ==ВЕРСИЯ.\n"
+    scroll = ("pip freeze > requirements.txt — точный список пакетов venv: NAME==VERSION.\n"
               "pip install -r requirements.txt — поставить всё по списку (r — requirement, в "
               "новый venv).\n"
               "Без == pip возьмёт самую новую. pip list — таблица для глаз, -r её не поймёт.")
     variants = (
         Variant("В .venv стоят пакеты проекта. Сохрани их точный список в requirements.txt.",
                 hints=("Включи .venv: список берётся из включённого окружения.",
-                       "pip freeze печатает строки ИМЯ==ВЕРСИЯ — запиши их в файл через >.",
+                       "pip freeze печатает строки NAME==VERSION — запиши их в файл через >.",
                        "source .venv/bin/activate; pip freeze > requirements.txt"),
                 solution="source .venv/bin/activate; pip freeze > requirements.txt",
                 wrong=("source .venv/bin/activate; pip list > requirements.txt",
@@ -3357,8 +3357,8 @@ class PipFreeze(Task):
     spell = "pip freeze > requirements.txt; pip install -r requirements.txt"
     MSG_LIST = ("Это таблица pip list — она для глаз, pip install -r её не поймёт: pip freeze > "
                 "requirements.txt")
-    MSG_FORMAT = "В requirements.txt нужны строки ИМЯ==ВЕРСИЯ, по одной — их печатает pip freeze."
-    MSG_NOPIN = ("Без версии pip возьмёт новейшую: в файле нужны строки ИМЯ==ВЕРСИЯ — как у pip "
+    MSG_FORMAT = "В requirements.txt нужны строки NAME==VERSION, по одной — их печатает pip freeze."
+    MSG_NOPIN = ("Без версии pip возьмёт новейшую: в файле нужны строки NAME==VERSION — как у pip "
                  "freeze.")
     MSG_OUTSIDE = ("В списке не пакеты .venv: pip freeze без окружения смотрит базовый Python. "
                    "Включи .venv: source .venv/bin/activate")
@@ -3482,7 +3482,7 @@ SOURCE_TXT = "report/source.txt"
 RC = ".termit/home/.zshrc"
 APP_REQ = f"{APP}/{REQ}"
 APP_VENV = f"{APP}/.venv"
-_PLACEHOLDERS = ("ИМЯ", "<ИМЯ>", "<имя>", "NAME")
+_PLACEHOLDERS = ("NAME", "<NAME>", "<имя>", "NAME")
 
 # части пути решения — ими собраны эталон и неверные решения (каждое — эталон с одной ошибкой)
 _B_FIX = "print -r -- '{fixed}' > app/config.json; "
@@ -3529,7 +3529,7 @@ class BossEnv(Task):
     # Открыты только cmd (шаги схватки) и строки игрока own (они и так в его ~/.zshrc)
     secret_keys = ("fixed", "src", "name", "extra", "others", "src_sha", "broken_sha", "want")
     scroll = ("Ничего не запускай — читай. python3 -m json.tool f.json — где сломан JSON;\n"
-              "jq -r '.a[0].b' f.json — значение без кавычек; which -a ИМЯ — кто первый.\n"
+              "jq -r '.a[0].b' f.json — значение без кавычек; which -a NAME — кто первый.\n"
               "Чужие строки ~/.zshrc убирают в nano; находку — mv в quarantine/, chmod -x.\n"
               "chmod 600 .env и строка .env в .gitignore; лишний пакет — pip uninstall -y.\n"
               "Список пакетов — pip freeze > requirements.txt из включённого venv.")
@@ -3549,7 +3549,7 @@ class BossEnv(Task):
     _H2 = ("which -a {cmd} покажет подмену в ~/.cache/bin, а ~/.zshrc — строку, что ставит её "
            "первой. Источник — в quarantine/ без права запуска; .env — chmod 600 и в .gitignore.")
     _H3 = ("Лишний пакет назван в самом источнике: grep -n pip в нём. Потом source "
-           "app/.venv/bin/activate; pip uninstall -y ИМЯ; pip freeze > app/requirements.txt")
+           "app/.venv/bin/activate; pip uninstall -y NAME; pip freeze > app/requirements.txt")
     _REF = _B_FIX + _B_SRC + _B_RC + _B_QUAR + _B_ENV + _B_PIP
     _ALT_SED = ("sed -i '' -e '/sync-agent/d' -e '/cache.bin/d' ~/.zshrc — чужие строки без "
                 "редактора")
@@ -3569,7 +3569,7 @@ class BossEnv(Task):
                 hints=(_H1, _H2, _H3), solution=_B_SHOWN, solution_script=_REF,
                 wrong=(_B_FIX + _B_SRC + _B_RC + "rm {src}; " + _B_ENV + _B_PIP,),
                 alternatives=(_ALT_SED,
-                              ".venv/bin/pip uninstall -y ИМЯ из папки app — pip окружения и без "
+                              ".venv/bin/pip uninstall -y NAME из папки app — pip окружения и без "
                               "activate")),
         Variant("Скрипт из downloads/ запустили, не читая. Теперь первым в PATH стоит "
                 "поддельный python3, app/config.json не читается, app/.env открыт всем, в "
@@ -3636,7 +3636,7 @@ class BossEnv(Task):
     MSG_REQ_DIR = "requirements.txt нужен в app/, рядом с .venv: pip freeze > app/requirements.txt"
     MSG_REQ_TABLE = ("app/requirements.txt — таблица pip list, pip install -r её не поймёт: pip "
                      "freeze > app/requirements.txt")
-    MSG_REQ_FORMAT = ("В app/requirements.txt нужны строки ИМЯ==ВЕРСИЯ, по одной — их печатает "
+    MSG_REQ_FORMAT = ("В app/requirements.txt нужны строки NAME==VERSION, по одной — их печатает "
                       "pip freeze.")
     MSG_REQ_EXTRA = ("В app/requirements.txt попал лишний пакет: сначала pip uninstall -y, потом "
                      "pip freeze заново.")
@@ -3644,7 +3644,7 @@ class BossEnv(Task):
                      "заново — pip freeze > app/requirements.txt (app/.venv включён).")
     MSG_REQ_HAND = ("Список пишет сам pip из app/.venv: source app/.venv/bin/activate; pip "
                     "freeze > app/requirements.txt")
-    MSG_PLACEHOLDER = ("ИМЯ в подсказке — место для имени пакета: его называет сам источник "
+    MSG_PLACEHOLDER = ("NAME в подсказке — место для имени пакета: его называет сам источник "
                        "(grep -n pip в нём).")
     MSG_PART = "В app/ сделано {k} из 4: осталось — {rest}."
     # E24a (аудит, мелкие): pip вне окружения; jq по ещё сломанному конфигу

@@ -462,7 +462,7 @@ def cmd_bug(box, text: str) -> int:
 
 
 def cmd_loot(box, arg: str) -> int:
-    """loot КОД или loot ПУТЬ (второе имя — memory): сдать находку. Штрафа за промах нет."""
+    """loot CODE или loot PATH (второе имя — memory): сдать находку. Штрафа за промах нет."""
     if not arg.strip():
         ui.say(story.NO_ARG)
         return 0
@@ -481,10 +481,10 @@ ASK_REPLY_CAP = 16384
 
 
 def cmd_ask(box, question: str) -> int:
-    """ask ВОПРОС: наводка Совы через мост родителя (unix-сокет в .termit). Моста нет —
+    """ask QUESTION: наводка Совы через мост родителя (unix-сокет в .termit). Моста нет —
     Сова спит, ничего не списано. Цены и лимиты считает мост, хук только передаёт."""
     if not question.strip():
-        ui.say(f"ask ВОПРОС — {theme.word('owl')}: наводка, не ответ.")
+        ui.say(f"ask QUESTION — {theme.word('owl')}: наводка, не ответ.")
         return 0
     path = str(Path(box) / ".termit" / "owl.sock")
     c = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

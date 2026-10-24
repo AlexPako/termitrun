@@ -62,6 +62,9 @@ class Variant:
     key: str = ""                                # стабильное имя варианта (для статистики)
     implant_script: Optional[str] = None         # то же решение утилитой задачи (Task.implant)
     explain: Optional[str] = None                # «Почему» в разборе; None — Task.explain (Н3.4)
+    # Р1 (владелец 23.10): ступень повтора — 0 базовая, 1 с подвохом (пробел в имени, скрытый
+    # файл, ловушка), 2 связка с прошлым приёмом или «почини сломанное»
+    tier: int = 0
 
 
 def variant_index(value, n: int) -> int:
@@ -327,9 +330,15 @@ OUTPUT_CMDS = ("pwd", "ls", "cat", "find", "grep", "du", "wc", "head", "tail", "
                "echo", "less", "cut", "uniq", "date", "whoami", "basename", "dirname")
 # совет с подстановкой — всегда полный и безопасный: без голых cat/grep, ждущих ввода (I2)
 SAFE_SUBST = {"pwd": "ans $(pwd)", "whoami": "ans $(whoami)", "date": "ans $(date)",
-              "cat": "ans $(cat ИМЯ_ФАЙЛА)", "grep": "ans $(grep 'ШАБЛОН' ИМЯ_ФАЙЛА)"}
-# Заготовка из текста задания: ПУТЬ, СЛОВО, ЧИСЛО, ИМЯ_ФАЙЛА… — заглавные кириллицей.
+              "cat": "ans $(cat FILE)", "grep": "ans $(grep 'PATTERN' FILE)"}
+# Заготовка из текста задания: PATH, WORD, NUMBER, FILE… — заглавные (раньше — кириллицей).
 _PLACEHOLDER = re.compile(r"(?<![\w])([А-ЯЁ][А-ЯЁ_]+)(?![\w])")
+# те же заготовки по-английски (скилл termit-lesson): только эти слова — заглавное английское
+# слово в ответе может быть и настоящим ответом
+_PLACEHOLDER_EN = re.compile(r"(?<![\w$])(WORD|NUMBER|PATH|NAME|FILE|DIR|ANSWER|PASSWORD|"
+                             r"COMMAND|PATTERN|SOURCE|DEST|CODEWORD|CITY|VERSION|LINE|HOUR|"
+                             r"CODE|TEXT|SURNAME|TYPE|ADDRESS|DISTRICT|DATE|ITEM|CHAR|KEY|"
+                             r"VALUE|STATUS|LETTER|PRICE|ACCOUNT|MONTH|OWNER|TAG)(?![\w])")
 # Похоже на имя файла: без пробелов, с расширением (в нём есть буква), скрытое имя с точки
 # или путь с косой чертой внутри.
 _FILE_LIKE = re.compile(r"^(?=.*[A-Za-zА-Яа-яЁё])[^\s:]*"
@@ -422,11 +431,11 @@ MSG_FILE_NUMBER = "{name} — это имя файла, а нужно число
 _WHOLE_FILE = (" ans $(cat файл) сдаёт файл целиком — так можно, только если в нём один ответ "
                "и больше ничего.")
 MSG_EXTRA = ("Нужен только сам ответ — без остальной строки и подписей." + _WHOLE_FILE +
-             " Найди ответ в тексте и сдай его один: ans ОТВЕТ")
+             " Найди ответ в тексте и сдай его один: ans ANSWER")
 MSG_ONE = ("Нужен ровно один ответ, а не несколько на выбор." + _WHOLE_FILE +
-           " Выбери нужный и сдай его один: ans ОТВЕТ")
-MSG_EXTRA_NUMBER = "Нужно одно число — без слов вокруг." + _WHOLE_FILE + " Сдай число: ans ЧИСЛО"
-MSG_ONE_NUMBER = "Нужно одно число, а не несколько." + _WHOLE_FILE + " Сдай одно: ans ЧИСЛО"
+           " Выбери нужный и сдай его один: ans ANSWER")
+MSG_EXTRA_NUMBER = "Нужно одно число — без слов вокруг." + _WHOLE_FILE + " Сдай число: ans NUMBER"
+MSG_ONE_NUMBER = "Нужно одно число, а не несколько." + _WHOLE_FILE + " Сдай одно: ans NUMBER"
 MSG_GREP_LINE = ("Это строка вывода grep целиком. Путь — до первого двоеточия: сдай только "
                  "его (grep -l печатает одни пути).")
 MSG_EXTRA_PATH = "Сдай только сам путь — без остальной строки."
@@ -439,6 +448,17 @@ MSG_HERE = ("Это путь папки, где ты стоишь, а спраш
 MSG_NOT_NUMBER = "Нужно число — сдай его цифрами."
 MSG_PARTIAL = "Ответ из {n} частей — сдай их все, через пробел."
 MSG_CASE = "Почти: здесь важен регистр — большая и маленькая буква дают разное."
+# Р7: «не то» с признаком — ответ не выдаём, говорим, что не так со сданным
+MSG_NEAR_NUMBER = ("«{given}» — близко, но не то число. Сверь, что именно считаешь: не попало ли "
+                   "в счёт лишнее (строка заголовка, . и ..) — или не пропущено ли нужное.")
+MSG_NEAR_TEXT = ("«{given}» — почти: одна-две буквы не те. Не перепечатывай — скопируй слово "
+                 "двойным щелчком и вставь Cmd+V.")
+MSG_NOT_IN_SOURCE = ("Слова «{given}» в файле с ответом нет — похоже, ты читал не тот файл. "
+                     "Перечитай задание: где лежит нужное.")
+MSG_NO_PATH = ("Пути «{given}» нет — проверь опечатку: набери начало имени и жми Tab, "
+               "терминал допишет сам.")
+MSG_OTHER_PATH = ("«{given}» — такое место есть, но нужно другое. Перечитай, какую папку или файл "
+                  "просит задание.")
 MSG_LOST_SOURCE = ("Файл, где лежал ответ, пропал или изменился. Набери reset — соберу задачу "
                    "заново, с теми же данными.")
 
@@ -540,7 +560,7 @@ class AnswerTask(Task):
             return MSG_EMPTY
         st = ctx.state
         exp = self.expected(st)
-        m = _PLACEHOLDER.search(g)
+        m = _PLACEHOLDER.search(g) or _PLACEHOLDER_EN.search(g)
         if m and m.group(1) in self._task_text(st):
             return MSG_PLACEHOLDER.format(word=m.group(1))
         words = g.split()
@@ -607,9 +627,49 @@ class AnswerTask(Task):
             return MSG_HERE
         return None
 
+    def near_miss(self, given: str, ctx: Ctx) -> Optional[str]:
+        """Р7 (владелец 23.10): «сдал X, а нужно другое по такому признаку» — без выдачи
+        ответа. Признак берётся из формы сданного: число рядом с нужным, слово с опечаткой,
+        слова нет в файле с ответом, пути нет в песочнице. Ничего не подошло — None."""
+        g = textnorm.clean(given)
+        st = ctx.state
+        try:
+            exp = textnorm.clean(self.expected(st))
+        except (KeyError, TypeError, ValueError):
+            return None
+        kind = self.answer_kind(st)
+        if kind == "number":
+            got, want = textnorm.as_number(g), textnorm.as_number(exp)
+            if got is not None and want and 0 < abs(got - want) <= 2:
+                return MSG_NEAR_NUMBER.format(given=g)
+            return None
+        if kind == "path":
+            if "/" in g or g in (".", ".."):
+                if not any((Path(g) if g.startswith("/") else b / g).exists()
+                           for b in self._bases(ctx)):
+                    return MSG_NO_PATH.format(given=g)
+                return MSG_OTHER_PATH.format(given=g)
+            return None
+        if len(g.split()) != 1 or len(exp.split()) != 1:
+            return None
+        if len(exp) >= 4 and _distance(g.casefold(), exp.casefold()) <= (1 if len(exp) < 7 else 2):
+            return MSG_NEAR_TEXT.format(given=g)
+        texts = []
+        for rel in (st.get("sources") or {}):
+            try:
+                texts.append((Path(ctx.box) / rel).read_text(errors="replace").casefold())
+            except OSError:
+                return None
+        # слово ответа лежит в файле как есть (не вычислено, не расшифровано) — иначе «не тот
+        # файл» соврёт игроку, который читал верный файл, но ошибся в обработке
+        if (texts and any(exp.casefold() in t for t in texts)
+                and not any(g.casefold() in t for t in texts)):
+            return MSG_NOT_IN_SOURCE.format(given=g)
+        return None
+
     def wrong_message(self, given: str, ctx: Ctx) -> str:
         return (self.trap_message(given, ctx) or self.common_mistake(given, ctx)
-                or self.fallback)
+                or self.near_miss(given, ctx) or self.fallback)
 
     def lost_source(self, ctx: Ctx) -> bool:
         """Файл с ответом стёрт или изменён: без reset задачу не решить. Читает судья у
@@ -632,6 +692,17 @@ def sources(box, *rels) -> dict:
     """{путь: sha} файлов с ответом — для AnswerTask.lost_source (в state, ключ sources)."""
     from termit_app.tasks import kit
     return {str(r): kit.sha(Path(box) / r) for r in rels}
+
+
+def _distance(a: str, b: str) -> int:
+    """Сколько букв поправить, чтобы из a вышло b (вставка, удаление, замена)."""
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, 1):
+        cur = [i]
+        for j, cb in enumerate(b, 1):
+            cur.append(min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (ca != cb)))
+        prev = cur
+    return prev[-1]
 
 
 def _shape(w: str) -> str:

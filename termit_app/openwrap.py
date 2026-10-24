@@ -1,9 +1,9 @@
-"""Обёртка тренажёра над open (.termit/bin/open): python3 -m termit_app.openwrap АРГУМЕНТЫ...
+"""Обёртка тренажёра над open (.termit/bin/open): python3 -m termit_app.openwrap ARGS...
 
 Запускается внутри песочницы. open — единственная команда, которой песочница по замыслу
 разрешает дойти до LaunchServices (задача open_gui, uses_gui): она открывает окна программ
 вне песочницы. Поэтому обёртка пропускает только то, что нужно уроку (В5 приёмки-1):
-  * папки — только в Finder: open ПАПКА, open -a Finder ПАПКА, open -R ПАПКА;
+  * папки — только в Finder: open DIR, open -a Finder DIR, open -R DIR;
   * обычные файлы безопасных типов (DOC_APPS) — только явной программой: txt, md, csv, log,
     json — TextEdit, png, jpg, gif, pdf — Preview; -a TextEdit|Preview, -e, -t, -R.
 Каждый путь раскрывается (realpath) и обязан остаться внутри песочницы. Отказ — пакеты (.app,
