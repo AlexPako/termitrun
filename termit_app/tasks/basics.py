@@ -1,6 +1,8 @@
 """Трек «Основы»: навигация, файлы, маски."""
+import io
 import os
 import re
+import zipfile
 from pathlib import Path
 from typing import List, Optional
 
@@ -883,12 +885,17 @@ class FileExt(AnswerTask):
     scroll = ("Расширение — хвост имени после точки (notes.txt, data.csv): подсказка, что "
               "внутри. Finder по нему выбирает, чем открыть, а терминалу всё равно.\n"
               "Расширение — часть имени: при файле notes.txt cat notes ответит No such file.\n"
-              "file NAME — что внутри на самом деле: текст, картинка, архив (NAME — имя "
-              "файла). ext — копилка: что значат расширения, что тебе уже попадались.")
+              "file NAME — что внутри на самом деле: текст (file ответит text), картинка, "
+              "архив (NAME — имя файла). ext — копилка: что значат расширения, что тебе уже попадались.")
     variants = (
         Variant("Здесь, в этой папке, свалены файлы разного сорта — ls их покажет. Какой из "
                 "них — таблица с данными? Сдай его полное имя, вместе с "
                 "расширением: ans NAME — вместо NAME вставь имя.",
+                hints=("Что значит расширение, подскажет ext; список файлов — ls.",
+                       ".csv — таблица: строки, поля через запятую.",
+                       "ls — найди файл .csv, file NAME.csv подтвердит: CSV text. Сдай имя: "
+                       "ans NAME.csv"),
+                solution="ls && file {name}.csv", solution_script="ls *.csv",
                 wrong=("ls *.json",),
                 alternatives=("ext — копилка расширений скажет, что .csv — это таблица",)),
         Variant("Нужна записка — файл с именем {stem} и расширением .txt; в ней слово. Рядом "
@@ -945,6 +952,8 @@ class FileExt(AnswerTask):
     # минимальные файлы, которые file узнаёт по первым байтам
     PNG = bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
                         "0000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
+    # заголовок JFIF и конец снимка: file узнаёт JPEG, cat печатает мусор
+    JPEG = bytes.fromhex("ffd8ffe000104a46494600010100000100010000ffd9")
 
     def setup_variant(self, box, rng, variant):
         if variant == 1:
@@ -956,8 +965,6 @@ class FileExt(AnswerTask):
             return {"stem": stem, "answer": word, "traps": [["old", old]],
                     "sources": sources(box, f"{stem}.txt")}
         if variant == 2:
-            import io
-            import zipfile
             folder = rng.choice(["drop", "inbox", "found"])
             names = rng.sample(["item1", "item2", "item3", "blob", "piece", "chunk"], 3)
             text, image, archive = names
@@ -976,12 +983,18 @@ class FileExt(AnswerTask):
         name = rng.choice(["sales", "clients", "orders", "prices"])
         files = {f"{name}.csv": "id,sum\n1,10\n2,25\n", "notes.txt": "Notes.\n",
                  "readme.md": "# Readme\n", "config.json": '{"debug": false}\n',
-                 "server.log": "12:00 start\n", "photo.jpg": "placeholder\n",
-                 "backup.zip": "placeholder\n"}
+                 "server.log": "12:00 start\n"}
         for fname, body in files.items():
             kit.write(box / fname, body)
-        traps = [["stem", name]] + [["other", f] for f in files if not f.endswith(".csv")]
-        return {"answer": f"{name}.csv", "traps": traps}
+        # практик 25.10: заглушки-тексты file звал ASCII text — урок обещал картинку и архив
+        (box / "photo.jpg").write_bytes(self.JPEG)
+        packed = io.BytesIO()
+        with zipfile.ZipFile(packed, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("old_notes.txt", "Old notes.\n" * 3)
+        (box / "backup.zip").write_bytes(packed.getvalue())
+        traps = [["stem", name]] + [["other", f] for f in [*files, "photo.jpg", "backup.zip"]
+                                    if not f.endswith(".csv")]
+        return {"name": name, "answer": f"{name}.csv", "traps": traps}
 
 
 def _keep_check(box: Path, keep, must_move, extra, where=("", "data")) -> Verdict:
@@ -1375,8 +1388,8 @@ class DeepRm(Task):
               "скрытыми папками.\n"
               "Папку голый rm не удаляет. rm -r DIR — папку DIR со всем содержимым, и скрытым "
               "тоже: -r — recursive (рекурсивно, вглубь). Навсегда, мимо Корзины.\n"
-              "Привычка: сначала ls с той же маской (или ls -R DIR) — посмотреть, что "
-              "исчезнет, — и только потом rm.")
+              "Привычка: сначала ls с той же маской (или ls -aR DIR — со скрытым) — "
+              "посмотреть, что исчезнет, — и только потом rm. При успехе rm молчит.")
     variants = (
         Variant("Ты стоишь в папке сборки. Сотри все файлы *.tmp — отсюда и на любой глубине, "
                 "в том числе в скрытых папках. Всё остальное не трогай.",
@@ -1397,7 +1410,7 @@ class DeepRm(Task):
                        "rm project/**/*.tmp(D) && rm trash/*(D)"),
                 alternatives=("ls project/**/*.tmp(D) && rm project/**/*.tmp(D) — сначала "
                               "посмотреть, кого заденет",
-                              "ls -R trash — что исчезнет вместе с папкой"),
+                              "ls -aR trash — что исчезнет вместе с папкой, и скрытое тоже"),
                 explain="rm берёт те же маски, что ls: **/*.tmp(D) — на любой глубине, со "
                         "скрытыми. rm -r удаляет папку со всем, что внутри. Сначала ls той "
                         "же маской."),
@@ -1406,8 +1419,8 @@ class DeepRm(Task):
                 "не трогай.",
                 hints=("Голый rm папку не удаляет — ему нужен флаг.",
                        "-r — со всем содержимым, на любую глубину. Сначала посмотри, что "
-                       "исчезнет: ls -R old",
-                       "ls -R old — проверить, затем rm -r old"),
+                       "исчезнет, со скрытым: ls -aR old",
+                       "ls -aR old — проверить, затем rm -r old"),
                 solution="rm -r old",
                 wrong=("rm old/*", "rm -r old/*"),
                 alternatives=("ls -laR old && rm -r old — сначала посмотреть всё, со "

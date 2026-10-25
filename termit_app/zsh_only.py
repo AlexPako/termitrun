@@ -88,6 +88,7 @@ ITEMS: Dict[str, Trick] = {
 FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     # «Основы»
     "quotes": ("quotes",),
+    "star_mask": ("nomatch",),
     "deep_dig": ("globstar", "qualifiers"),
     "history_recall": ("history",),
     "z_jump": ("setopt", "auto_pushd", "zshrc"),
