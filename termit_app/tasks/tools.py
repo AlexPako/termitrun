@@ -74,7 +74,10 @@ class ManFlag(AnswerTask):
                 alternatives=("man {cmd} | grep -B1 '{word}' — найти строку, не открывая "
                               "листалку; -B1 добавит строку над совпадением",)),
         Variant("У {cmd} есть флаг {flag}. Что он делает? Открой man {cmd} и найди строку, "
-                "которая начинается с {flag} (поиск: /{flag}). Сдай одно слово из её описания — "
+                "которая начинается с {flag} (поиск: /{flag}). Первое совпадение бывает вверху, "
+                "в строке-образце SYNOPSIS («краткий вид»): там все флаги команды подряд в "
+                "квадратных скобках, вроде [-abc], без описаний — жми n, пока не дойдёшь до "
+                "строки флага. Сдай одно слово из её описания — "
                 "по-английски, как в man, — главное слово: то, что есть только у этого флага. "
                 "Пример: у ls -l описание «List files in the long format» — список ls "
                 "печатает всегда, а long — только с -l: сдают long. Сдают слово, а не флаг: "
@@ -341,17 +344,20 @@ class NanoConfig(Task):
     id = "nano_config"
     track = "tools"
     title = "Конфиг в nano"
-    scroll = ("nano FILE — простой редактор для файла FILE. Внизу подсказки, ^ — это Ctrl. "
-              "Ctrl+W — поиск, Ctrl+K — вырезать строку, Ctrl+X — выйти.\n"
-              "Ctrl+W и сразу Enter — искать то же слово дальше. Ctrl+X по несохранённому файлу "
-              "спросит, сохранить ли: Y, потом Enter. Сохранил — игра сама сверит файл.")
+    scroll = ("nano FILE — простой редактор для файла FILE (на Mac вверху написано UW PICO — "
+              "это он). Внизу подсказки, ^ — это Ctrl. Backspace — стереть букву слева, Ctrl+A "
+              "— в начало строки, Ctrl+W — поиск куска текста, Ctrl+K — вырезать строку, "
+              "Ctrl+X — выйти.\n"
+              "Ctrl+W и сразу Enter — искать то же дальше. Ctrl+X по несохранённому файлу "
+              "спросит, сохранить ли: Y, потом Enter; N — выйти без сохранения, Ctrl+C — "
+              "остаться. Сохранил — игра сама сверит файл.")
     variants = (
         Variant("В конфиге app.conf замени port 5432 на 6432 (строка «port = 5432») и удали "
                 "строку с debug. backup_port не трогай. Открой файл в nano: nano app.conf — "
                 "и сохрани, ans не нужен.",
                 wrong=("sed -i '' -e 's/5432/6432/' -e '/^debug = /d' app.conf",),
-                alternatives=("nano app.conf, Ctrl+W port и Enter — прыжок прямо к нужной "
-                              "строке, без листания",)),
+                alternatives=("nano app.conf, Ctrl+W port и Enter — прыжок к строке с port "
+                              "без листания; встал на backup_port — Ctrl+W и Enter ещё раз",)),
         Variant("В db.ini поменяй пользователя: user = test должно стать user = admin. И допиши "
                 "в самый конец файла новую строку timeout = 30: стрелкой вниз, пока курсор не "
                 "встанет на пустую строку под последней. Остальное не трогай. Открой файл в "
@@ -650,7 +656,8 @@ class VimPurge(Task):
     track = "tools"
     title = "Чистка строк в vim"
     scroll = ("vim FILE — открыть файл FILE. В режиме команд: /WORD и Enter — поиск, n — "
-              "следующее, dd — удалить строку, u — отменить последнее, :wq — сохранить и выйти.\n"
+              "следующее, dd — удалить строку (первая d — «удалить», вторая — «строку "
+              "целиком»), u — отменить последнее, :wq — сохранить и выйти.\n"
               "Не знаешь, в каком ты режиме, — нажми Esc. ^ в поиске — начало строки: /^# найдёт "
               "только строки, которые начинаются с #. Пробел в поиске — тоже символ.")
     variants = (
@@ -901,33 +908,36 @@ class TldrTar(Task):
     title = "tldr и архив"
     implant = "tldr"      # близнец: решается и без tldr (man tar), tldr — подарок после
     scroll = ("tldr COMMAND — живые примеры (нет tldr — man tar, /extract). "
-              "tar -xzf ARCHIVE -C DIR — распаковать архив ARCHIVE в папку DIR; tar -tzf "
-              "ARCHIVE — оглавление; tar -xzf ARCHIVE PATH — один файл; tar -czf ARCHIVE DIR — "
-              "собрать. -C — Change directory; x — extract, c — create, t — table, z — gzip, "
-              "f — file.\n"
+              "tar -xf ARCHIVE -C DIR — распаковать архив ARCHIVE в папку DIR (без -C — сюда; "
+              "папка DIR должна уже быть); tar -tf ARCHIVE — оглавление; tar -xf ARCHIVE PATH — "
+              "один файл; tar -czf ARCHIVE DIR — собрать сжатый. x — extract, c — create, t — "
+              "table, f — file, -C — Change directory; z — gzip: нужна при сборке, при "
+              "распаковке и оглавлении tar узнаёт сжатие сам.\n"
               "В tldr {{…}} или path/to/… — твоё имя; --wildcards — для Linux, на Mac не нужен.")
     variants = (
         Variant("В backup.tar.gz — архив с файлами. Распакуй его в папку backup/ — она уже "
                 "есть, рядом. Как именно, подскажет tldr tar, а если tldr не стоит — man tar. "
                 "Сдавать ничего не надо: игра проверит папку сама.",
-                wrong=("tar -xzf backup.tar.gz",),
-                alternatives=("cd backup && tar -xzf ../backup.tar.gz — зайти и распаковать "
-                              "на месте",)),
+                wrong=("tar -xf backup.tar.gz",),
+                alternatives=("cd backup && tar -xf ../backup.tar.gz — зайти и распаковать "
+                              "на месте",
+                              "tar -xzf backup.tar.gz -C backup — с z то же самое: при "
+                              "распаковке tar узнаёт сжатие сам")),
         Variant("В release.tar.gz целый проект, а нужен один файл — readme.txt, он лежит "
                 "где-то внутри. Достань только его в текущую папку: путь из архива пишется "
                 "после имени архива, и файл ляжет вместе с папками из этого пути. Где он "
                 "лежит, покажет оглавление архива, а как распаковывать вообще — tldr tar или "
                 "man tar. Сдавать ничего не надо.",
-                hints=("Сначала оглавление: tar -tzf release.tar.gz — там виден полный путь к "
+                hints=("Сначала оглавление: tar -tf release.tar.gz — там виден полный путь к "
                        "readme.txt.",
-                       "Этот путь целиком допиши после имени архива: tar -xzf release.tar.gz PATH, "
+                       "Этот путь целиком допиши после имени архива: tar -xf release.tar.gz PATH, "
                        "где PATH — путь из оглавления",
-                       "tar -tzf release.tar.gz, затем tar -xzf release.tar.gz {path} "
+                       "tar -tf release.tar.gz, затем tar -xf release.tar.gz {path} "
                        "(примеры — в tldr tar или man tar)"),
-                solution="tar -tzf release.tar.gz, tar -xzf release.tar.gz {path}",
-                solution_script="tar -xzf release.tar.gz {path}",
-                wrong=("tar -xzf release.tar.gz", "tar -xzf release.tar.gz readme.txt"),
-                alternatives=("tar -xzf release.tar.gz '*/readme.txt' — tar на Mac понимает "
+                solution="tar -tf release.tar.gz, tar -xf release.tar.gz {path}",
+                solution_script="tar -xf release.tar.gz {path}",
+                wrong=("tar -xf release.tar.gz", "tar -xf release.tar.gz readme.txt"),
+                alternatives=("tar -xf release.tar.gz '*/readme.txt' — tar на Mac понимает "
                               "шаблон и без --wildcards",)),
         Variant("Собери из папки notes сжатый архив notes.tar.gz — здесь, рядом с папкой. "
                 "Как — подскажет tldr tar, а если tldr не стоит — man tar. Сдавать ничего не "
@@ -944,12 +954,14 @@ class TldrTar(Task):
     )
     par = 60
     hints = ("tldr tar — короткие примеры; если tldr не стоит — man tar, /extract",
-             "Распаковка — tar -xzf, папка назначения — флаг -C.",
-             "tar -xzf backup.tar.gz -C backup — этот пример есть и в tldr tar")
-    solution = "tldr tar (или man tar), tar -xzf backup.tar.gz -C backup"
-    solution_script = "tar -xzf backup.tar.gz -C backup"
-    explain = "x — извлечь, z — gzip, f — файл архива, -C — куда. tldr выдаст это за пару секунд."
-    spell = "tldr COMMAND — примеры; tar -xzf ARCHIVE -C DIR — распаковать"
+             "Распаковка — tar -xf, папка назначения — флаг -C и её имя (в tldr — "
+             "--directory=).",
+             "tar -xf backup.tar.gz -C backup (примеры — в tldr tar или man tar)")
+    solution = "tldr tar (или man tar), tar -xf backup.tar.gz -C backup"
+    solution_script = "tar -xf backup.tar.gz -C backup"
+    explain = ("x — извлечь, f — файл архива, -C — куда. z (gzip) нужна только при сборке: "
+               "при распаковке tar узнаёт сжатие сам. tldr выдаст это за пару секунд.")
+    spell = "tldr COMMAND — примеры; tar -xf ARCHIVE -C DIR — распаковать"
 
     def _files(self, rng, folder, names):
         shas = {}
@@ -999,7 +1011,7 @@ class TldrTar(Task):
             last = ctx.cmds[-1].line if ctx.cmds else ""
             if not got and not extra and re.search(r"tar .*(^|\s)readme\.txt", last):
                 return Verdict(False, "В архиве readme.txt лежит не в корне, а в папке: имя "
-                                      "нужно с полным путём, как в оглавлении tar -tzf "
+                                      "нужно с полным путём, как в оглавлении tar -tf "
                                       "release.tar.gz.")
             return Verdict(got and not extra)
         if v == 2:
@@ -1350,7 +1362,8 @@ class BossTools(Task):
               "цел — напечатает его красиво.\n"
               "Правила JSON: текст — в двойных кавычках, числа и true/false — без кавычек, "
               "между элементами запятая, после последнего — нет.\n"
-              "Править — в nano или vim, как в прошлых задачах; после правки снова jq . FILE")
+              "Править — в nano или vim, как в прошлых задачах; после правки снова jq . FILE. "
+              "jq молчит — значит, цела форма, а не смысл: значения сверяй с запиской сам.")
     steps = ("файл снова читается: jq . без ошибок",
              "число из записки note.txt — на месте и без кавычек",
              "остальное по записке и правилам JSON исправлено",
@@ -1559,10 +1572,12 @@ class JobControl(Task):
     track = "tools"
     title = "Задачи в фоне"
     scroll = ("Ctrl+Z — приостановить то, что заняло экран (vim, скрипт); fg — вернуть "
-              "на экран.\n"
+              "на экран. Ctrl+C — прервать насовсем.\n"
               "bg — пусть работает в фоне; команда & — сразу в фоне. jobs — задачи с "
-              "номерами.\n"
-              "kill %2 — остановить задачу 2 из jobs (% — номер задачи). wait — дождаться "
+              "номерами и состоянием: работает, приостановлена, закончилась; + — её берут fg "
+              "и bg без номера.\n"
+              "kill %2 — остановить задачу 2 из jobs (% — номер задачи; без % число — номер "
+              "процесса — запущенной программы — в системе, чужого). wait — дождаться "
               "фоновых.")
     variants = (
         Variant("Запусти ./build.sh — он будет ждать файл config.txt. Не закрывай его и не "
