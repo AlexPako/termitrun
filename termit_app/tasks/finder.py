@@ -403,8 +403,9 @@ class DuHeavy(AnswerTask):
     kind_answer = "path"
     # владелец 25.10: «не ставь сразу два новых понятия в урок» — здесь одно: du; sort -h и
     # tail/head убраны, ступень 3 — связка с пройденной маской (* в пути, «Основы»)
-    scroll = ("du -sh * — сколько весит каждая папка и файл здесь (s — summarize, итогом на "
-              "папку; h — human-readable, в K, M, G).\n"
+    scroll = ("du — вес всех папок здесь и глубже, в блоках; du -h — то же буквами K, M, G "
+              "(human-readable); du -sh — одной строкой-итогом (summarize); имя или * после — "
+              "взвесить именно это: du -sh * — по строке на каждую папку и файл здесь.\n"
               "Сравнивай сначала букву, потом число: K < M < G, поэтому 900K меньше 2M. Внутри "
               "другой папки — du -sh DIR/*. Имя — двойным щелчком, Cmd+C, ans NAME.")
     variants = (
@@ -515,7 +516,8 @@ class LsNewest(AnswerTask):
     track = "finder"
     title = "По времени изменения"
     scroll = ("ls -t — свежие файлы сверху (t — time, по времени); ls -tr — наоборот, старые "
-              "сверху (r — reverse); ls -t *.pdf — только PDF. | head -1 — оставить одну "
+              "сверху (r — reverse: переворачивает порядок -t; один ls -r — алфавит задом "
+              "наперёд); ls -t *.pdf — только PDF. | head -1 — оставить одну "
               "первую строку.\n"
               "Сразу в ответ: ans $(ls -t | head -1)")
     variants = (
@@ -523,9 +525,10 @@ class LsNewest(AnswerTask):
                 wrong=("ls | head -1",),
                 alternatives=("ls -lt | head -3 — с датами, чтобы видеть разницу",)),
         Variant("Какой файл здесь самый старый — дольше всех не менялся? Назови его: ans NAME — имя файла. "
-                "Флаг -r у ls переворачивает порядок",
+                "Флаг -r у ls переворачивает порядок, который задали остальные флаги.",
                 hints=("ls -t сортирует по времени: свежие сверху, старые — внизу.",
-                       "-r переворачивает порядок: ls -tr — старые сверху.",
+                       "-r переворачивает порядок, заданный -t: ls -tr — старые сверху. Один ls -r "
+                       "перевернёт алфавит — это не то.",
                        "ls -tr | head -1 — или сразу ans $(ls -tr | head -1)"),
                 solution="ls -tr | head -1",
                 wrong=("ls -t | head -1",),
@@ -549,6 +552,8 @@ class LsNewest(AnswerTask):
     trap_messages = {
         "abc": "Это первый по алфавиту: обычный ls сортирует по имени. По времени — ls -t.",
         "newest": "Это самый свежий, а нужен самый старый: -r переворачивает порядок.",
+        "abcrev": "Это последний по алфавиту: один -r переворачивает алфавит. Время задаёт "
+                  "-t, а -r его переворачивает: ls -tr.",
         "notpdf": "Это не PDF: дай ls маску *.pdf — остальные файлы не в счёт.",
     }
 
@@ -579,7 +584,11 @@ class LsNewest(AnswerTask):
             os.utime(p, (now - age, now - age))
         newest = names[ages.index(min(ages))]
         if variant == 1:
-            return {"answer": names[ages.index(max(ages))], "traps": [["newest", newest]]}
+            oldest = names[ages.index(max(ages))]
+            traps = [["newest", newest]]
+            if max(names) != oldest:        # ls -r | head -1 — алфавит задом наперёд
+                traps.append(["abcrev", max(names)])
+            return {"answer": oldest, "traps": traps}
         if variant == 2:
             pdfs = [i for i in range(len(names)) if names[i].endswith(".pdf")]
             return {"answer": names[min(pdfs, key=lambda i: ages[i])],
@@ -1146,8 +1155,8 @@ class TopHog(Task):
     title = "Пожиратель ресурсов"
     scroll = ("top -o cpu — живой список процессов, прожорливые сверху (o — order; top -o mem — "
               "по памяти, M в колонке MEM — мегабайты); q — выход.\n"
-              "ps aux -r | grep procs — то же разом, без прыжков (r — по процессору; ps aux -m — по "
-              "памяти, m — memory): PID — второй столбец, полная команда — в конце, у нужного "
+              "ps aux | grep procs — то же разом, без прыжков (ps aux сам ставит прожорливых по "
+              "процессору сверху; ps aux -m — по памяти, m — memory): PID — второй столбец, полная команда — в конце, у нужного "
               "путь .termit/procs. Потом kill PID; двоих — kill PID PID.")
     variants = (
         Variant("Какой-то процесс съедает процессор. Найди его в top и останови. "
@@ -1176,15 +1185,15 @@ class TopHog(Task):
                 "Остальных не трогай! kill принимает несколько номеров через пробел.",
                 hints=("top -o cpu — прожорливые сверху; сегодня виновников двое — смотри две "
                        "верхние строки. Выход — q.",
-                       "Сверь: ps aux -r | grep procs — у обоих в команде путь .termit/procs. kill "
+                       "Сверь: ps aux | grep procs — у обоих в команде путь .termit/procs. kill "
                        "принимает несколько PID сразу.",
-                       "top -o cpu или ps aux -r | grep procs, два PID с .termit/procs наверху, kill "
+                       "top -o cpu или ps aux | grep procs, два PID с .termit/procs наверху, kill "
                        "PID1 PID2"),
-                solution=("top -o cpu, два PID сверху; сверка: ps aux -r | grep procs (в команде "
+                solution=("top -o cpu, два PID сверху; сверка: ps aux | grep procs (в команде "
                           ".termit/procs), kill PID1 PID2"),
-                solution_script=("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | "
+                solution_script=("kill $(ps aux | grep \"$TERMIT_BOX/.termit/procs\" | "
                                  "grep -v grep | head -2 | awk '{{print $2}}')"),
-                wrong=("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
+                wrong=("kill $(ps aux | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
                        "head -1 | awk '{{print $2}}')",),
                 alternatives=("top -l 1 -o cpu -n 5 — -l 1 — один снимок вместо живого экрана, "
                               "-n 5 — пять верхних строк",)),
@@ -1192,12 +1201,12 @@ class TopHog(Task):
     par = 45
     hints = ("Кто ест процессор, показывает top -o cpu — виновник в первой строке, PID — в "
              "первом столбце. Выход — q.",
-             "Сверь кандидата: ps aux -r | grep procs — у нужного процесса в команде путь "
+             "Сверь кандидата: ps aux | grep procs — у нужного процесса в команде путь "
              ".termit/procs. PID — во втором столбце.",
-             "top -o cpu или ps aux -r | grep procs, строка с .termit/procs наверху, kill PID")
-    solution = ("top -o cpu, PID в первой строке; сверка: ps aux -r | grep procs (в команде "
+             "top -o cpu или ps aux | grep procs, строка с .termit/procs наверху, kill PID")
+    solution = ("top -o cpu, PID в первой строке; сверка: ps aux | grep procs (в команде "
                 ".termit/procs), kill PID")
-    solution_script = ("kill $(ps aux -r | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
+    solution_script = ("kill $(ps aux | grep \"$TERMIT_BOX/.termit/procs\" | grep -v grep | "
                        "head -1 | awk '{{print $2}}')")
     explain = "top — «Мониторинг системы» в терминале: виден виновник тормозов и его PID."
     spell = "top -o cpu — кто ест процессор (q — выход); top -o mem — память"
