@@ -14,7 +14,7 @@ from termit_app.tasks.base import AnswerTask, Verdict, grep_recursive, grep_wait
 
 EXIT_SHELL = 10
 SERVICE = ("task", "hint", "ans", "reset", "giveup", "skip", "quit", "bug", "loot", "memory", "ask",
-           "keys", "ext", "book", "lesson", "help")
+           "keys", "ext", "book", "lesson", "help", "board")
 
 
 QUIT_HUB = "Назад в убежище."

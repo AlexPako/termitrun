@@ -199,6 +199,30 @@ NEUTRAL = {
 }
 
 
+def find_implant(word: str) -> Optional["Implant"]:
+    """Имплант по id, программе, формуле или имени из темы («zoxide», «z», «Крот»)."""
+    w = word.strip().lower()
+    names = {v.lower(): k for k, v in (text("names") or {}).items()}
+    for imp in CATALOG:
+        if w in (imp.id, imp.binary, imp.formula, (imp.command or "").lower()) or \
+                names.get(w) == imp.id:
+            return imp
+    return None
+
+
+def guide_lines(imp_id: str) -> List[str]:
+    """Руководство к импланту: что делает, как пользоваться, без него, как убрать."""
+    from termit_app import ui
+    rows = (text("guide") or {}).get(imp_id)
+    if not rows:
+        return []
+    name = (text("names") or {}).get(imp_id) or imp_id
+    out = [text("guide_head").format(name=name) if text("guide_head") else name]
+    for para in rows:
+        out += ui.story_fill(para, "   ", "     ").splitlines()
+    return out
+
+
 def text(key: str):
     """Строка (или словарь names/pitch) раздела implants выбранной темы; нет — нейтральная.
     Словари без темы пустые: имя утилиты тогда — её программа."""
@@ -298,6 +322,8 @@ def _install(st: dict, imp: Implant, installer: Optional[Callable], today: date)
     if path:
         st["later"].pop(imp.id, None)
         ui.ok(text("installed").format(binary=imp.binary, path=path))
+        for row in guide_lines(imp.id):     # владелец 25.10: подробно, как пользоваться
+            ui.say(row)
         if imp.shell:
             ui.say(text("shell_hint"))
         return imp.id

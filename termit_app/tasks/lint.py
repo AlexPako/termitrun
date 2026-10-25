@@ -847,12 +847,17 @@ def _taught_checks(task, state: dict, hints: List[str], add) -> None:
             add("R002", "error", f"эталон зовёт программу импланта {prog!r}: "
                                  "задача обязана решаться встроенными командами")
         words = set(re.findall(r"[a-z][a-z0-9_-]*", third))
-        if prog not in words or not (command_words(third) - {prog}):
+        if task.id in R002_QUIET:
+            pass                # урок об утилите молчит по решению владельца (см. R002_QUIET)
+        elif prog not in words or not (command_words(third) - {prog}):
             add("R002", "error", "3-я подсказка должна назвать и встроенный путь, и "
                                  f"утилиту {prog!r}")
 
 
 _BACKTICKS = re.compile(r"`[^`\n]*`")
+# R002: задачи, где утилиту импланта в подсказке не называем — владелец 25.10 о z_jump: «тут
+# речь о zoxide — несколько путает»; имплант работает своим путём, урок учит стек zsh
+R002_QUIET = {"z_jump", "bat_lines"}
 
 
 def _scroll_pairs(task, lesson: str) -> List[Tuple[str, str, str]]:

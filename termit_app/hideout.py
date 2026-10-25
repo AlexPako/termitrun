@@ -1154,7 +1154,16 @@ def _board_rows(text: str) -> List[str]:
     словам, продолжение с отступом (zsh печатает строки над приглашением как есть)."""
     from termit_app import tui
     width = tui.text_width()
-    return [text] if tui.vlen(text) <= width else tui.fill(text, width, "", "  ")
+    if tui.vlen(text) <= width:
+        return [text]
+    rows = tui.fill(text, width, "", "  ")
+    if len(rows) > BOARD_CARD_ROWS:     # владелец 25.10: «не больше 2 строк на одно закреплённое»
+        rows = rows[:BOARD_CARD_ROWS]
+        rows[-1] = tui.trunc(rows[-1], width - 1).rstrip(" …") + "…"
+    return rows
+
+
+BOARD_CARD_ROWS = 2
 
 
 def _free(p: dict) -> int:

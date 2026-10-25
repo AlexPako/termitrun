@@ -1058,9 +1058,7 @@ class BatLines(AnswerTask):
     scroll = ("cat -n FILE — файл FILE с номерами строк (n — number); grep -n WORD FILE — "
               "номера строк, где нашлось слово WORD.\n"
               "sed -n '12p' FILE — только строка 12 (у sed -n — no print: остальные не "
-              "печатать).\n"
-              "Утилита bat, если стоит: bat -n FILE — номера и подсветка, bat -r 12:12 FILE — "
-              "range, только строка 12.")
+              "печатать).")
     variants = (
         Variant("В config.yaml несколько блоков настроек: блок — заголовок без отступа, "
                 "например «{block}:», и строки с отступом под ним. В каждом блоке есть свой "
@@ -1077,8 +1075,7 @@ class BatLines(AnswerTask):
                 hints=("Считать строки глазами не нужно — номера печатает cat -n.",
                        "Одну строку по номеру вырежет sed -n '{n}p': p — напечатать, -n — "
                        "молчать про остальные.",
-                       "sed -n '{n}p' events.log, и ans с этой строкой — утилитой: "
-                       "bat -r {n}:{n} events.log"),
+                       "sed -n '{n}p' events.log, и ans с этой строкой"),
                 solution="sed -n '{n}p' events.log",
                 solution_script="sed -n '{n}p' events.log",
                 implant_script="bat -pp -r {n}:{n} events.log",
@@ -1093,7 +1090,7 @@ class BatLines(AnswerTask):
                        "Имя этой настройки ищи сразу в трёх файлах: grep -n печатает перед "
                        "каждой находкой имя файла и номер строки.",
                        "sed -n '{n}p' {f1}, затем grep -n '^{key} =' {f1} {f2} {f3} — где "
-                       "значение другое, тот файл; утилитой: bat -r {n}:{n} {f1} {f2} {f3}"),
+                       "значение другое, тот файл"),
                 solution="sed -n '{n}p' {f1}; grep -n '^{key} =' {f1} {f2} {f3}",
                 solution_script="grep -lxF \"$(for f in {f1} {f2} {f3}; do sed -n '{n}p' $f; "
                                 "done | sort | uniq -u)\" {f1} {f2} {f3}",
@@ -1101,22 +1098,23 @@ class BatLines(AnswerTask):
                                "uniq -u)\" {f1} {f2} {f3}",
                 wrong=("grep -lxF \"$(for f in {f1} {f2} {f3}; do sed -n '{m}p' $f; done | "
                        "sort | uniq -u)\" {f1} {f2} {f3}",),
-                alternatives=("bat -r {n}:{n} {f1} {f2} {f3} — утилитой bat, если стоит: "
-                              "строка {n} всех трёх файлов разом",)),
+                alternatives=("sed -n '{n}p' {f1}, потом то же для {f2} и {f3} — по файлу "
+                              "за раз, и сравнить глазами",)),
     )
     par = 45
     hints = ("Номера строк печатает cat -n — весь файл с номерами слева.",
              "timeout есть в каждом блоке: найди глазами заголовок {block}: (строка без "
              "отступа) и первый timeout под ним.",
-             "cat -n config.yaml — номер timeout под {block}:, и ans с этим номером; "
-             "утилитой: bat -n config.yaml")
+             "cat -n config.yaml — номер timeout под {block}:, и ans с этим номером")
     solution = "cat -n config.yaml"
     solution_script = ("grep -n -e '^{block}:' -e 'timeout:' config.yaml | grep -A1 '{block}:' "
                        "| tail -1 | cut -d: -f1")
     implant_script = ("bat --decorations=always --color=never -n config.yaml | "
                       "sed -n '/ {block}:/,$p' | grep -m1 'timeout:' | awk '{{print $1}}'")
+    # владелец 25.10: утилиту, которой у игрока нет и которую урок не учит, не называем (bat —
+    # имплант: кто его поставил, получает руководство при установке и по help bat)
     explain = ("Номера строк покажут cat -n, grep -n и less -N, а одну строку по номеру "
-               "выдернет sed -n 'Np'. bat — то же самое, только нагляднее.")
+               "выдернет sed -n 'Np'.")
     spell = "sed -n '12p' FILE — строка номер 12; cat -n — файл с номерами строк"
 
     BLOCKS = ("database", "cache", "queue", "mailer", "search")

@@ -294,7 +294,7 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "flag_use": ("head",),
     "tldr_tar": ("tar", "tldr"),
     "json_check": ("jq",),
-    "bat_lines": ("bat", "sed"),
+    "bat_lines": ("sed",),
     "job_control": ("Ctrl+Z", "fg", "bg", "kill"),
     # «Свалка»
     "open_gui": ("open",),

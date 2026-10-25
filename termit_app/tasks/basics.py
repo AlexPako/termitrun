@@ -2625,22 +2625,22 @@ class ZJump(Task):
               "свежее — сверху). dirs -v — стек с номерами (v — verbose, подробно): 0 — где "
               "стоишь сейчас, 1 — откуда пришёл, дальше — старше. cd ~3 — прыжок в папку номер "
               "3, cd - — на шаг назад.\n"
-              "Вне игры стек включает строка в ~/.zshrc (setopt auto_pushd). Утилита zoxide "
-              "запоминает папки сама: z NAME (кусок имени папки) — и ты там.")
+              "Вне игры стек включает строка в ~/.zshrc (setopt auto_pushd).")
     variants = (
         Variant("Обойди четыре папки по порядку, в каждую — одной командой cd с путём целиком: "
                 "{d1}, {d2}, {d3}, {d4} (Tab допишет путь). Затем вернись в первую из четырёх, "
                 "{d1}, — одной командой короче 15 знаков и без её пути.",
                 wrong=("setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd -",
                        "setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd {d1}"),
-                alternatives=("z {leaf1} — если стоит zoxide: прыжок по куску имени",)),
+                alternatives=("cd ~-1 — то же с другого конца: минус считает от самой старой "
+                              "папки стека (~-0 — откуда ты начал)",)),
         Variant("Маршрут — {d1}, затем {d2}, {d3} и {d4}: заходи по очереди, каждый раз cd и "
                 "полный путь. После четвёртой прыгни обратно во вторую — короткой командой "
                 "(меньше 15 знаков, путь не набирать).",
                 hints=("Каждый cd в этом zsh запоминает, откуда ты ушёл: папки копятся в стеке.",
                        "dirs -v покажет стек с номерами: 0 — где ты сейчас, дальше — от "
                        "свежих к старым.",
-                       "dirs -v, затем cd ~2 — вторая из четырёх; утилитой: z и кусок её имени"),
+                       "dirs -v, затем cd ~2 — вторая из четырёх"),
                 solution="cd {d1}; cd {d2}; cd {d3}; cd {d4}; dirs -v; cd ~2",
                 solution_script="setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd ~2",
                 implant_script=("export _ZO_DATA_DIR=$TERMIT_BOX/.termit/zoxide; mkdir -p "
@@ -2648,15 +2648,15 @@ class ZJump(Task):
                                 "cd {d3}; cd {d4}; z {leaf2}"),
                 wrong=("setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd -",
                        "setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd ~3"),
-                alternatives=("z {leaf2} — если стоит zoxide: прыжок по куску имени",)),
+                alternatives=("cd ~-2 — то же с другого конца: минус считает от самой старой "
+                              "папки стека (~-0 — откуда ты начал)",)),
         Variant("Пройди {d1}, {d2}, {d3} и {d4} — в каждую одной командой cd с полным путём — и "
                 "по дороге набирай ls в каждой, чтобы увидеть, где лежит marker.txt. Закончи "
                 "там, где он лежит, а "
                 "последнюю команду сделай короче 15 знаков и без пути.",
                 hints=("ls в каждой папке покажет, где marker.txt; запомни, которая по счёту.",
                        "dirs -v перечислит пройденные папки с номерами — от свежих к старым.",
-                       "dirs -v, затем cd ~N — N: номер папки с marker.txt; утилитой: z и "
-                       "кусок её имени"),
+                       "dirs -v, затем cd ~N — N: номер папки с marker.txt"),
                 solution="cd {d1}; ls; cd {d2}; ls; cd {d3}; cd {d4}; dirs -v; cd ~{k}",
                 solution_script="setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd ~{k}",
                 implant_script=("export _ZO_DATA_DIR=$TERMIT_BOX/.termit/zoxide; mkdir -p "
@@ -2664,18 +2664,21 @@ class ZJump(Task):
                                 "cd {d3}; cd {d4}; z {leaf}"),
                 wrong=("setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd -",
                        "setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd ~{wk}"),
-                alternatives=("z {leaf} — если стоит zoxide: прыжок по куску имени",)),
+                alternatives=("dirs -v и по номеру — или cd ~-N: тот же стек, но счёт от самой "
+                              "старой папки",)),
     )
     par = 60
     hints = ("Каждый cd в этом zsh запоминает, откуда ты ушёл: папки копятся в стеке.",
              "dirs -v покажет стек с номерами: 0 — где ты сейчас, дальше — от свежих к старым.",
-             "dirs -v, затем cd ~3 — первая из четырёх; утилитой: z и кусок её имени")
+             "dirs -v, затем cd ~3 — первая из четырёх")
     solution = "cd {d1}; cd {d2}; cd {d3}; cd {d4}; dirs -v; cd ~3"
     solution_script = "setopt auto_pushd; cd {d1}; cd {d2}; cd {d3}; cd {d4}; cd ~3"
     implant_script = ("export _ZO_DATA_DIR=$TERMIT_BOX/.termit/zoxide; mkdir -p $_ZO_DATA_DIR; "
                       "eval \"$(zoxide init zsh)\"; cd {d1}; cd {d2}; cd {d3}; cd {d4}; z {leaf1}")
+    # владелец 25.10: «тут речь о zoxide — несколько путает» — урок про стек zsh, утилита не
+    # нужна; имплант zoxide (implant_script) работает своим путём, урок о нём молчит
     explain = ("zsh складывает пройденные папки в стек: dirs -v показывает номера, cd ~N "
-               "прыгает. zoxide помнит частые папки и между сеансами.")
+               "прыгает по номеру.")
     spell = "dirs -v — где я был; cd ~3 — прыжок в папку номер 3 из стека"
 
     AREAS = ("clients", "vault", "depot", "archive", "ledger", "studio")

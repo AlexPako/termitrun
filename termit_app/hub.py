@@ -471,6 +471,10 @@ def help_lines(p: dict, name: str = "", width: Optional[int] = None, dense: bool
     width = width or tui.caps().width
     if name:
         word = find(name.lower())
+        from termit_app import implants
+        imp = implants.find_implant(name) if word is None else None
+        if imp is not None:         # владелец 25.10: о импланте — подробно, как пользоваться
+            return implants.guide_lines(imp.id)
         if word is None:
             book = _book_lines(p, name)
             if book:

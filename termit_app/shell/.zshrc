@@ -199,7 +199,7 @@ if [[ -n $TERMIT_ZOXIDE ]] && (( $+commands[zoxide] )); then
   _tr_zo_on=1
 fi
 
-unalias task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson help 2>/dev/null
+unalias task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson help board 2>/dev/null
 _tr() { "$TERMIT_PY" -I -B -c "$_tr_boot" "$_tr_root" termit_app.hook "$@" }
 task()   { _tr task }
 hint()   { _tr hint }
@@ -290,7 +290,7 @@ if autoload -Uz add-zle-hook-widget 2>/dev/null; then
 fi
 
 # Служебные команды не попадают в историю — иначе !! повторит task.
-typeset -ga _tr_service=(task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson help)
+typeset -ga _tr_service=(task hint ans reset giveup skip quit bug loot memory ask keys ext book lesson help board)
 [[ -n $TERMIT_LINGER ]] && _tr_service+=(next)
 _tr_addhist() {
   local w=${${(z)1}[1]}
@@ -342,24 +342,24 @@ fi
 [[ -n $TERMIT_PROMPT ]] && PROMPT=$TERMIT_PROMPT
 [[ -n $TERMIT_RPROMPT ]] && RPROMPT=$TERMIT_RPROMPT
 PROMPT="%F{yellow}[$TERMIT_LABEL]%f $PROMPT"
-# FB3 (3) + FB5 (8): строки над приглашением — карточки доски убежища (текст задаёт родитель,
-# строк может быть несколько). Текст — только для показа: % ! $ ` \ экранируем, чтобы тема
-# владельца с prompt_subst или prompt_bang не раскрыла в нём ни переменную, ни команду.
-if [[ -n $TERMIT_TIPS ]]; then
-  _tr_tips=${TERMIT_TIPS//\%/%%}
-  [[ -o prompt_bang ]] && _tr_tips=${_tr_tips//\!/!!}
-  if [[ -o prompt_subst ]]; then
-    _tr_tips=${_tr_tips//\\/\\\\}
-    _tr_tips=${_tr_tips//\$/\\\$}
-    _tr_tips=${_tr_tips//\`/\\\`}
-  fi
+# FB3 (3) + FB5 (8): карточки доски убежища (текст задаёт родитель, строк может быть несколько).
+# Владелец 25.10: «выводи её только 1 раз при начале задания либо по команде board — сильно
+# мешает, когда после каждой команды вылезает по 10 строк». Печатаем один раз перед первым
+# приглашением (print -r — текст как есть, ни $, ни ! не раскрываются); board — ещё раз.
+_tr_board() {
+  [[ -n $TERMIT_TIPS ]] || { print -r -- "(доска пуста: приколоть карточку — ./termit home board)"; return 0 }
   if [[ -n $NO_COLOR ]]; then
-    PROMPT="$_tr_tips"$'\n'"$PROMPT"
+    print -r -- "$TERMIT_TIPS"
   else
-    PROMPT="%F{cyan}$_tr_tips%f"$'\n'"$PROMPT"
+    print -r -- $'\e[36m'"$TERMIT_TIPS"$'\e[0m'
   fi
-  unset _tr_tips
-fi
+}
+board() { _tr_board }
+_tr_board_once() {
+  add-zsh-hook -d precmd _tr_board_once
+  [[ -n $TERMIT_TIPS ]] && _tr_board
+}
+autoload -Uz add-zsh-hook 2>/dev/null && add-zsh-hook precmd _tr_board_once
 
 # «Капкан»: поручение само запускает команду (например, vim) при старте.
 if [[ -n $TERMIT_AUTORUN ]]; then
@@ -377,7 +377,7 @@ if [[ -n $TERMIT_HUB ]]; then
   command_not_found_handler() {
     _termit_layout_hint "$1" && return 127
     case $1 in
-      board|callsign|clear|coach|deck|diary|dossier|feedback|fence|grind|home|hub|implants|inbox|info|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|settings|shop|short|sound|stats|story|style|theme|train|update|wheels)
+      callsign|clear|coach|deck|diary|dossier|feedback|fence|grind|home|hub|implants|inbox|info|intro|list|look|map|master|music|new|owl|palette|play|prompt|rehearse|report|run|settings|shop|short|sound|stats|story|style|theme|train|update|wheels)
         print -r -- "$1 — слово убежища. quit — и ты в убежище, там набери $1."
         return 127 ;;
     esac
