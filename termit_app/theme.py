@@ -221,6 +221,12 @@ def reaction(track_key: str, outcome: str, seed: int = 0,
     return pool[seed % len(pool)]
 
 
+def reaction_pool_lines(track_key: str, outcome: str) -> List[str]:
+    """Все строки пула реплик вида outcome (для фильтров вроде ui.boss_safe_reaction)."""
+    val = _plain(_reaction_pool(track_key, outcome))
+    return [val] if isinstance(val, str) else list(val or [])
+
+
 def remember_reaction(track_key: str, avoid, line: str) -> List[str]:
     """Новая память трека после реплики line: на каждый вид — не больше половины его пула
     последних реплик; реплик, которых в теме больше нет, память не держит."""

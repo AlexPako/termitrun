@@ -18,7 +18,7 @@ TIERS = {
     "vim_purge": (0, 1, 1), "job_control": (0, 0, 1), "brew_lesson": (0, 0, 1),
     "tldr_tar": (0, 1, 0), "json_check": (0, 1, 2), "bat_lines": (0, 0, 1),
     # «Вместо Finder»
-    "open_gui": (0, 0, 1), "find_name": (0, 1, 1), "grep_r": (0, 1, 2), "du_heavy": (0, 0, 1),
+    "open_gui": (0, 0, 1), "find_name": (0, 1, 1), "grep_r": (0, 1, 2), "du_heavy": (0, 1, 2),
     "ls_newest": (0, 0, 1), "recent_move": (0, 1, 1), "batch_rename": (0, 1, 1),
     "zip_pack": (0, 1, 1), "pbcopy_list": (0, 0, 1), "kill_frozen": (0, 1, 1),
     "top_hog": (0, 1, 1), "disk_sweep": (0, 2, 1), "dup_sort": (0, 2, 1), "rg_hunt": (0, 1, 2),

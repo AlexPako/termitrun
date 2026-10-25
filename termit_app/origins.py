@@ -300,7 +300,7 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "open_gui": ("open",),
     "path_which": ("which",),      # 24.10: which ушёл из урока brew_lesson
     "grep_r": ("wc",),
-    "du_heavy": ("du", "sort", "head", "tail"),
+    "du_heavy": ("du",),
     "zip_pack": ("zip", "unzip"),
     "pbcopy_list": ("pbcopy", "pbpaste"),
     "kill_frozen": ("kill", "pgrep", "pkill"),
@@ -308,7 +308,8 @@ FIRST_SEEN: Dict[str, Tuple[str, ...]] = {
     "rg_hunt": ("rg", "xargs"),
     "fd_hunt": ("fd",),
     "csv_by_hand": ("tr",),
-    "csv_top": ("cut", "uniq", "awk", "qsv"),
+    "ls_newest": ("head",),
+    "csv_top": ("cut", "uniq", "awk", "qsv", "sort", "tail"),
     "csv_sum": ("duckdb",),
     # «Данные», базы
     "curl_api": ("curl",),

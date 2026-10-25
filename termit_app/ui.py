@@ -614,7 +614,24 @@ def review(task, state, outcome, mine, elapsed, stars_n, record_from,
             say(story_fill(after_fail, "   ", "   "))
     else:
         say("   Задача вернётся завтра.")
+    if task.boss and outcome == "giveup":
+        reaction = boss_safe_reaction(task.track, reaction, state.get("_seed", 0))
     react(task.track, outcome, state.get("_seed", 0), line=reaction)
+
+
+# страж остаётся экзаменом: ни тренировки, ни подсказок даром ему не обещаем (реплики «сдался»
+# общие для трека, а часть их обещает именно это)
+_NOT_FOR_BOSS = ("тренировк", "даром", "бесплатн", "без оплаты")
+
+
+def boss_safe_reaction(track_key: str, line, seed: int):
+    """Реплика «сдался» для стража: обещание тренировки и бесплатных подсказок — неправда,
+    берём другую из того же пула (или молчим)."""
+    if line == "" or (line and not any(w in line.lower() for w in _NOT_FOR_BOSS)):
+        return line
+    pool = theme.reaction_pool_lines(track_key, "giveup")
+    fair = [x for x in pool if not any(w in x.lower() for w in _NOT_FOR_BOSS)]
+    return fair[seed % len(fair)] if fair else ""
 
 
 def react(track_key: str, outcome: str, seed: int, line: str = None) -> None:

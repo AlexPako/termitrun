@@ -401,53 +401,55 @@ class DuHeavy(AnswerTask):
     track = "finder"
     title = "Кто сколько весит"
     kind_answer = "path"
-    scroll = ("du -sh * — сколько весит каждая папка и файл здесь (s — summarize, итогом; h — "
-              "human-readable, в K, M, G). | — труба: отдать напечатанное следующей команде. "
-              "sort -h — по весу, самое тяжёлое последним: du -sh * | sort -h\n"
-              "Имя из последней строки — двойным щелчком, Cmd+C, ans NAME. Второе место — "
-              "предпоследняя строка: du -sh * | sort -h | tail -2 | head -1 (tail -2 — две "
-              "последние строки, head -1 — первая из них).")
+    # владелец 25.10: «не ставь сразу два новых понятия в урок» — здесь одно: du; sort -h и
+    # tail/head убраны, ступень 3 — связка с пройденной маской (* в пути, «Основы»)
+    scroll = ("du -sh * — сколько весит каждая папка и файл здесь (s — summarize, итогом на "
+              "папку; h — human-readable, в K, M, G).\n"
+              "Сравнивай сначала букву, потом число: K < M < G, поэтому 900K меньше 2M. Внутри "
+              "другой папки — du -sh DIR/*. Имя — двойным щелчком, Cmd+C, ans NAME.")
     variants = (
         Variant("Диск трещит по швам. Какая из папок здесь весит больше всех? "
                 "Ответ: ans NAME — имя папки.",
                 wrong=("ls -S | head -1",),
-                alternatives=("du -sh * | sort -h | tail -1 — сразу одна строка",)),
+                alternatives=("du -sh */ — то же, но только папки: / в конце маски берёт одни "
+                              "папки",)),
         Variant("В media/ лежат одни файлы. Какой из них весит больше всех? "
                 "Ответ: ans NAME — имя файла (можно и с media/ впереди).",
                 hints=("Размер файлов тоже показывает du: du -sh media/*",
-                       "Отсортируй с -h: | sort -h. Без -h sort сравнивает буквы, и 900K у него "
-                       "окажется «больше», чем 2M.",
-                       "du -sh media/* | sort -h — самый тяжёлый внизу; сдай ans NAME"),
-                solution="du -sh media/* | sort -h",
+                       "Сравни сначала буквы: K — килобайты, M — мегабайты; 900K меньше 2M.",
+                       "du -sh media/* — самый тяжёлый тот, у кого буква старше, а при равных "
+                       "буквах — число больше; сдай ans NAME"),
+                solution="du -sh media/*",
                 solution_script="du -sk media/* | sort -n | tail -1 | cut -f2",
                 wrong=("du -sh media/* | sort | tail -1 | cut -f2",),
-                alternatives=("ls -lS media — у файлов размер видит и ls: -S сортирует по "
-                              "размеру, тяжёлые сверху",)),
-        Variant("Самую тяжёлую папку здесь уже чистят. Какая папка вторая по весу — тяжелее "
-                "всех, кроме одной? Ответ: ans NAME — имя папки. Две последние строки даёт tail -2, "
-                "а первую из них — head -1",
-                hints=("Размеры папок — du -sh *, по порядку — | sort -h.",
-                       "Самая тяжёлая — последняя строка, вторая — над ней: | tail -2 | head -1",
-                       "du -sh * | sort -h | tail -2 | head -1"),
-                solution="du -sh * | sort -h | tail -2 | head -1",
-                solution_script="du -sk * | sort -n | tail -2 | head -1 | cut -f2",
-                wrong=("du -sk * | sort -n | tail -1 | cut -f2",),
-                alternatives=("du -sh * | sort -rh | head -2 — -r переворачивает порядок: "
-                              "тяжёлые сверху, нужна вторая строка",)),
+                alternatives=("cd media, потом du -sh * — то же изнутри папки",)),
+        Variant("В projects/ у каждого проекта свои папки. Какая папка на втором уровне — внутри "
+                "любого проекта — весит больше всех? Ответ: ans PATH — путь, как его "
+                "напечатает du: projects, проект, папка через /.",
+                hints=("du считает и глубже: маска может стоять в пути не один раз.",
+                       "projects/*/* — все папки на два уровня ниже projects: du -sh projects/*/*",
+                       "du -sh projects/*/* — у самой тяжёлой старшая буква; сдай ans PATH"),
+                solution="du -sh projects/*/*",
+                solution_script="du -sk projects/*/* | sort -n | tail -1 | cut -f2",
+                wrong=("du -sk projects/* | sort -n | tail -1 | cut -f2",),
+                alternatives=("cd projects, потом du -sh */* — то же изнутри",)),
     )
     par = 35
     hints = ("Размер папок показывает du.",
-             "du -sh * — по каждой; отсортировать — | sort -h",
-             "du -sh * | sort -h — самая тяжёлая внизу")
-    solution = "du -sh * | sort -h"
+             "du -sh * — вес каждой; сравни сначала буквы K, M, G, потом числа",
+             "du -sh * — самая тяжёлая та, у кого буква старше; сдай ans NAME")
+    solution = "du -sh *"
     solution_script = "du -sk * | sort -n | tail -1 | cut -f2"
-    explain = "du считает место на диске, sort -h понимает K/M/G — вместе это «что съело диск»."
-    spell = "du -sh * | sort -h — что сколько весит, по возрастанию"
+    explain = ("du считает место на диске; -h пишет его буквами: K — килобайты, M — мегабайты, "
+               "G — гигабайты, поэтому сравнивают сначала букву, потом число.")
+    spell = "du -sh * — что сколько весит (K < M < G)"
     trap_messages = {
-        "crowd": "Тут куча мелких файлов: записей больше всех, а весу мало. ls -S (по размеру) меряет "
-                 "саму запись папки, а не её содержимое — вес считает du.",
-        "text": "Без -h sort сравнивает как текст: 9xxK у него «больше» 2M. Нужен sort -h.",
-        "first": "Это самая тяжёлая, а нужна вторая по весу — строка над ней.",
+        "crowd": "Тут куча мелких файлов: записей больше всех, а весу мало. Вес считает du — "
+                 "сравни буквы K, M, G у каждой папки.",
+        "text": "Сравни буквы: K — килобайты, M — мегабайты. 900K меньше, чем 2M, хоть число и "
+                "больше.",
+        "top": "Это проект целиком, а нужна папка внутри проекта — на уровень глубже: "
+               "du -sh projects/*/*.",
     }
 
     def setup_variant(self, box, rng, variant):
@@ -468,17 +470,22 @@ class DuHeavy(AnswerTask):
                     "traps": [["text", f"media/{trap}"], ["text", trap]]}
         names = rng.sample(kit.LATIN, rng.randint(6, 9))
         if variant == 2:
-            first, second = rng.sample(names, 2)
-            for n in names:
-                if n == first:
-                    sizes = [rng.randint(4_200_000, 5_000_000)]
-                elif n == second:
-                    sizes = [rng.randint(500_000, 800_000) for _ in range(4)]
-                else:
-                    sizes = [rng.randint(10_000, 250_000) for _ in range(rng.randint(1, 4))]
-                for i, s in enumerate(sizes):
-                    kit.write_random(box / n / f"file_{i}.bin", s, rng)
-            return {"answer": second, "traps": [["first", first]]}
+            # три проекта; самый тяжёлый проект — не тот, где самая тяжёлая папка (ловушка top)
+            projects = rng.sample(kit.LATIN, 3)
+            subs = rng.sample(kit.LATIN, 9)
+            heavy_sub = subs[0]
+            heavy_proj, crowd_proj = projects[0], projects[1]
+            for k, proj in enumerate(projects):
+                for sub in subs[3 * k:3 * k + 3]:
+                    d = box / "projects" / proj / sub
+                    if sub == heavy_sub:
+                        kit.write_random(d / "data.bin", rng.randint(2_200_000, 2_800_000), rng)
+                    elif proj == crowd_proj:        # много средних: проект тяжелее, папки — нет
+                        kit.write_random(d / "data.bin", rng.randint(900_000, 1_300_000), rng)
+                    else:
+                        kit.write_random(d / "data.bin", rng.randint(20_000, 300_000), rng)
+            return {"answer": f"projects/{heavy_proj}/{heavy_sub}",
+                    "traps": [["top", f"projects/{crowd_proj}"], ["top", crowd_proj]]}
         heavy = rng.choice(names)
         # толпа мелочи: больше всех записей в каталоге (ls -S), но лёгкая
         crowd = rng.choice([n for n in names if n != heavy])
@@ -522,7 +529,7 @@ class LsNewest(AnswerTask):
                        "ls -tr | head -1 — или сразу ans $(ls -tr | head -1)"),
                 solution="ls -tr | head -1",
                 wrong=("ls -t | head -1",),
-                alternatives=("ls -t | tail -1 — последняя строка списка «свежие сверху»",)),
+                alternatives=("ls -lt — список «свежие сверху», самый старый — последняя строка",)),
         Variant("Какой PDF здесь появился последним? Остальные файлы не в счёт. "
                 "Назови его: ans NAME — имя файла.",
                 hints=("ls можно дать маску: ls *.pdf — только PDF.",

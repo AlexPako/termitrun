@@ -225,7 +225,10 @@ class LessSearch(AnswerTask):
     title = "Иголка в логе"
     scroll = ("less FILE — листать большой файл FILE. Пробел — страница вниз, b — вверх, "
               "/WORD и Enter — поиск, n — следующее, Shift+G — в конец, g — в начало, q — "
-              "выход.")
+              "выход.\n"
+              "Поиск различает регистр: less -i FILE (ignore case, или -i и Enter прямо в less) — "
+              "большие и маленькие буквы равны, пока в поиске нет большой; less -I FILE (IGNORE "
+              "CASE) — равны всегда.")
     variants = (
         Variant("В логе server.log больше {n} строк. В строке с CRITICAL в конце стоит "
                 "число — какое? И какое слово стоит после «Signature:» в самой последней строке? "
