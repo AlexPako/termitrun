@@ -199,6 +199,13 @@ NEUTRAL = {
 }
 
 
+def shown_name(imp: "Implant") -> str:
+    """Владелец 26.10: «сначала имя, а в скобках кличка» — zoxide («Крот»)."""
+    nick = (text("names") or {}).get(imp.id)
+    real = imp.binary if imp.id != "pg" else "PostgreSQL"
+    return f"{real} («{nick}»)" if nick else real
+
+
 def find_implant(word: str) -> Optional["Implant"]:
     """Имплант по id, программе, формуле или имени из темы («zoxide», «z», «Крот»)."""
     w = word.strip().lower()
@@ -216,7 +223,7 @@ def guide_lines(imp_id: str) -> List[str]:
     rows = (text("guide") or {}).get(imp_id)
     if not rows:
         return []
-    name = (text("names") or {}).get(imp_id) or imp_id
+    name = shown_name(get(imp_id))
     out = [text("guide_head").format(name=name) if text("guide_head") else name]
     for para in rows:
         out += ui.story_fill(para, "   ", "     ").splitlines()
@@ -292,7 +299,7 @@ def _ask(ask: Callable, prompt: str) -> str:
 def _card(imp: Implant) -> None:
     """Карточка подарка: имя из темы, что даёт, встроенный двойник, ровно запускаемая команда."""
     from termit_app import ui
-    name = text("names").get(imp.id) or imp.binary
+    name = shown_name(imp)
     ui.say()
     ui.say(ui.story_fill(text("card").format(name=name, what=imp.what, binary=imp.binary),
                          "", "   "))
@@ -424,7 +431,7 @@ def listing(p: dict, today: Optional[date] = None) -> List[str]:
     out = [text("list_title"), ""]
     for imp in CATALOG:
         key, detail = status(p, imp, today)
-        name = text("names").get(imp.id) or imp.binary
+        name = shown_name(imp)
         out.append(f"  {imp.id:<7} {name} — {imp.what}")
         out.append("          " + text("st_" + key).format(path=detail, date=detail))
         out.append("          " + text("builtin_short").format(builtin=imp.builtin))
@@ -728,7 +735,7 @@ def compare(task, p: dict, elapsed: float, cmds: List[str], hints_used: int) -> 
     st["compare"][task.id] = {"twin": imp.twin, "hand": hand, "after": round(now, 1)}
     from termit_app import ui
     return text("compare").format(twin=_twin_title(imp.twin), hand=ui.fmt_time(hand),
-                                  name=text("names").get(imp.id) or imp.binary,
+                                  name=shown_name(imp),
                                   now=ui.fmt_time(now),
                                   ratio=f"{hand / now:.1f}".replace(".", ","))
 
@@ -758,7 +765,7 @@ def _pitch(key: str, task, p: Optional[dict]) -> Optional[str]:
     imp = _pitchable(task, p)
     if imp is None:
         return None
-    return text(key).format(name=text("names").get(imp.id) or imp.binary, binary=imp.binary,
+    return text(key).format(name=shown_name(imp), binary=imp.binary,
                             what=imp.what)
 
 
